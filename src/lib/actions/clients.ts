@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requirePermission } from '@/lib/establishment/permissions'
 import type { ClientType } from '@/lib/types/database'
 
 export async function createClientAction(data: {
@@ -14,20 +15,25 @@ export async function createClientAction(data: {
   type?: ClientType | null
   notes?: string | null
 }) {
-  const supabase = await createClient()
-  const { data: client, error } = await supabase
-    .from('clients')
-    .insert(data)
-    .select()
-    .single()
+  try {
+    const { establishmentId } = await requirePermission('manage_clients')
+    const supabase = await createClient()
+    const { data: client, error } = await supabase
+      .from('clients')
+      .insert({ ...data, establishment_id: establishmentId })
+      .select()
+      .single()
 
-  if (error) {
-    return { error: error.message }
+    if (error) {
+      return { error: error.message }
+    }
+
+    revalidatePath('/clients')
+    revalidatePath('/dashboard')
+    return { data: client }
+  } catch (e) {
+    return { error: (e as Error).message }
   }
-
-  revalidatePath('/clients')
-  revalidatePath('/dashboard')
-  return { data: client }
 }
 
 export async function updateClientAction(id: string, data: {
@@ -40,30 +46,48 @@ export async function updateClientAction(id: string, data: {
   type?: ClientType | null
   notes?: string | null
 }) {
-  const supabase = await createClient()
-  const { error } = await supabase.from('clients').update(data).eq('id', id)
+  try {
+    const { establishmentId } = await requirePermission('manage_clients')
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('clients')
+      .update(data)
+      .eq('id', id)
+      .eq('establishment_id', establishmentId)
 
-  if (error) {
-    return { error: error.message }
+    if (error) {
+      return { error: error.message }
+    }
+
+    revalidatePath('/clients')
+    revalidatePath(`/clients/${id}`)
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
   }
-
-  revalidatePath('/clients')
-  revalidatePath(`/clients/${id}`)
-  return { success: true }
 }
 
 export async function deleteClientAction(id: string) {
-  const supabase = await createClient()
-  const { error } = await supabase.from('clients').delete().eq('id', id)
+  try {
+    const { establishmentId } = await requirePermission('manage_clients')
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('clients')
+      .delete()
+      .eq('id', id)
+      .eq('establishment_id', establishmentId)
 
-  if (error) {
-    if (error.message.includes('violates foreign key') || error.code === '23503') {
-      return { error: 'Impossible de supprimer ce client car il a des documents associes' }
+    if (error) {
+      if (error.message.includes('violates foreign key') || error.code === '23503') {
+        return { error: 'Impossible de supprimer ce client car il a des documents associes' }
+      }
+      return { error: error.message }
     }
-    return { error: error.message }
-  }
 
-  revalidatePath('/clients')
-  revalidatePath('/dashboard')
-  return { success: true }
+    revalidatePath('/clients')
+    revalidatePath('/dashboard')
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
 }

@@ -7,7 +7,13 @@ import { createClient } from '@/lib/supabase/client'
 import { deleteClientAction } from '@/lib/actions/clients'
 import type { Client } from '@/lib/types/database'
 
-export function ClientList({ initialData }: { initialData: Client[] }) {
+interface ClientListProps {
+  initialData: Client[]
+  canEdit: boolean
+  establishmentId: string
+}
+
+export function ClientList({ initialData, canEdit, establishmentId }: ClientListProps) {
   const [clients, setClients] = useState<Client[]>(initialData)
   const [search, setSearch] = useState('')
   const [isPending, startTransition] = useTransition()
@@ -23,6 +29,7 @@ export function ClientList({ initialData }: { initialData: Client[] }) {
     const { data } = await supabase
       .from('clients')
       .select('*')
+      .eq('establishment_id', establishmentId)
       .or(`name.ilike.%${query}%,email.ilike.%${query}%,city.ilike.%${query}%`)
       .order('name')
 
@@ -110,13 +117,15 @@ export function ClientList({ initialData }: { initialData: Client[] }) {
                       >
                         Voir
                       </Link>
-                      <button
-                        onClick={() => handleDelete(client.id, client.name)}
-                        disabled={isPending}
-                        className="px-2 py-1 rounded text-xs font-medium bg-danger/15 text-danger hover:bg-danger/25 transition-colors disabled:opacity-50"
-                      >
-                        Suppr.
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => handleDelete(client.id, client.name)}
+                          disabled={isPending}
+                          className="px-2 py-1 rounded text-xs font-medium bg-danger/15 text-danger hover:bg-danger/25 transition-colors disabled:opacity-50"
+                        >
+                          Suppr.
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

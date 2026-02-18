@@ -7,7 +7,7 @@ export default function NouveauClientPage() {
       <div className="flex items-center gap-4 mb-6">
         <Link
           href="/clients"
-          className="text-muted hover:text-white transition-colors"
+          className="text-muted hover:text-text transition-colors"
         >
           ← Retour
         </Link>

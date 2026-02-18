@@ -1,4 +1,6 @@
 import { formatCurrency } from '@/lib/utils'
+import { DocumentTextIcon, PencilSquareIcon, ReceiptIcon, UsersIcon } from '@/components/icons'
+import type { ComponentType } from 'react'
 
 interface StatsData {
   totalDocuments: number
@@ -9,11 +11,11 @@ interface StatsData {
   totalClients: number
 }
 
-const statConfig = [
-  { key: 'totalDocuments' as const, label: 'Documents', icon: '📄', color: 'from-primary to-secondary' },
-  { key: 'totalDevis' as const, label: 'Devis', icon: '📝', color: 'from-warning to-orange-500' },
-  { key: 'totalFactures' as const, label: 'Factures', icon: '🧾', color: 'from-success to-emerald-500' },
-  { key: 'totalClients' as const, label: 'Clients', icon: '👥', color: 'from-info to-cyan-500' },
+const statConfig: { key: keyof StatsData; label: string; Icon: ComponentType<{ className?: string }> }[] = [
+  { key: 'totalDocuments', label: 'Documents', Icon: DocumentTextIcon },
+  { key: 'totalDevis', label: 'Devis', Icon: PencilSquareIcon },
+  { key: 'totalFactures', label: 'Factures', Icon: ReceiptIcon },
+  { key: 'totalClients', label: 'Clients', Icon: UsersIcon },
 ]
 
 export function StatsCards({ stats }: { stats: StatsData }) {
@@ -22,8 +24,9 @@ export function StatsCards({ stats }: { stats: StatsData }) {
       {statConfig.map((s) => (
         <div key={s.key} className="bg-surface rounded-xl p-5 border border-border hover:glow transition-shadow">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-2xl">{s.icon}</span>
-            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${s.color} opacity-20`} />
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <s.Icon className="w-5 h-5" />
+            </div>
           </div>
           <p className="text-2xl font-bold">{stats[s.key]}</p>
           <p className="text-xs text-muted mt-1">{s.label}</p>

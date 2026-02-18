@@ -7,9 +7,10 @@ import type { Client } from '@/lib/types/database'
 interface ClientSearchProps {
   onSelect: (client: Client | null) => void
   selected: Client | null
+  establishmentId: string
 }
 
-export function ClientSearch({ onSelect, selected }: ClientSearchProps) {
+export function ClientSearch({ onSelect, selected, establishmentId }: ClientSearchProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Client[]>([])
   const [isOpen, setIsOpen] = useState(false)
@@ -28,6 +29,7 @@ export function ClientSearch({ onSelect, selected }: ClientSearchProps) {
       const { data } = await supabase
         .from('clients')
         .select('*')
+        .eq('establishment_id', establishmentId)
         .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
         .limit(5)
 
