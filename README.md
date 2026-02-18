@@ -2,6 +2,8 @@
 
 Application de gestion de factures, devis et clients pour **La Ferme O 4 Vents** (refuge pour animaux).
 
+Multi-etablissement, permissions granulaires, theme clair/sombre.
+
 ---
 
 ## Demarrage rapide
@@ -9,8 +11,7 @@ Application de gestion de factures, devis et clients pour **La Ferme O 4 Vents**
 ### Prerequis
 
 - **Node.js** 18+ installe
-- Un compte **Supabase** avec la base de donnees configuree (tables `clients`, `documents`, `settings`)
-- Un utilisateur cree dans Supabase Auth (email/mot de passe)
+- Un compte **Supabase** avec la base de donnees configuree
 
 ### Installation
 
@@ -21,11 +22,36 @@ npm install
 
 ### Configuration
 
-Le fichier `.env.local` a la racine du projet contient les credentials Supabase :
+Creer un fichier `.env.local` a la racine :
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://votre-projet.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=votre_anon_key
+```
+
+### Base de donnees
+
+Executer les migrations SQL dans l'editeur Supabase :
+
+1. `supabase/migrations/001_initial.sql` — Tables de base (clients, documents)
+2. `supabase/migrations/002_establishments.sql` — Multi-etablissement, permissions, RLS
+
+Creer les buckets de stockage :
+
+```sql
+-- Logos d'etablissements
+INSERT INTO storage.buckets (id, name, public) VALUES ('logos', 'logos', true);
+CREATE POLICY "logos_upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'logos' AND auth.uid() IS NOT NULL);
+CREATE POLICY "logos_update" ON storage.objects FOR UPDATE USING (bucket_id = 'logos' AND auth.uid() IS NOT NULL);
+CREATE POLICY "logos_read" ON storage.objects FOR SELECT USING (bucket_id = 'logos');
+CREATE POLICY "logos_delete" ON storage.objects FOR DELETE USING (bucket_id = 'logos' AND auth.uid() IS NOT NULL);
+
+-- Avatars utilisateurs
+INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true);
+CREATE POLICY "avatars_upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'avatars' AND auth.uid() IS NOT NULL);
+CREATE POLICY "avatars_update" ON storage.objects FOR UPDATE USING (bucket_id = 'avatars' AND auth.uid() IS NOT NULL);
+CREATE POLICY "avatars_read" ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
+CREATE POLICY "avatars_delete" ON storage.objects FOR DELETE USING (bucket_id = 'avatars' AND auth.uid() IS NOT NULL);
 ```
 
 ### Lancer l'application
@@ -34,16 +60,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=votre_anon_key
 npm run dev
 ```
 
-Ouvrir **http://localhost:3000** dans le navigateur.
-
-Se connecter avec l'email et le mot de passe de l'utilisateur Supabase.
-
-### Build de production
-
-```bash
-npm run build
-npm start
-```
+Ouvrir **http://localhost:3000**. A la premiere connexion, l'application redirige vers `/setup` pour creer l'etablissement initial.
 
 ---
 
@@ -51,78 +68,90 @@ npm start
 
 ### Authentification
 
-- Connexion par email/mot de passe via Supabase Auth
+- Connexion par email/mot de passe ou Google OAuth via Supabase Auth
 - Session geree par cookies (compatible Server Components)
 - Middleware de protection : toutes les pages sauf `/login` necessitent une authentification
-- Deconnexion depuis le menu utilisateur en haut a droite
+
+### Multi-etablissement
+
+- Un utilisateur peut appartenir a plusieurs etablissements
+- Switcher d'etablissement dans le sidebar (dropdown)
+- Donnees isolees par etablissement (documents, clients)
+- Cookie httpOnly `current-establishment-id` pour le contexte serveur
+- Page d'onboarding `/setup` pour les nouveaux utilisateurs
+
+### Permissions granulaires
+
+| Role | Description |
+|------|-------------|
+| `admin` | Acces complet a toutes les fonctionnalites |
+| `member` | Acces configurable par permission |
+
+| Permission | Portee |
+|------------|--------|
+| `manage_documents` | Creer, modifier, supprimer des documents |
+| `manage_clients` | Creer, modifier, supprimer des clients |
+| `manage_establishment` | Editer les infos de l'etablissement, gerer les membres |
+
+Securite a 3 niveaux :
+1. **RLS PostgreSQL** — filtrage au niveau de la base
+2. **`requirePermission()`** — verification dans les Server Actions
+3. **UI conditionnelle** — masquage des boutons sans permission
 
 ### Dashboard
 
-- Message d'accueil personnalise selon l'heure (Bonjour / Bon apres-midi / Bonsoir)
-- Statistiques en temps reel :
-  - Nombre total de documents, devis, factures, clients
-  - Chiffre d'affaires (factures payees)
-  - Montant en attente (factures envoyees)
-- Liste des 5 documents les plus recents
+- Statistiques en temps reel (documents, CA paye, montant en attente)
+- 5 documents les plus recents
+- Donnees scopees par etablissement
 
-### Gestion des documents
+### Documents
 
-**Creation** (`/documents/nouveau`) :
-- Choix du type : devis ou facture
-- Recherche client par nom ou email (autocomplete)
-- Saisie du nombre d'adultes + prix unitaire
-- Saisie du nombre d'enfants + prix unitaire
-- Calcul automatique du total en temps reel
-- Champ notes libre
-- Apercu en direct du document (colonne droite)
-- Numerotation automatique : `D-2026-001` pour les devis, `F-2026-001` pour les factures
+- Types : devis, facture, avoir
+- Numerotation automatique scopee par etablissement (`D-2026-001`, `F-2026-001`, `A-2026-001`)
+- Recherche client par autocomplete
+- Calcul automatique du total (adultes + enfants)
+- Apercu en direct du document
+- Changement de statut (brouillon, envoye, paye, annule)
+- Conversion devis vers facture
+- Annulation de facture avec creation d'avoir
+- Generation PDF avec logo et infos de l'etablissement
 
-**Liste** (`/documents`) :
-- Tableau avec colonnes : Type, Numero, Date, Client, Total, Statut, Actions
-- Filtres par type (devis/facture) et par statut (brouillon/envoye/paye/annule)
-- Changement de statut directement depuis le tableau
-- Actions par document :
-  - **PDF** : genere et ouvre le PDF dans un nouvel onglet
-  - **Convertir** : transforme un devis en facture (copie toutes les donnees, nouveau numero)
-  - **Supprimer** : suppression avec confirmation
+### Clients
 
-**Conversion devis vers facture** :
-- Cree une nouvelle facture avec un numero `F-YYYY-XXX`
-- Copie toutes les donnees du devis (client, montants, notes)
-- Etablit le lien entre le devis et la facture (`converted_from_id` / `converted_to_id`)
-- Le bouton "Convertir" disparait une fois le devis converti
-
-### Gestion des clients
-
-**Liste** (`/clients`) :
-- Tableau avec colonnes : Nom, Email, Telephone, Ville, Type, Actions
-- Recherche en temps reel par nom, email ou ville
-- Actions : voir la fiche detail, supprimer
-
-**Creation** (`/clients/nouveau`) :
-- Formulaire : nom (obligatoire), email, telephone, adresse, code postal, ville, type (particulier/organisation), notes
-
-**Fiche client** (`/clients/[id]`) :
-- Informations de contact completes
-- Statistiques : nombre de documents, chiffre d'affaires paye
-- Historique complet des documents lies a ce client
-- Formulaire de modification (accordeon)
-
-**Protection** :
-- Un client avec des documents associes ne peut pas etre supprime (contrainte de cle etrangere)
+- Fiche client avec informations de contact
+- Statistiques par client (documents, CA)
+- Historique des documents lies
+- Recherche en temps reel
+- Protection contre la suppression si documents lies
 
 ### Generation PDF
 
 - Route API : `GET /api/pdf/[documentId]`
-- Template HTML fidele au design violet/gradient de la Ferme O 4 Vents :
-  - En-tete avec gradient violet (#667eea vers #764ba2) et logo emoji
-  - Sections informations document et client
-  - Tableau des prestations (adultes/enfants)
-  - Section total avec mention "TVA non applicable - Article 293 B du CGI"
-  - Notes conditionnelles
-  - Pied de page avec coordonnees
-- Generation via Puppeteer (rendu pixel-perfect du HTML/CSS)
-- Le PDF s'ouvre dans un nouvel onglet du navigateur
+- Logo dynamique de l'etablissement (fetch + conversion base64)
+- Infos entreprise depuis la table `establishments`
+- Generation via Puppeteer
+
+### Gestion de l'etablissement (`/etablissement`)
+
+- Edition des informations (nom, raison sociale, email, tel, adresse, IBAN, BIC)
+- Upload du logo (Supabase Storage, bucket `logos`)
+- Gestion des membres : ajout par email, toggles de permissions, suppression
+- Accessible uniquement aux admins et membres avec `manage_establishment`
+
+### Compte utilisateur (`/compte`)
+
+- Upload d'avatar (Supabase Storage, bucket `avatars`)
+- Modification du nom
+- Changement d'email (avec confirmation par mail)
+- Changement de mot de passe (verification de l'ancien)
+- Avatar affiche dans le header
+
+### Theme
+
+- Mode clair et mode sombre
+- Toggle accessible depuis le header
+- Persistance dans localStorage
+- Variables CSS pour les deux themes
 
 ---
 
@@ -134,8 +163,8 @@ npm start
 |-------------|------|
 | Next.js 16 (App Router) | Framework fullstack |
 | TypeScript | Typage |
-| Tailwind CSS v4 | Styles |
-| Supabase | Base de donnees PostgreSQL, authentification, RLS |
+| Tailwind CSS v4 | Styles avec variables CSS `@theme` |
+| Supabase | PostgreSQL, Auth, Storage, RLS |
 | Puppeteer | Generation PDF cote serveur |
 | Sonner | Notifications toast |
 
@@ -143,164 +172,165 @@ npm start
 
 ```
 crm-ferme/
-├── middleware.ts                     # Garde d'authentification
-├── .env.local                        # Variables d'environnement Supabase
+├── middleware.ts
+├── next.config.ts
+├── .env.local
+│
+├── supabase/
+│   └── migrations/
+│       ├── 001_initial.sql
+│       └── 002_establishments.sql
 │
 └── src/
     ├── app/
-    │   ├── layout.tsx                # Layout racine (font Inter, Toaster)
-    │   ├── globals.css               # Theme dark + utilitaires CSS
-    │   ├── page.tsx                  # Redirection vers /dashboard
-    │   ├── login/page.tsx            # Page de connexion
+    │   ├── layout.tsx                    # Layout racine + ThemeProvider
+    │   ├── globals.css                   # Variables theme light/dark
+    │   ├── page.tsx                      # Redirect → /dashboard
+    │   ├── login/page.tsx                # Connexion (email + Google)
     │   │
-    │   ├── (app)/                    # Groupe de routes authentifiees
-    │   │   ├── layout.tsx            # Layout avec sidebar + header
-    │   │   ├── dashboard/page.tsx    # Dashboard statistiques
+    │   ├── setup/page.tsx                # Onboarding (1er etablissement)
+    │   │
+    │   ├── (app)/                        # Routes authentifiees
+    │   │   ├── layout.tsx                # Sidebar + Header + contexte etablissement
+    │   │   ├── dashboard/page.tsx
     │   │   ├── documents/
-    │   │   │   ├── page.tsx          # Liste des documents
-    │   │   │   └── nouveau/page.tsx  # Creation de document
-    │   │   └── clients/
-    │   │       ├── page.tsx          # Liste des clients
-    │   │       ├── nouveau/page.tsx  # Creation de client
-    │   │       └── [id]/page.tsx     # Fiche client
+    │   │   │   ├── page.tsx
+    │   │   │   ├── nouveau/page.tsx
+    │   │   │   └── [id]/edit/page.tsx
+    │   │   ├── clients/
+    │   │   │   ├── page.tsx
+    │   │   │   ├── nouveau/page.tsx
+    │   │   │   └── [id]/page.tsx
+    │   │   ├── etablissement/page.tsx    # Admin etablissement
+    │   │   └── compte/page.tsx           # Compte utilisateur
     │   │
-    │   └── api/pdf/[documentId]/
-    │       └── route.ts              # API generation PDF
+    │   ├── api/pdf/[documentId]/route.ts
+    │   └── auth/callback/route.ts        # Callback OAuth
     │
     ├── lib/
     │   ├── supabase/
-    │   │   ├── client.ts             # Client Supabase navigateur
-    │   │   ├── server.ts             # Client Supabase serveur
-    │   │   └── middleware.ts         # Client Supabase middleware
+    │   │   ├── client.ts                 # Client navigateur
+    │   │   ├── server.ts                 # Client serveur
+    │   │   └── middleware.ts
+    │   ├── establishment/
+    │   │   ├── context.ts                # getEstablishmentContext(), getUserEstablishments()
+    │   │   └── permissions.ts            # requirePermission(), requireEstablishment()
     │   ├── actions/
-    │   │   ├── documents.ts          # Server Actions documents
-    │   │   └── clients.ts            # Server Actions clients
-    │   ├── pdf/template.ts           # Template HTML pour les PDFs
-    │   ├── types/database.ts         # Types TypeScript
-    │   └── utils.ts                  # Fonctions utilitaires
+    │   │   ├── documents.ts              # CRUD documents (scoped)
+    │   │   ├── clients.ts                # CRUD clients (scoped)
+    │   │   ├── establishments.ts         # CRUD etablissement + membres
+    │   │   ├── switch-establishment.ts   # Changement d'etablissement (cookie)
+    │   │   └── account.ts                # Profil, email, mot de passe
+    │   ├── pdf/
+    │   │   └── template.ts               # Template HTML PDF
+    │   ├── types/database.ts             # Types TypeScript
+    │   └── utils.ts
     │
     └── components/
+        ├── theme-provider.tsx
+        ├── icons.tsx
         ├── layout/
-        │   ├── sidebar.tsx           # Navigation laterale
-        │   └── header.tsx            # Barre superieure + menu utilisateur
+        │   ├── sidebar.tsx               # Navigation + switcher etablissement
+        │   ├── header.tsx                # Header + menu user + nav mobile
+        │   └── main-content.tsx
         ├── dashboard/
-        │   ├── stats-cards.tsx       # Cartes de statistiques
-        │   └── welcome-banner.tsx    # Banniere d'accueil
+        │   ├── stats-cards.tsx
+        │   └── welcome-banner.tsx
         ├── documents/
-        │   ├── document-list.tsx     # Tableau + filtres
-        │   ├── document-form.tsx     # Formulaire + apercu
-        │   └── status-badge.tsx      # Badges type/statut
-        └── clients/
-            ├── client-list.tsx       # Tableau + recherche
-            ├── client-form.tsx       # Formulaire creation/edition
-            └── client-search.tsx     # Autocomplete recherche
+        │   ├── document-list.tsx
+        │   ├── document-form.tsx
+        │   └── status-badge.tsx
+        ├── clients/
+        │   ├── client-list.tsx
+        │   ├── client-form.tsx
+        │   └── client-search.tsx
+        ├── establishment/
+        │   ├── establishment-switcher.tsx
+        │   ├── establishment-form.tsx
+        │   ├── logo-upload.tsx
+        │   ├── members-list.tsx
+        │   ├── add-member-form.tsx
+        │   └── setup-form.tsx
+        └── account/
+            ├── account-form.tsx
+            ├── avatar-upload.tsx
+            └── password-form.tsx
 ```
+
+### Base de donnees
+
+| Table | Description |
+|-------|-------------|
+| `establishments` | Etablissements (nom, adresse, IBAN, BIC, logo_url, etc.) |
+| `establishment_members` | Liens utilisateur-etablissement avec role et permissions |
+| `documents` | Documents scopes par `establishment_id` |
+| `clients` | Clients scopes par `establishment_id` |
+
+| Fonction PostgreSQL | Description |
+|---------------------|-------------|
+| `get_next_document_number(type, est_id)` | Numero suivant scope par etablissement |
+| `user_establishment_ids()` | `SECURITY DEFINER` — IDs d'etablissements de l'utilisateur (evite les references circulaires RLS) |
+| `get_user_id_by_email(email)` | `SECURITY DEFINER` — Lookup utilisateur pour ajout de membres |
+
+| Bucket Storage | Contenu |
+|----------------|---------|
+| `logos` | Logos d'etablissements |
+| `avatars` | Avatars utilisateurs |
 
 ### Flux d'authentification
 
 ```
 Utilisateur → Page quelconque
        ↓
-  middleware.ts
+  middleware.ts → Supabase getUser()
        ↓
-  Supabase: getUser() (verifie le JWT dans les cookies)
+  Non authentifie?  →  Redirect /login
+  Authentifie?      →  (app)/layout.tsx
        ↓
-  Non authentifie?  →  Redirection /login
-  Authentifie?      →  Page demandee
+  getUserEstablishments()
+       ↓
+  0 etablissements?  →  Redirect /setup
+  >= 1?              →  getEstablishmentContext() → Page demandee
 ```
-
-1. L'utilisateur accede a n'importe quelle page
-2. Le middleware intercepte la requete
-3. Supabase verifie le token JWT dans les cookies
-4. Si non authentifie : redirection vers `/login`
-5. Si authentifie et sur `/login` : redirection vers `/dashboard`
-6. La connexion utilise `signInWithPassword()` de Supabase Auth
-7. Les cookies de session sont geres automatiquement par `@supabase/ssr`
 
 ### Server Actions
 
-Les mutations (creation, modification, suppression) passent par des **Server Actions** Next.js :
-
-| Action | Fichier | Description |
-|--------|---------|-------------|
-| `createDocument()` | `actions/documents.ts` | Appelle `rpc('get_next_document_number')` puis insere le document |
-| `deleteDocument()` | `actions/documents.ts` | Supprime un document par ID |
-| `convertDevisToFacture()` | `actions/documents.ts` | Cree une facture a partir d'un devis, etablit les liens |
-| `updateDocumentStatus()` | `actions/documents.ts` | Change le statut (brouillon/envoye/paye/annule) |
-| `createClientAction()` | `actions/clients.ts` | Cree un nouveau client |
-| `updateClientAction()` | `actions/clients.ts` | Modifie un client existant |
-| `deleteClientAction()` | `actions/clients.ts` | Supprime un client (echoue si documents lies) |
-
-Chaque action appelle `revalidatePath()` pour rafraichir les donnees cote serveur.
-
-### Base de donnees Supabase
-
-**Tables** :
-
-| Table | Description |
-|-------|-------------|
-| `clients` | id, name, email, phone, address, postal_code, city, type, notes |
-| `documents` | id, type, numero, date, client_id, client_name (snapshot), nb_adultes, prix_adulte, nb_enfants, prix_enfant, total, notes, status, converted_from_id, converted_to_id, pdf_url |
-| `settings` | key, value (JSONB) — compteurs de numerotation et infos entreprise |
-
-**Fonction PostgreSQL** :
-- `get_next_document_number(doc_type)` : retourne le prochain numero (`F-2026-001` ou `D-2026-001`), incremente le compteur dans `settings`, gere le changement d'annee automatiquement
-
-**RLS (Row Level Security)** :
-- Toutes les tables sont protegees
-- Seuls les utilisateurs authentifies ont acces en lecture et ecriture
-
-### Theme et design
-
-| Element | Valeur |
-|---------|--------|
-| Mode | Dark par defaut |
-| Couleur primaire | `#6366f1` (indigo) |
-| Couleur secondaire | `#8b5cf6` (violet) |
-| Couleur accent | `#ec4899` (rose) |
-| Fond principal | `#0f172a` |
-| Fond cartes | `#1e293b` |
-| Fond survol | `#334155` |
-| Police | Inter |
-
-Effets : ombres luminescentes (glow), transitions fluides, animations fadeUp, badges colores par statut.
-
-Responsive : sidebar masquee sur mobile avec navigation hamburger.
+| Action | Fichier | Permission requise |
+|--------|---------|--------------------|
+| `createDocument()` | `actions/documents.ts` | `manage_documents` |
+| `updateDocument()` | `actions/documents.ts` | `manage_documents` |
+| `deleteDocument()` | `actions/documents.ts` | `manage_documents` |
+| `convertDevisToFacture()` | `actions/documents.ts` | `manage_documents` |
+| `cancelFactureWithAvoir()` | `actions/documents.ts` | `manage_documents` |
+| `createClientAction()` | `actions/clients.ts` | `manage_clients` |
+| `updateClientAction()` | `actions/clients.ts` | `manage_clients` |
+| `deleteClientAction()` | `actions/clients.ts` | `manage_clients` |
+| `updateEstablishment()` | `actions/establishments.ts` | `manage_establishment` |
+| `addMember()` | `actions/establishments.ts` | `manage_establishment` |
+| `updateMemberPermissions()` | `actions/establishments.ts` | `manage_establishment` |
+| `removeMember()` | `actions/establishments.ts` | `manage_establishment` |
+| `updateProfile()` | `actions/account.ts` | Authentifie |
+| `updateEmail()` | `actions/account.ts` | Authentifie |
+| `updatePassword()` | `actions/account.ts` | Authentifie |
 
 ---
 
-## Schema de la base de donnees
+## Pages
 
-Pour initialiser la base Supabase, executer le script SQL :
-
-```
-ferme-factures/database/supabase-schema.sql
-```
-
-Ce script cree :
-- Les 3 tables (clients, documents, settings)
-- Les index de performance
-- La fonction `get_next_document_number()`
-- Les triggers `updated_at`
-- Les policies RLS
-- Les vues `documents_with_client` et `stats_overview`
-- Des donnees de test (3 clients)
-
----
-
-## Pages de l'application
-
-| URL | Page | Type |
-|-----|------|------|
-| `/` | Redirection vers `/dashboard` | Statique |
-| `/login` | Connexion | Client Component |
-| `/dashboard` | Dashboard avec statistiques | Server Component |
-| `/documents` | Liste des documents | Server + Client |
-| `/documents/nouveau` | Formulaire de creation | Client Component |
-| `/clients` | Liste des clients | Server + Client |
-| `/clients/nouveau` | Formulaire de creation client | Client Component |
-| `/clients/[id]` | Fiche client detaillee | Server Component |
-| `/api/pdf/[id]` | Generation PDF | API Route |
+| URL | Description | Acces |
+|-----|-------------|-------|
+| `/login` | Connexion email/mdp + Google | Public |
+| `/setup` | Creation du premier etablissement | Authentifie, sans etablissement |
+| `/dashboard` | Statistiques et documents recents | Membre |
+| `/documents` | Liste des documents | Membre |
+| `/documents/nouveau` | Creer un document | `manage_documents` |
+| `/documents/[id]/edit` | Modifier un document | `manage_documents` |
+| `/clients` | Liste des clients | Membre |
+| `/clients/nouveau` | Creer un client | `manage_clients` |
+| `/clients/[id]` | Fiche client | Membre |
+| `/etablissement` | Admin etablissement + membres | `manage_establishment` |
+| `/compte` | Profil, avatar, email, mot de passe | Authentifie |
+| `/api/pdf/[id]` | Generation PDF | Authentifie |
 
 ---
 
@@ -308,7 +338,7 @@ Ce script cree :
 
 | Commande | Description |
 |----------|-------------|
-| `npm run dev` | Lancer en mode developpement (http://localhost:3000) |
-| `npm run build` | Compiler pour la production |
-| `npm start` | Lancer le build de production |
+| `npm run dev` | Mode developpement (http://localhost:3000) |
+| `npm run build` | Build de production |
+| `npm start` | Lancer le build |
 | `npm run lint` | Verifier le code avec ESLint |
