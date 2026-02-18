@@ -30,16 +30,17 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install Google Chrome Stable — apt resolves ALL dependencies automatically
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget \
-    gnupg \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/googlechrome-linux-keyring.gpg \
+# Install prerequisites for adding Google's repo
+RUN apt-get update && apt-get install -y --no-install-recommends wget gnupg ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Google Chrome repo and install Chrome Stable
+RUN wget -q -O /tmp/google.pub https://dl-ssl.google.com/linux/linux_signing_key.pub \
+    && gpg --dearmor -o /usr/share/keyrings/googlechrome-linux-keyring.gpg /tmp/google.pub \
+    && rm /tmp/google.pub \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/googlechrome-linux-keyring.gpg] https://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends \
-    google-chrome-stable \
-    fonts-liberation \
+    && apt-get install -y --no-install-recommends google-chrome-stable fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
