@@ -2,8 +2,8 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Skip Puppeteer's bundled Chromium download
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+# Skip Chrome download during npm ci (we install it in runner stage)
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 COPY package.json package-lock.json* ./
 RUN npm ci
@@ -21,7 +21,7 @@ ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 RUN npm run build
 
@@ -31,39 +31,47 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PUPPETEER_CACHE_DIR=/app/.cache/puppeteer
 
-# Install Chromium and dependencies for Puppeteer
+# Install system dependencies required by Chrome for Testing
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium \
+    ca-certificates \
     fonts-liberation \
+    libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
     libcups2 \
+    libdbus-1-3 \
     libdrm2 \
     libgbm1 \
+    libnspr4 \
     libnss3 \
+    libx11-xcb1 \
     libxcomposite1 \
     libxdamage1 \
+    libxfixes3 \
+    libxkbcommon0 \
     libxrandr2 \
+    libxshmfence1 \
+    wget \
     && rm -rf /var/lib/apt/lists/*
-
-# Tell Puppeteer where Chromium is
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-
-# Neutralize chrome_crashpad_handler (causes "—database is required" in containers)
-RUN find /usr -name "chrome_crashpad_handler" -exec ln -sf /bin/true {} \; 2>/dev/null || true
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
+# Copy node_modules (needed for puppeteer CLI)
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+
+# Install Chrome for Testing via Puppeteer (exact compatible version)
+RUN npx puppeteer browsers install chrome && \
+    chown -R nextjs:nodejs /app/.cache
+
 # Copy standalone build
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-# Copy full node_modules for puppeteer and all its transitive deps
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 USER nextjs
 
