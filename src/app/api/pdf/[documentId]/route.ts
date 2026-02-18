@@ -79,7 +79,14 @@ export async function GET(
     const puppeteer = await import('puppeteer')
     const browser = await puppeteer.default.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-crash-reporter',
+        '--crash-dumps-dir=/tmp',
+      ],
       ...(process.env.PUPPETEER_EXECUTABLE_PATH && {
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
       }),
