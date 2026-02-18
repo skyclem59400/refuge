@@ -30,10 +30,14 @@ export function getStatusLabel(status: string): string {
     sent: 'Envoyé',
     paid: 'Payé',
     cancelled: 'Annulé',
+    converted: 'Converti',
+    validated: 'Validée',
   }
   return labels[status] || status
 }
 
 export function getTypeLabel(type: string): string {
-  return type === 'facture' ? 'Facture' : 'Devis'
+  if (type === 'facture') return 'Facture'
+  if (type === 'avoir') return 'Avoir'
+  return 'Devis'
 }
