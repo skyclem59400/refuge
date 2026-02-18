@@ -79,7 +79,13 @@ export async function GET(
     const puppeteer = await import('puppeteer')
     const browser = await puppeteer.default.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--user-data-dir=/tmp/chrome-data',
+      ],
     })
 
     const page = await browser.newPage()

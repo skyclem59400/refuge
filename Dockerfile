@@ -26,38 +26,16 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true
 RUN npm run build
 
 # === Stage 3: Production ===
-FROM node:20-slim AS runner
+FROM node:20 AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PUPPETEER_CACHE_DIR=/app/.cache/puppeteer
 
-# Install system dependencies required by Chrome for Testing
+# Install fonts
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
     fonts-liberation \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libcairo2 \
-    libcups2 \
-    libdbus-1-3 \
-    libdrm2 \
-    libgbm1 \
-    libglib2.0-0 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libpango-1.0-0 \
-    libx11-xcb1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxkbcommon0 \
-    libxrandr2 \
-    libxshmfence1 \
-    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -70,7 +48,6 @@ COPY --from=builder /app/package.json ./
 
 # Install Chrome for Testing via Puppeteer (exact compatible version)
 RUN npx puppeteer browsers install chrome && \
-    find /app/.cache -name "chrome_crashpad_handler" -exec ln -sf /bin/true {} \; && \
     chown -R nextjs:nodejs /app/.cache
 
 # Copy standalone build
