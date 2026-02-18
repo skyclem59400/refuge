@@ -197,9 +197,31 @@ export async function getEstablishmentMembers() {
 
     if (error) return { error: error.message }
 
-    // Enrich with emails via RPC (we can't query auth.users directly)
-    // Instead, we store it simply — the admin sees emails when they add members
-    return { data: (members as EstablishmentMember[]) || [] }
+    const typedMembers = (members as EstablishmentMember[]) || []
+
+    // Enrich with user info (email, name, avatar) via SECURITY DEFINER RPC
+    if (typedMembers.length > 0) {
+      const userIds = typedMembers.map(m => m.user_id)
+      const { data: usersInfo } = await supabase.rpc('get_users_info', {
+        user_ids: userIds,
+      })
+
+      if (usersInfo && Array.isArray(usersInfo)) {
+        const userMap = new Map(
+          usersInfo.map((u: { id: string; email: string; full_name: string | null; avatar_url: string | null }) => [u.id, u])
+        )
+        for (const member of typedMembers) {
+          const info = userMap.get(member.user_id)
+          if (info) {
+            member.email = info.email
+            member.full_name = info.full_name
+            member.avatar_url = info.avatar_url
+          }
+        }
+      }
+    }
+
+    return { data: typedMembers }
   } catch (e) {
     return { error: (e as Error).message }
   }

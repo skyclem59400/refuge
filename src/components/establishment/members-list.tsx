@@ -88,12 +88,17 @@ export function MembersList({ members, currentUserId }: MembersListProps) {
               <tr key={member.id} className="hover:bg-surface-hover/30 transition-colors">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
-                      {(member.email || '?')[0].toUpperCase()}
-                    </div>
+                    {member.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={member.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
+                        {(member.full_name || member.email || '?')[0].toUpperCase()}
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">
-                        {member.email || member.user_id.slice(0, 8)}
+                        {member.full_name || member.email || member.user_id.slice(0, 8)}
                         {isCurrentUser && <span className="text-muted text-xs ml-1">(vous)</span>}
                       </p>
                       <p className="text-xs text-muted">
@@ -101,6 +106,9 @@ export function MembersList({ members, currentUserId }: MembersListProps) {
                           <span className="text-primary font-medium">Admin</span>
                         ) : (
                           'Membre'
+                        )}
+                        {member.email && member.full_name && (
+                          <span className="ml-1">· {member.email}</span>
                         )}
                       </p>
                     </div>

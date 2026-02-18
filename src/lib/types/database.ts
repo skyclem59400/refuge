@@ -81,7 +81,10 @@ export interface EstablishmentMember {
   manage_establishment: boolean
   created_at: string
   updated_at: string
+  // Enriched from auth.users via RPC
   email?: string
+  full_name?: string | null
+  avatar_url?: string | null
 }
 
 export interface Permissions {
