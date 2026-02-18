@@ -57,6 +57,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Copy full node_modules for puppeteer and all its transitive deps
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
+ENV HOME=/tmp
 USER nextjs
 
 EXPOSE 3000

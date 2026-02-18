@@ -85,6 +85,7 @@ export async function GET(
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
+        '--user-data-dir=/tmp/chrome-data',
       ],
     })
 
