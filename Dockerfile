@@ -70,6 +70,7 @@ COPY --from=builder /app/package.json ./
 
 # Install Chrome for Testing via Puppeteer (exact compatible version)
 RUN npx puppeteer browsers install chrome && \
+    find /app/.cache -name "chrome_crashpad_handler" -exec ln -sf /bin/true {} \; && \
     chown -R nextjs:nodejs /app/.cache
 
 # Copy standalone build
