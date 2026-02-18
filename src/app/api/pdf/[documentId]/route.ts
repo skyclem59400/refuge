@@ -79,12 +79,12 @@ export async function GET(
     const puppeteer = await import('puppeteer')
     const browser = await puppeteer.default.launch({
       headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--user-data-dir=/tmp/chrome-data',
       ],
     })
 

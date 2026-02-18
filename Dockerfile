@@ -2,7 +2,6 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Skip Chrome download during npm ci (we install it in runner stage)
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 COPY package.json package-lock.json* ./
@@ -15,7 +14,6 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build args for Next.js public env vars (needed at build time)
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -26,34 +24,37 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true
 RUN npm run build
 
 # === Stage 3: Production ===
-FROM node:20 AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PUPPETEER_CACHE_DIR=/app/.cache/puppeteer
 
-# Install fonts
+# Install Google Chrome Stable — apt resolves ALL dependencies automatically
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    gnupg \
+    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/googlechrome-linux-keyring.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/googlechrome-linux-keyring.gpg] https://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+    google-chrome-stable \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
+
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy node_modules (needed for puppeteer CLI)
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./
-
-# Install Chrome for Testing via Puppeteer (exact compatible version)
-RUN npx puppeteer browsers install chrome && \
-    chown -R nextjs:nodejs /app/.cache
-
 # Copy standalone build
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy full node_modules for puppeteer and all its transitive deps
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 USER nextjs
 
