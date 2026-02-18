@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getEstablishmentContext } from '@/lib/establishment/context'
 import { ClientForm } from '@/components/clients/client-form'
 import { TypeBadge, StatusBadge } from '@/components/documents/status-badge'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
@@ -9,13 +10,16 @@ import type { Client, Document } from '@/lib/types/database'
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
+  const ctx = await getEstablishmentContext()
+  const estabId = ctx!.establishment.id
 
   const [{ data: client }, { data: documents }] = await Promise.all([
-    supabase.from('clients').select('*').eq('id', id).single(),
+    supabase.from('clients').select('*').eq('id', id).eq('establishment_id', estabId).single(),
     supabase
       .from('documents')
       .select('*')
       .eq('client_id', id)
+      .eq('establishment_id', estabId)
       .order('created_at', { ascending: false }),
   ])
 
@@ -27,11 +31,13 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     .filter((d) => d.type === 'facture' && d.status === 'paid')
     .reduce((sum, d) => sum + d.total, 0)
 
+  const canEditClients = ctx!.permissions.canManageClients
+
   return (
     <div className="animate-fade-up">
       <div className="flex items-center gap-4 mb-6">
-        <Link href="/clients" className="text-muted hover:text-white transition-colors">
-          ← Retour
+        <Link href="/clients" className="text-muted hover:text-text transition-colors">
+          &larr; Retour
         </Link>
         <div>
           <h1 className="text-2xl font-bold">{typedClient.name}</h1>
@@ -64,20 +70,20 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
             <div className="space-y-2 text-sm">
               {typedClient.email && (
-                <p className="text-muted">📧 {typedClient.email}</p>
+                <p className="text-muted">{typedClient.email}</p>
               )}
               {typedClient.phone && (
-                <p className="text-muted">📞 {typedClient.phone}</p>
+                <p className="text-muted">{typedClient.phone}</p>
               )}
               {typedClient.address && (
                 <p className="text-muted">
-                  📍 {typedClient.address}<br />
+                  {typedClient.address}<br />
                   {typedClient.postal_code} {typedClient.city}
                 </p>
               )}
               {typedClient.notes && (
                 <p className="text-muted mt-3 p-2 bg-surface-dark rounded-lg text-xs">
-                  📝 {typedClient.notes}
+                  {typedClient.notes}
                 </p>
               )}
             </div>
@@ -95,15 +101,17 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             </div>
           </div>
 
-          {/* Edit form */}
-          <details className="bg-surface rounded-xl border border-border">
-            <summary className="p-4 cursor-pointer text-sm font-medium text-muted hover:text-white transition-colors">
-              Modifier le client
-            </summary>
-            <div className="px-4 pb-4">
-              <ClientForm client={typedClient} />
-            </div>
-          </details>
+          {/* Edit form — only if can edit */}
+          {canEditClients && (
+            <details className="bg-surface rounded-xl border border-border">
+              <summary className="p-4 cursor-pointer text-sm font-medium text-muted hover:text-text transition-colors">
+                Modifier le client
+              </summary>
+              <div className="px-4 pb-4">
+                <ClientForm client={typedClient} />
+              </div>
+            </details>
+          )}
         </div>
 
         {/* Documents */}

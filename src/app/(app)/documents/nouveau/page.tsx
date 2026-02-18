@@ -1,15 +1,18 @@
 import Link from 'next/link'
+import { getEstablishmentContext } from '@/lib/establishment/context'
 import { DocumentForm } from '@/components/documents/document-form'
 
-export default function NouveauDocumentPage() {
+export default async function NouveauDocumentPage() {
+  const ctx = await getEstablishmentContext()
+
   return (
     <div className="animate-fade-up">
       <div className="flex items-center gap-4 mb-6">
         <Link
           href="/documents"
-          className="text-muted hover:text-white transition-colors"
+          className="text-muted hover:text-text transition-colors"
         >
-          ← Retour
+          &larr; Retour
         </Link>
         <div>
           <h1 className="text-2xl font-bold">Nouveau document</h1>
@@ -17,7 +20,7 @@ export default function NouveauDocumentPage() {
         </div>
       </div>
 
-      <DocumentForm />
+      <DocumentForm establishmentId={ctx!.establishment.id} />
     </div>
   )
 }

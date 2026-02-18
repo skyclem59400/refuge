@@ -1,13 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
+import { getEstablishmentContext } from '@/lib/establishment/context'
 import { WelcomeBanner } from '@/components/dashboard/welcome-banner'
 import { StatsCards } from '@/components/dashboard/stats-cards'
+import { TypeBadge } from '@/components/documents/status-badge'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const ctx = await getEstablishmentContext()
+  const estabId = ctx!.establishment.id
 
-  // Fetch stats in parallel
+  // Fetch stats in parallel — scoped by establishment
   const [
     { count: totalDocuments },
     { count: totalDevis },
@@ -17,13 +21,13 @@ export default async function DashboardPage() {
     { count: totalClients },
     { data: recentDocs },
   ] = await Promise.all([
-    supabase.from('documents').select('*', { count: 'exact', head: true }),
-    supabase.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'devis'),
-    supabase.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'facture'),
-    supabase.from('documents').select('total').eq('type', 'facture').eq('status', 'paid'),
-    supabase.from('documents').select('total').eq('type', 'facture').eq('status', 'sent'),
-    supabase.from('clients').select('*', { count: 'exact', head: true }),
-    supabase.from('documents').select('*').order('created_at', { ascending: false }).limit(5),
+    supabase.from('documents').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId),
+    supabase.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'devis').eq('establishment_id', estabId),
+    supabase.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'facture').eq('establishment_id', estabId),
+    supabase.from('documents').select('total').eq('type', 'facture').eq('status', 'paid').eq('establishment_id', estabId),
+    supabase.from('documents').select('total').eq('type', 'facture').eq('status', 'sent').eq('establishment_id', estabId),
+    supabase.from('clients').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId),
+    supabase.from('documents').select('*').eq('establishment_id', estabId).order('created_at', { ascending: false }).limit(5),
   ])
 
   const caTotal = caPaidData?.reduce((sum, d) => sum + (d.total || 0), 0) || 0
@@ -56,13 +60,7 @@ export default async function DashboardPage() {
             recentDocs.map((doc) => (
               <div key={doc.id} className="flex items-center justify-between px-5 py-3 hover:bg-surface-hover transition-colors">
                 <div className="flex items-center gap-3">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    doc.type === 'facture'
-                      ? 'bg-success/15 text-success'
-                      : 'bg-warning/15 text-warning'
-                  }`}>
-                    {doc.type === 'facture' ? 'Facture' : 'Devis'}
-                  </span>
+                  <TypeBadge type={doc.type} />
                   <span className="text-sm font-medium">{doc.numero}</span>
                   <span className="text-sm text-muted">{doc.client_name}</span>
                 </div>
