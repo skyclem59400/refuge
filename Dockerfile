@@ -50,6 +50,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Tell Puppeteer where Chromium is
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
+# Neutralize chrome_crashpad_handler (causes "—database is required" in containers)
+RUN find /usr -name "chrome_crashpad_handler" -exec ln -sf /bin/true {} \; 2>/dev/null || true
+
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
@@ -61,9 +64,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Copy full node_modules for puppeteer and all its transitive deps
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-
-# Create writable dirs for Chromium (crash handler, user data)
-RUN mkdir -p /tmp/chromium-data && chown -R nextjs:nodejs /tmp/chromium-data
 
 USER nextjs
 

@@ -84,9 +84,6 @@ export async function GET(
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--no-zygote',
-        '--single-process',
-        '--user-data-dir=/tmp/chromium-data',
       ],
       ...(process.env.PUPPETEER_EXECUTABLE_PATH && {
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
