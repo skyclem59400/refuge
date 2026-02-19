@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
-import { getEstablishmentMembers, getUnassignedUsers } from '@/lib/actions/establishments'
+import { getEstablishmentMembers, getUnassignedUsers, getInvitableUsers } from '@/lib/actions/establishments'
 import { EstablishmentForm } from '@/components/establishment/establishment-form'
 import { MembersList } from '@/components/establishment/members-list'
 import { PendingUsersList } from '@/components/establishment/pending-users-list'
+import { InviteMemberSearch } from '@/components/establishment/invite-member-search'
 
 export default async function EtablissementPage() {
   const ctx = await getEstablishmentContext()
@@ -18,6 +19,7 @@ export default async function EtablissementPage() {
 
   const { data: members } = await getEstablishmentMembers()
   const { data: pendingUsers } = await getUnassignedUsers()
+  const { data: invitableUsers } = await getInvitableUsers()
 
   return (
     <div className="animate-fade-up space-y-8">
@@ -48,6 +50,11 @@ export default async function EtablissementPage() {
             )}
           </div>
           <PendingUsersList users={pendingUsers || []} />
+        </div>
+
+        <div className="pt-2 border-t border-border">
+          <h3 className="text-sm font-semibold mt-4 mb-3">Inviter un utilisateur</h3>
+          <InviteMemberSearch users={invitableUsers || []} />
         </div>
       </div>
     </div>

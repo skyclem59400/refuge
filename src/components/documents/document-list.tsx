@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
@@ -24,6 +24,8 @@ interface DocumentListProps {
 export function DocumentList({ initialData, canEdit, establishmentId }: DocumentListProps) {
   const [documents, setDocuments] = useState<Document[]>(initialData)
   const [typeFilter, setTypeFilter] = useState('')
+
+  useEffect(() => { setDocuments(initialData) }, [initialData])
   const [statusFilter, setStatusFilter] = useState('')
   const [isPending, startTransition] = useTransition()
   const supabase = createClient()

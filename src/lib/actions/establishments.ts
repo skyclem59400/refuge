@@ -252,6 +252,81 @@ export async function getUnassignedUsers() {
   }
 }
 
+export async function getInvitableUsers() {
+  try {
+    const { establishmentId } = await requirePermission('manage_establishment')
+    const admin = createAdminClient()
+
+    // Get all platform users via admin auth API
+    const { data: { users }, error: usersError } = await admin.auth.admin.listUsers()
+    if (usersError) return { error: usersError.message }
+
+    // Get current establishment members
+    const { data: members } = await admin
+      .from('establishment_members')
+      .select('user_id')
+      .eq('establishment_id', establishmentId)
+
+    const memberUserIds = new Set((members || []).map((m: { user_id: string }) => m.user_id))
+
+    // Filter out existing members, return the rest
+    const invitable = users
+      .filter(u => !memberUserIds.has(u.id))
+      .map(u => ({
+        id: u.id,
+        email: u.email || '',
+        full_name: (u.user_metadata?.full_name || u.user_metadata?.name || null) as string | null,
+        avatar_url: (u.user_metadata?.avatar_url || null) as string | null,
+        created_at: u.created_at,
+      }))
+
+    return { data: invitable }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+export async function addMemberById(userId: string, permissions: {
+  manage_documents?: boolean
+  manage_clients?: boolean
+  manage_establishment?: boolean
+}) {
+  try {
+    const { establishmentId } = await requirePermission('manage_establishment')
+    const admin = createAdminClient()
+
+    // Check if already member of THIS establishment
+    const { data: existing } = await admin
+      .from('establishment_members')
+      .select('id')
+      .eq('establishment_id', establishmentId)
+      .eq('user_id', userId)
+      .single()
+
+    if (existing) {
+      return { error: 'Cet utilisateur est deja membre de cet etablissement' }
+    }
+
+    const { error } = await admin
+      .from('establishment_members')
+      .insert({
+        establishment_id: establishmentId,
+        user_id: userId,
+        role: 'member',
+        manage_documents: permissions.manage_documents ?? false,
+        manage_clients: permissions.manage_clients ?? false,
+        manage_establishment: permissions.manage_establishment ?? false,
+      })
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/etablissement')
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
 export async function addPendingUser(userId: string, permissions: {
   manage_documents?: boolean
   manage_clients?: boolean

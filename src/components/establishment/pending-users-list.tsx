@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { addPendingUser } from '@/lib/actions/establishments'
@@ -14,6 +14,8 @@ export function PendingUsersList({ users }: PendingUsersListProps) {
   const [list, setList] = useState(users)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+
+  useEffect(() => { setList(users) }, [users])
 
   const [permissionsMap, setPermissionsMap] = useState<Record<string, {
     manage_documents: boolean

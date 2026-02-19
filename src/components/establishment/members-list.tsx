@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { updateMemberPermissions, removeMember } from '@/lib/actions/establishments'
@@ -33,6 +33,8 @@ export function MembersList({ members, currentUserId }: MembersListProps) {
   const [list, setList] = useState(members)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+
+  useEffect(() => { setList(members) }, [members])
 
   function handleToggle(memberId: string, field: 'manage_documents' | 'manage_clients' | 'manage_establishment', currentValue: boolean) {
     startTransition(async () => {
