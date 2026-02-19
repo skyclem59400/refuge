@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requireEstablishment } from '@/lib/establishment/permissions'
-import type { EstablishmentMember } from '@/lib/types/database'
+import type { EstablishmentMember, UnassignedUser } from '@/lib/types/database'
 
 export async function updateEstablishment(data: {
   name: string
@@ -222,6 +222,62 @@ export async function getEstablishmentMembers() {
     }
 
     return { data: typedMembers }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+export async function getUnassignedUsers() {
+  try {
+    await requirePermission('manage_establishment')
+    const supabase = await createClient()
+
+    const { data, error } = await supabase.rpc('get_unassigned_users')
+
+    if (error) return { error: error.message }
+
+    return { data: (data as UnassignedUser[]) || [] }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+export async function addPendingUser(userId: string, permissions: {
+  manage_documents?: boolean
+  manage_clients?: boolean
+  manage_establishment?: boolean
+}) {
+  try {
+    const { establishmentId } = await requirePermission('manage_establishment')
+    const supabase = await createClient()
+
+    // Check if already member
+    const { data: existing } = await supabase
+      .from('establishment_members')
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1)
+      .single()
+
+    if (existing) {
+      return { error: 'Cet utilisateur est deja membre d\'un etablissement' }
+    }
+
+    const { error } = await supabase
+      .from('establishment_members')
+      .insert({
+        establishment_id: establishmentId,
+        user_id: userId,
+        role: 'member',
+        manage_documents: permissions.manage_documents ?? false,
+        manage_clients: permissions.manage_clients ?? false,
+        manage_establishment: permissions.manage_establishment ?? false,
+      })
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/etablissement')
+    return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
   }

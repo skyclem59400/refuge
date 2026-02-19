@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
-import { getEstablishmentMembers } from '@/lib/actions/establishments'
+import { getEstablishmentMembers, getUnassignedUsers } from '@/lib/actions/establishments'
 import { EstablishmentForm } from '@/components/establishment/establishment-form'
 import { MembersList } from '@/components/establishment/members-list'
-import { AddMemberForm } from '@/components/establishment/add-member-form'
+import { PendingUsersList } from '@/components/establishment/pending-users-list'
 
 export default async function EtablissementPage() {
   const ctx = await getEstablishmentContext()
@@ -17,6 +17,7 @@ export default async function EtablissementPage() {
   if (!user) redirect('/login')
 
   const { data: members } = await getEstablishmentMembers()
+  const { data: pendingUsers } = await getUnassignedUsers()
 
   return (
     <div className="animate-fade-up space-y-8">
@@ -38,8 +39,15 @@ export default async function EtablissementPage() {
         <MembersList members={members || []} currentUserId={user.id} />
 
         <div className="pt-2 border-t border-border">
-          <h3 className="text-sm font-semibold mb-3 mt-4">Ajouter un membre</h3>
-          <AddMemberForm />
+          <div className="flex items-center justify-between mt-4 mb-3">
+            <h3 className="text-sm font-semibold">Utilisateurs en attente</h3>
+            {pendingUsers && pendingUsers.length > 0 && (
+              <span className="text-xs text-amber-500 bg-amber-500/10 px-2 py-1 rounded-lg font-medium">
+                {pendingUsers.length} en attente
+              </span>
+            )}
+          </div>
+          <PendingUsersList users={pendingUsers || []} />
         </div>
       </div>
     </div>

@@ -10,7 +10,7 @@ Multi-etablissement, permissions granulaires, theme clair/sombre.
 
 ### Prerequis
 
-- **Node.js** 18+ installe
+- **Node.js** 20+ installe
 - Un compte **Supabase** avec la base de donnees configuree
 
 ### Installation
@@ -31,10 +31,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=votre_anon_key
 
 ### Base de donnees
 
-Executer les migrations SQL dans l'editeur Supabase :
-
-1. `supabase/migrations/001_initial.sql` — Tables de base (clients, documents)
-2. `supabase/migrations/002_establishments.sql` — Multi-etablissement, permissions, RLS
+Executer les migrations SQL dans l'editeur SQL de Supabase (Dashboard > SQL Editor). Le schema complet est documente dans la section [Base de donnees](#base-de-donnees-1) plus bas.
 
 Creer les buckets de stockage :
 
@@ -172,14 +169,11 @@ Securite a 3 niveaux :
 
 ```
 crm-ferme/
+├── Dockerfile                       # Multi-stage Docker build
+├── .dockerignore
 ├── middleware.ts
 ├── next.config.ts
 ├── .env.local
-│
-├── supabase/
-│   └── migrations/
-│       ├── 001_initial.sql
-│       └── 002_establishments.sql
 │
 └── src/
     ├── app/
@@ -222,7 +216,8 @@ crm-ferme/
     │   │   ├── switch-establishment.ts   # Changement d'etablissement (cookie)
     │   │   └── account.ts                # Profil, email, mot de passe
     │   ├── pdf/
-    │   │   └── template.ts               # Template HTML PDF
+    │   │   ├── template.ts               # Template HTML PDF
+    │   │   └── logo-base64.ts            # Logo fallback en base64
     │   ├── types/database.ts             # Types TypeScript
     │   └── utils.ts
     │
@@ -271,6 +266,7 @@ crm-ferme/
 | `get_next_document_number(type, est_id)` | Numero suivant scope par etablissement |
 | `user_establishment_ids()` | `SECURITY DEFINER` — IDs d'etablissements de l'utilisateur (evite les references circulaires RLS) |
 | `get_user_id_by_email(email)` | `SECURITY DEFINER` — Lookup utilisateur pour ajout de membres |
+| `get_users_info(user_ids)` | `SECURITY DEFINER` — Retourne email, nom et avatar des utilisateurs |
 
 | Bucket Storage | Contenu |
 |----------------|---------|
@@ -342,3 +338,48 @@ Utilisateur → Page quelconque
 | `npm run build` | Build de production |
 | `npm start` | Lancer le build |
 | `npm run lint` | Verifier le code avec ESLint |
+
+---
+
+## Deploiement Docker (Coolify)
+
+L'application est deployee via **Coolify** sur un VPS avec un Dockerfile multi-stage.
+
+### Variables d'environnement
+
+Configurer dans Coolify (Settings > Environment Variables) :
+
+**Build arguments** (necessaires au build Next.js) :
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | URL du projet Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Cle anonyme Supabase |
+
+**Variables runtime** (injectees dans le conteneur) :
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | URL du projet Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Cle anonyme Supabase |
+
+### Dockerfile
+
+Le Dockerfile utilise 3 stages :
+
+1. **deps** (`node:20-alpine`) — `npm ci` avec `PUPPETEER_SKIP_DOWNLOAD=true`
+2. **builder** (`node:20-alpine`) — `npm run build` (standalone output)
+3. **runner** (`node:20-slim`) — Image de production avec Google Chrome Stable
+
+Points importants :
+- **Google Chrome Stable** est installe depuis le depot officiel Google (apt) pour la generation PDF via Puppeteer
+- `PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable` pointe Puppeteer vers Chrome
+- `ENV HOME=/tmp` donne un repertoire home inscriptible a l'utilisateur non-root `nextjs`
+- `--user-data-dir=/tmp/chrome-data` dans les args Chrome fournit un repertoire pour le crash handler
+- Le `node_modules` complet est copie pour les dependances transitives de Puppeteer
+
+### Domaine personnalise
+
+Lors de l'utilisation d'un domaine personnalise (ex: `crm.skyclem.fr`) :
+- Ajouter l'URL de redirection dans Supabase > Authentication > URL Configuration > Redirect URLs
+- Exemple : `https://crm.skyclem.fr/auth/callback`

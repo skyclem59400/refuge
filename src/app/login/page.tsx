@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showAdminLogin, setShowAdminLogin] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const { theme, toggleTheme } = useTheme()
@@ -82,66 +83,13 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="votre@email.fr"
-                required
-                className="w-full px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
-                  focus:border-primary focus:ring-1 focus:ring-primary transition-colors
-                  placeholder:text-muted/50"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
-                Mot de passe
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                className="w-full px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
-                  focus:border-primary focus:ring-1 focus:ring-primary transition-colors
-                  placeholder:text-muted/50"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-lg font-semibold text-white text-sm
-                gradient-primary hover:opacity-90 transition-opacity
-                disabled:opacity-50 disabled:cursor-not-allowed
-                shadow-lg shadow-primary/25"
-            >
-              {loading ? 'Connexion...' : 'Se connecter'}
-            </button>
-          </form>
-
-          {/* Separator */}
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-xs text-muted">ou</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-
-          {/* Google SSO */}
+          {/* Google SSO — Primary */}
           <button
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 py-2.5 rounded-lg
-              bg-white text-gray-700 font-medium text-sm
+            className="w-full flex items-center justify-center gap-3 py-3 rounded-lg
+              bg-white text-gray-700 font-semibold text-sm
               hover:bg-gray-100 transition-colors
-              border border-gray-300"
+              border border-gray-300 shadow-sm"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
               <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
@@ -149,8 +97,71 @@ export default function LoginPage() {
               <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
               <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
             </svg>
-            Continuer avec Google
+            Se connecter avec Google
           </button>
+
+          {/* Admin login toggle */}
+          {!showAdminLogin ? (
+            <button
+              onClick={() => setShowAdminLogin(true)}
+              className="w-full text-center text-xs text-muted/60 hover:text-muted mt-6 transition-colors"
+            >
+              Connexion administrateur
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 my-6">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted">administrateur</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="votre@email.fr"
+                    required
+                    className="w-full px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
+                      focus:border-primary focus:ring-1 focus:ring-primary transition-colors
+                      placeholder:text-muted/50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+                    Mot de passe
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    className="w-full px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
+                      focus:border-primary focus:ring-1 focus:ring-primary transition-colors
+                      placeholder:text-muted/50"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-2.5 rounded-lg font-semibold text-white text-sm
+                    gradient-primary hover:opacity-90 transition-opacity
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    shadow-lg shadow-primary/25"
+                >
+                  {loading ? 'Connexion...' : 'Se connecter'}
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </div>
     </div>
