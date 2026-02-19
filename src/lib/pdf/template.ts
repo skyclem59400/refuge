@@ -70,6 +70,9 @@ export function buildPdfHtml(doc: Document, companyInfo?: CompanyInfo, logoBase6
       color: #1e293b;
       font-size: 13px;
       line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+      min-height: calc(297mm - 20mm - 18mm);
     }
 
     /* Header */
@@ -242,6 +245,7 @@ export function buildPdfHtml(doc: Document, companyInfo?: CompanyInfo, logoBase6
   </style>
 </head>
 <body>
+  <div class="content">
   <div class="header">
     <div class="header-left">
       ${logoBase64 ? `<img src="${logoBase64}" class="logo" alt="Logo" />` : ''}
@@ -303,6 +307,7 @@ export function buildPdfHtml(doc: Document, companyInfo?: CompanyInfo, logoBase6
     <p>IBAN : ${company.iban}</p>
     ${'bic' in company && company.bic ? `<p>BIC : ${company.bic}</p>` : ''}
   </div>` : ''}
+  </div>
 
   <div class="footer">
     <p><strong>${company.name}</strong> &ndash; ${company.description}</p>
