@@ -94,6 +94,7 @@ export async function addMember(email: string, permissions: {
   try {
     const { establishmentId } = await requirePermission('manage_establishment')
     const supabase = await createClient()
+    const admin = createAdminClient()
 
     // Lookup user by email via RPC
     const { data: userId, error: lookupError } = await supabase.rpc('get_user_id_by_email', {
@@ -104,8 +105,8 @@ export async function addMember(email: string, permissions: {
       return { error: 'Aucun utilisateur trouve avec cet email' }
     }
 
-    // Check if already member
-    const { data: existing } = await supabase
+    // Check if already member (admin client to avoid RLS recursion)
+    const { data: existing } = await admin
       .from('establishment_members')
       .select('id')
       .eq('establishment_id', establishmentId)
@@ -116,7 +117,7 @@ export async function addMember(email: string, permissions: {
       return { error: 'Cet utilisateur est deja membre de cet etablissement' }
     }
 
-    const { error } = await supabase
+    const { error } = await admin
       .from('establishment_members')
       .insert({
         establishment_id: establishmentId,
@@ -143,9 +144,9 @@ export async function updateMemberPermissions(memberId: string, permissions: {
 }) {
   try {
     await requirePermission('manage_establishment')
-    const supabase = await createClient()
+    const admin = createAdminClient()
 
-    const { error } = await supabase
+    const { error } = await admin
       .from('establishment_members')
       .update(permissions)
       .eq('id', memberId)
@@ -162,10 +163,10 @@ export async function updateMemberPermissions(memberId: string, permissions: {
 export async function removeMember(memberId: string) {
   try {
     const { userId, establishmentId } = await requirePermission('manage_establishment')
-    const supabase = await createClient()
+    const admin = createAdminClient()
 
     // Fetch member to check
-    const { data: member } = await supabase
+    const { data: member } = await admin
       .from('establishment_members')
       .select('*')
       .eq('id', memberId)
@@ -179,7 +180,7 @@ export async function removeMember(memberId: string) {
       return { error: 'Vous ne pouvez pas vous retirer vous-meme' }
     }
 
-    const { error } = await supabase
+    const { error } = await admin
       .from('establishment_members')
       .delete()
       .eq('id', memberId)
@@ -258,10 +259,11 @@ export async function addPendingUser(userId: string, permissions: {
 }) {
   try {
     const { establishmentId } = await requirePermission('manage_establishment')
-    const supabase = await createClient()
+    // Use admin client to bypass RLS (self-referencing policies cause infinite recursion)
+    const admin = createAdminClient()
 
     // Check if already member
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from('establishment_members')
       .select('id')
       .eq('user_id', userId)
@@ -272,7 +274,7 @@ export async function addPendingUser(userId: string, permissions: {
       return { error: 'Cet utilisateur est deja membre d\'un etablissement' }
     }
 
-    const { error } = await supabase
+    const { error } = await admin
       .from('establishment_members')
       .insert({
         establishment_id: establishmentId,
