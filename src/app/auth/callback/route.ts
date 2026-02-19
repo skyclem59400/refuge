@@ -4,11 +4,23 @@ import { createClient } from '@/lib/supabase/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  const next = searchParams.get('next') ?? '/dashboard'
 
   if (code) {
     const supabase = await createClient()
-    await supabase.auth.exchangeCodeForSession(code)
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (!error) {
+      const forwardedHost = request.headers.get('x-forwarded-host')
+      if (forwardedHost) {
+        return NextResponse.redirect(`https://${forwardedHost}${next}`)
+      }
+      return NextResponse.redirect(`${origin}${next}`)
+    }
   }
 
-  return NextResponse.redirect(`${origin}/dashboard`)
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  if (forwardedHost) {
+    return NextResponse.redirect(`https://${forwardedHost}/login`)
+  }
+  return NextResponse.redirect(`${origin}/login`)
 }
