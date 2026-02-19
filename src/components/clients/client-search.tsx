@@ -12,37 +12,55 @@ interface ClientSearchProps {
 
 export function ClientSearch({ onSelect, selected, establishmentId }: ClientSearchProps) {
   const [query, setQuery] = useState('')
+  const [allClients, setAllClients] = useState<Client[]>([])
   const [results, setResults] = useState<Client[]>([])
   const [isOpen, setIsOpen] = useState(false)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const [loaded, setLoaded] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
+  async function loadClients() {
+    if (loaded) return allClients
+    const { data } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('establishment_id', establishmentId)
+      .order('name')
+    const clients = (data as Client[]) || []
+    setAllClients(clients)
+    setLoaded(true)
+    return clients
+  }
+
+  async function handleFocus() {
+    const clients = await loadClients()
+    if (query.length === 0) {
+      setResults(clients)
+    }
+    setIsOpen(true)
+  }
+
   useEffect(() => {
-    if (query.length < 2) {
-      setResults([])
-      setIsOpen(false)
-      return
+    if (!loaded) return
+    if (query.length === 0) {
+      setResults(allClients)
+    } else {
+      const q = query.toLowerCase()
+      setResults(allClients.filter(c =>
+        c.name.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q)
+      ))
     }
+  }, [query, allClients, loaded])
 
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('establishment_id', establishmentId)
-        .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
-        .limit(5)
-
-      if (data) {
-        setResults(data as Client[])
-        setIsOpen(true)
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
       }
-    }, 250)
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [query])
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   function handleSelect(client: Client) {
     onSelect(client)
@@ -80,11 +98,12 @@ export function ClientSearch({ onSelect, selected, establishmentId }: ClientSear
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={wrapperRef}>
       <input
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onFocus={handleFocus}
         placeholder="Rechercher un client..."
         className="w-full px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
           focus:border-primary focus:ring-1 focus:ring-primary transition-colors
@@ -92,7 +111,7 @@ export function ClientSearch({ onSelect, selected, establishmentId }: ClientSear
       />
 
       {isOpen && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border rounded-lg shadow-xl z-20 max-h-48 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto">
           {results.map((client) => (
             <button
               key={client.id}
@@ -114,7 +133,7 @@ export function ClientSearch({ onSelect, selected, establishmentId }: ClientSear
         </div>
       )}
 
-      {isOpen && results.length === 0 && query.length >= 2 && (
+      {isOpen && results.length === 0 && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border rounded-lg shadow-xl z-20 p-3">
           <p className="text-sm text-muted text-center">Aucun client trouve</p>
         </div>
