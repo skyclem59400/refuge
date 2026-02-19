@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requirePermission, requireEstablishment } from '@/lib/establishment/permissions'
 import type { EstablishmentMember, UnassignedUser } from '@/lib/types/database'
 
@@ -47,11 +47,20 @@ export async function createEstablishment(data: {
   address?: string
   legal_name?: string
 }) {
+  // Auth check via normal client
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifie' }
 
-  const { data: establishment, error } = await supabase
+  const SUPER_ADMIN_EMAIL = 'clement.scailteux@gmail.com'
+  if (user.email !== SUPER_ADMIN_EMAIL) {
+    return { error: 'Seul l\'administrateur principal peut creer un etablissement' }
+  }
+
+  // Use admin client to bypass RLS for creation
+  const admin = createAdminClient()
+
+  const { data: establishment, error } = await admin
     .from('establishments')
     .insert(data)
     .select()
@@ -60,7 +69,7 @@ export async function createEstablishment(data: {
   if (error) return { error: error.message }
 
   // Creator becomes admin
-  const { error: memberError } = await supabase
+  const { error: memberError } = await admin
     .from('establishment_members')
     .insert({
       establishment_id: establishment.id,

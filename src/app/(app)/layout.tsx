@@ -35,6 +35,7 @@ export default async function AppLayout({
         establishments={establishments}
         currentEstablishment={ctx.establishment}
         permissions={ctx.permissions}
+        userEmail={user.email}
       />
       <MainContent>
         <Header

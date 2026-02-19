@@ -18,9 +18,10 @@ interface SidebarProps {
   establishments: Establishment[]
   currentEstablishment: Establishment
   permissions: Permissions
+  userEmail?: string
 }
 
-export function Sidebar({ establishments, currentEstablishment, permissions }: SidebarProps) {
+export function Sidebar({ establishments, currentEstablishment, permissions, userEmail }: SidebarProps) {
   const pathname = usePathname()
   const { sidebarCollapsed, toggleSidebar } = useTheme()
 
@@ -42,6 +43,7 @@ export function Sidebar({ establishments, currentEstablishment, permissions }: S
           establishments={establishments}
           currentEstablishment={currentEstablishment}
           collapsed={sidebarCollapsed}
+          userEmail={userEmail}
         />
       </div>
 
