@@ -6,6 +6,7 @@ import type { Document } from '@/lib/types/database'
 
 export default async function DocumentsPage() {
   const supabase = await createClient()
+  await supabase.auth.getUser()
   const ctx = await getEstablishmentContext()
   const estabId = ctx!.establishment.id
 
