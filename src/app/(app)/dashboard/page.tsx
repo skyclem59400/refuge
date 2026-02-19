@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { WelcomeBanner } from '@/components/dashboard/welcome-banner'
 import { StatsCards } from '@/components/dashboard/stats-cards'
+import { RevenueChart } from '@/components/dashboard/revenue-chart'
 import { TypeBadge } from '@/components/documents/status-badge'
 import Link from 'next/link'
 
@@ -21,6 +22,7 @@ export default async function DashboardPage() {
     { data: caSentData },
     { count: totalClients },
     { data: recentDocs },
+    { data: invoicesByMonth },
   ] = await Promise.all([
     admin.from('documents').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId).neq('status', 'converted'),
     admin.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'devis').eq('establishment_id', estabId).neq('status', 'converted'),
@@ -29,6 +31,12 @@ export default async function DashboardPage() {
     admin.from('documents').select('total').eq('type', 'facture').eq('status', 'sent').eq('establishment_id', estabId),
     admin.from('clients').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId),
     admin.from('documents').select('*').eq('establishment_id', estabId).neq('status', 'converted').order('created_at', { ascending: false }).limit(5),
+    admin.from('documents')
+      .select('date, total, status')
+      .eq('type', 'facture')
+      .eq('establishment_id', estabId)
+      .in('status', ['paid', 'sent'])
+      .order('date', { ascending: true }),
   ])
 
   const caTotal = caPaidData?.reduce((sum, d) => sum + (d.total || 0), 0) || 0
@@ -47,6 +55,10 @@ export default async function DashboardPage() {
     <div className="animate-fade-up">
       <WelcomeBanner userEmail={user?.email || 'Utilisateur'} />
       <StatsCards stats={stats} />
+
+      <div className="mb-6">
+        <RevenueChart invoices={(invoicesByMonth || []).map(inv => ({ date: inv.date, total: inv.total || 0, status: inv.status as 'paid' | 'sent' }))} />
+      </div>
 
       {/* Recent documents */}
       <div className="bg-surface rounded-xl border border-border">
