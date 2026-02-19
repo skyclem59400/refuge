@@ -22,13 +22,13 @@ export default async function DashboardPage() {
     { count: totalClients },
     { data: recentDocs },
   ] = await Promise.all([
-    admin.from('documents').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId),
-    admin.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'devis').eq('establishment_id', estabId),
+    admin.from('documents').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId).neq('status', 'converted'),
+    admin.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'devis').eq('establishment_id', estabId).neq('status', 'converted'),
     admin.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'facture').eq('establishment_id', estabId),
     admin.from('documents').select('total').eq('type', 'facture').eq('status', 'paid').eq('establishment_id', estabId),
     admin.from('documents').select('total').eq('type', 'facture').eq('status', 'sent').eq('establishment_id', estabId),
     admin.from('clients').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId),
-    admin.from('documents').select('*').eq('establishment_id', estabId).order('created_at', { ascending: false }).limit(5),
+    admin.from('documents').select('*').eq('establishment_id', estabId).neq('status', 'converted').order('created_at', { ascending: false }).limit(5),
   ])
 
   const caTotal = caPaidData?.reduce((sum, d) => sum + (d.total || 0), 0) || 0
