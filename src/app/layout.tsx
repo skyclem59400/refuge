@@ -12,6 +12,16 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Optimus',
   description: 'Gestion intelligente - Factures, clients & etablissements',
+  icons: {
+    icon: '/favicon-32x32.png',
+    apple: '/apple-icon.png',
+  },
+  openGraph: {
+    title: 'Optimus',
+    description: 'Gestion intelligente - Factures, clients & etablissements',
+    images: [{ url: '/logo.png', width: 376, height: 370 }],
+    type: 'website',
+  },
 }
 
 export default function RootLayout({
