@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { ClientForm } from '@/components/clients/client-form'
 import { TypeBadge, StatusBadge } from '@/components/documents/status-badge'
@@ -9,14 +9,13 @@ import type { Client, Document } from '@/lib/types/database'
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
-  await supabase.auth.getUser()
   const ctx = await getEstablishmentContext()
   const estabId = ctx!.establishment.id
+  const admin = createAdminClient()
 
   const [{ data: client }, { data: documents }] = await Promise.all([
-    supabase.from('clients').select('*').eq('id', id).eq('establishment_id', estabId).single(),
-    supabase
+    admin.from('clients').select('*').eq('id', id).eq('establishment_id', estabId).single(),
+    admin
       .from('documents')
       .select('*')
       .eq('client_id', id)

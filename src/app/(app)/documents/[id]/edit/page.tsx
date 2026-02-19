@@ -1,18 +1,17 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { DocumentForm } from '@/components/documents/document-form'
 import type { Document, Client } from '@/lib/types/database'
 
 export default async function EditDocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
-  await supabase.auth.getUser()
   const ctx = await getEstablishmentContext()
   const estabId = ctx!.establishment.id
+  const admin = createAdminClient()
 
-  const { data: document, error } = await supabase
+  const { data: document, error } = await admin
     .from('documents')
     .select('*')
     .eq('id', id)
@@ -32,7 +31,7 @@ export default async function EditDocumentPage({ params }: { params: Promise<{ i
   // Fetch linked client if exists
   let client: Client | null = null
   if (doc.client_id) {
-    const { data: clientData } = await supabase
+    const { data: clientData } = await admin
       .from('clients')
       .select('*')
       .eq('id', doc.client_id)

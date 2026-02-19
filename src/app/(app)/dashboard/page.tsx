@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { WelcomeBanner } from '@/components/dashboard/welcome-banner'
 import { StatsCards } from '@/components/dashboard/stats-cards'
@@ -10,6 +10,7 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const ctx = await getEstablishmentContext()
   const estabId = ctx!.establishment.id
+  const admin = createAdminClient()
 
   // Fetch stats in parallel — scoped by establishment
   const [
@@ -21,13 +22,13 @@ export default async function DashboardPage() {
     { count: totalClients },
     { data: recentDocs },
   ] = await Promise.all([
-    supabase.from('documents').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId),
-    supabase.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'devis').eq('establishment_id', estabId),
-    supabase.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'facture').eq('establishment_id', estabId),
-    supabase.from('documents').select('total').eq('type', 'facture').eq('status', 'paid').eq('establishment_id', estabId),
-    supabase.from('documents').select('total').eq('type', 'facture').eq('status', 'sent').eq('establishment_id', estabId),
-    supabase.from('clients').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId),
-    supabase.from('documents').select('*').eq('establishment_id', estabId).order('created_at', { ascending: false }).limit(5),
+    admin.from('documents').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId),
+    admin.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'devis').eq('establishment_id', estabId),
+    admin.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'facture').eq('establishment_id', estabId),
+    admin.from('documents').select('total').eq('type', 'facture').eq('status', 'paid').eq('establishment_id', estabId),
+    admin.from('documents').select('total').eq('type', 'facture').eq('status', 'sent').eq('establishment_id', estabId),
+    admin.from('clients').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId),
+    admin.from('documents').select('*').eq('establishment_id', estabId).order('created_at', { ascending: false }).limit(5),
   ])
 
   const caTotal = caPaidData?.reduce((sum, d) => sum + (d.total || 0), 0) || 0

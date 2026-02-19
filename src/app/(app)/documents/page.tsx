@@ -1,16 +1,15 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { DocumentList } from '@/components/documents/document-list'
 import type { Document } from '@/lib/types/database'
 
 export default async function DocumentsPage() {
-  const supabase = await createClient()
-  await supabase.auth.getUser()
   const ctx = await getEstablishmentContext()
   const estabId = ctx!.establishment.id
+  const admin = createAdminClient()
 
-  const { data: documents } = await supabase
+  const { data: documents } = await admin
     .from('documents')
     .select('*')
     .eq('establishment_id', estabId)
