@@ -27,15 +27,15 @@ function getLineItems(doc: Document): LineItem[] {
 
 export function buildPdfHtml(doc: Document, companyInfo?: CompanyInfo, logoBase64?: string): string {
   const company = companyInfo || {
-    name: 'La Ferme O 4 Vents',
-    description: 'Refuge pour animaux',
-    email: 'contact@ferme4vents.fr',
-    phone: '01 23 45 67 89',
-    website: 'www.ferme4vents.fr',
-    iban: 'FR76 1350 7001 3032 0002 2218 454',
-    bic: 'CCBPFRPPLIL',
-    address: '11 Route Nationale, 59400 Estourmel',
-    legal_name: 'ASS DECL SOC DE DEFENSE DES ANIMAUX DU NORD',
+    name: 'Mon Etablissement',
+    description: '',
+    email: '',
+    phone: '',
+    website: '',
+    iban: '',
+    bic: '',
+    address: '',
+    legal_name: '',
   }
 
   const docTypeLabel = doc.type === 'facture' ? 'FACTURE' : doc.type === 'avoir' ? 'AVOIR' : 'DEVIS'

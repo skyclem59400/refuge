@@ -43,7 +43,7 @@ export function WaitingPage({ userEmail }: WaitingPageProps) {
       <div className="w-full max-w-md animate-fade-up">
         <div className="bg-surface rounded-2xl p-8 glow border border-border text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Logo" className="w-16 h-16 rounded-full mx-auto mb-3" />
+          <img src="/logo.png" alt="Optimus" className="w-20 h-20 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-primary-light">En attente de validation</h1>
 
           <p className="text-muted text-sm mt-4 leading-relaxed">

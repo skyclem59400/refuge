@@ -71,9 +71,9 @@ export default function LoginPage() {
           {/* Logo */}
           <div className="text-center mb-8">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Logo" className="w-16 h-16 rounded-full mx-auto mb-3" />
-            <h1 className="text-2xl font-bold text-primary-light">La Ferme O 4 Vents</h1>
-            <p className="text-muted text-sm mt-1">Gestion des factures & clients</p>
+            <img src="/logo.png" alt="Optimus" className="w-20 h-20 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-primary-light">Optimus</h1>
+            <p className="text-muted text-sm mt-1">Gestion intelligente</p>
           </div>
 
           {/* Error */}

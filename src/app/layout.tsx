@@ -10,8 +10,8 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'CRM - La Ferme O 4 Vents',
-  description: 'Gestion des factures et clients - La Ferme O 4 Vents',
+  title: 'Optimus',
+  description: 'Gestion intelligente - Factures, clients & etablissements',
 }
 
 export default function RootLayout({

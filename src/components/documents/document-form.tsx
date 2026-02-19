@@ -320,8 +320,8 @@ export function DocumentForm({ document: doc, initialClient, establishmentId }: 
           <div className="mb-4 pb-3 border-b-2 border-indigo-500">
             <div className="flex justify-between items-end">
               <div>
-                <h4 className="font-bold text-indigo-600 text-base">La Ferme O 4 Vents</h4>
-                <p className="text-xs text-gray-500">Refuge pour animaux</p>
+                <h4 className="font-bold text-indigo-600 text-base">Mon Etablissement</h4>
+                <p className="text-xs text-gray-500">Apercu du document</p>
               </div>
               <span className={`px-3 py-1 rounded text-xs font-bold text-white ${
                 type === 'facture' ? 'bg-green-500' : 'bg-amber-500'
