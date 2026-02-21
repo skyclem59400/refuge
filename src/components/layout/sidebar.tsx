@@ -35,12 +35,12 @@ const farmItems: NavItem[] = [
 ]
 
 const shelterItems: NavItem[] = [
-  { href: '/animaux', label: 'Animaux', Icon: PawPrint, permission: 'canViewAnimals' },
-  { href: '/fourriere', label: 'Fourri\u00e8re', Icon: Warehouse, permission: 'canViewPound' },
-  { href: '/sante', label: 'Sant\u00e9', Icon: HeartPulse, permission: 'canManageHealth' },
-  { href: '/box', label: 'Box', Icon: Package, permission: 'canManageBoxes' },
+  { href: '/animals', label: 'Animaux', Icon: PawPrint, permission: 'canViewAnimals' },
+  { href: '/pound', label: 'Fourri\u00e8re', Icon: Warehouse, permission: 'canViewPound' },
+  { href: '/health', label: 'Sant\u00e9', Icon: HeartPulse, permission: 'canManageHealth' },
+  { href: '/boxes', label: 'Box', Icon: Package, permission: 'canManageBoxes' },
   { href: '/documents', label: 'Documents', Icon: FileText, permission: 'canManageDocuments' },
-  { href: '/repertoire', label: 'R\u00e9pertoire', Icon: Users, permission: 'canManageClients' },
+  { href: '/clients', label: 'R\u00e9pertoire', Icon: Users, permission: 'canManageClients' },
   { href: '/statistiques', label: 'Statistiques', Icon: BarChart3, permission: 'canViewStatistics' },
 ]
 
