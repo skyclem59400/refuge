@@ -3,16 +3,75 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTheme } from '@/components/theme-provider'
-import { ChartBarIcon, DocumentTextIcon, UsersIcon, BuildingIcon } from '@/components/icons'
 import { EstablishmentSwitcher } from '@/components/establishment/establishment-switcher'
 import type { ComponentType } from 'react'
-import type { Establishment, Permissions } from '@/lib/types/database'
+import type { Establishment, EstablishmentType, Permissions } from '@/lib/types/database'
+import {
+  LayoutDashboard,
+  FileText,
+  Users,
+  Building2,
+  PawPrint,
+  Warehouse,
+  HeartPulse,
+  Package,
+  BarChart3,
+} from 'lucide-react'
 
-const baseNavItems: { href: string; label: string; Icon: ComponentType<{ className?: string }> }[] = [
-  { href: '/dashboard', label: 'Dashboard', Icon: ChartBarIcon },
-  { href: '/documents', label: 'Documents', Icon: DocumentTextIcon },
-  { href: '/clients', label: 'Clients', Icon: UsersIcon },
+interface NavItem {
+  href: string
+  label: string
+  Icon: ComponentType<{ className?: string }>
+  permission?: keyof Permissions
+}
+
+const commonItems: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
 ]
+
+const farmItems: NavItem[] = [
+  { href: '/documents', label: 'Documents', Icon: FileText, permission: 'canManageDocuments' },
+  { href: '/clients', label: 'Clients', Icon: Users, permission: 'canManageClients' },
+]
+
+const shelterItems: NavItem[] = [
+  { href: '/animaux', label: 'Animaux', Icon: PawPrint, permission: 'canViewAnimals' },
+  { href: '/fourriere', label: 'Fourri\u00e8re', Icon: Warehouse, permission: 'canViewPound' },
+  { href: '/sante', label: 'Sant\u00e9', Icon: HeartPulse, permission: 'canManageHealth' },
+  { href: '/box', label: 'Box', Icon: Package, permission: 'canManageBoxes' },
+  { href: '/documents', label: 'Documents', Icon: FileText, permission: 'canManageDocuments' },
+  { href: '/repertoire', label: 'R\u00e9pertoire', Icon: Users, permission: 'canManageClients' },
+  { href: '/statistiques', label: 'Statistiques', Icon: BarChart3, permission: 'canViewStatistics' },
+]
+
+const adminItems: NavItem[] = [
+  { href: '/etablissement', label: '\u00c9tablissement', Icon: Building2, permission: 'canManageEstablishment' },
+]
+
+function getNavItems(type: EstablishmentType, permissions: Permissions): NavItem[] {
+  let typeItems: NavItem[]
+
+  switch (type) {
+    case 'farm':
+      typeItems = farmItems
+      break
+    case 'shelter':
+      typeItems = shelterItems
+      break
+    case 'both':
+      typeItems = [...farmItems, ...shelterItems]
+      break
+    default:
+      typeItems = farmItems
+  }
+
+  const allItems = [...commonItems, ...typeItems, ...adminItems]
+
+  return allItems.filter((item) => {
+    if (!item.permission) return true
+    return permissions[item.permission]
+  })
+}
 
 interface SidebarProps {
   establishments: Establishment[]
@@ -25,12 +84,8 @@ export function Sidebar({ establishments, currentEstablishment, permissions, use
   const pathname = usePathname()
   const { sidebarCollapsed, toggleSidebar } = useTheme()
 
-  const navItems = [
-    ...baseNavItems,
-    ...(permissions.canManageEstablishment
-      ? [{ href: '/etablissement', label: 'Etablissement', Icon: BuildingIcon }]
-      : []),
-  ]
+  const establishmentType: EstablishmentType = currentEstablishment.type || 'farm'
+  const navItems = getNavItems(establishmentType, permissions)
 
   return (
     <aside
@@ -53,7 +108,7 @@ export function Sidebar({ establishments, currentEstablishment, permissions, use
           const isActive = pathname.startsWith(item.href)
           return (
             <Link
-              key={item.href}
+              key={item.href + item.label}
               href={item.href}
               title={sidebarCollapsed ? item.label : undefined}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
