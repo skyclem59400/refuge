@@ -67,6 +67,7 @@ export interface Establishment {
   address: string
   legal_name: string
   logo_url: string | null
+  type: EstablishmentType
   created_at: string
   updated_at: string
 }
@@ -79,6 +80,15 @@ export interface EstablishmentMember {
   manage_documents: boolean
   manage_clients: boolean
   manage_establishment: boolean
+  manage_animals: boolean
+  view_animals: boolean
+  manage_health: boolean
+  manage_movements: boolean
+  manage_boxes: boolean
+  manage_posts: boolean
+  manage_donations: boolean
+  view_pound: boolean
+  view_statistics: boolean
   created_at: string
   updated_at: string
   // Enriched from auth.users via RPC
@@ -91,6 +101,15 @@ export interface Permissions {
   canManageEstablishment: boolean
   canManageDocuments: boolean
   canManageClients: boolean
+  canManageAnimals: boolean
+  canViewAnimals: boolean
+  canManageHealth: boolean
+  canManageMovements: boolean
+  canManageBoxes: boolean
+  canManagePosts: boolean
+  canManageDonations: boolean
+  canViewPound: boolean
+  canViewStatistics: boolean
   isAdmin: boolean
 }
 
@@ -118,4 +137,101 @@ export interface CompanyInfo {
   bic: string
   address: string
   legal_name: string
+}
+
+// ============================================
+// SDA Estormel - Animal Shelter Types
+// ============================================
+
+export type AnimalSpecies = 'cat' | 'dog'
+export type AnimalSex = 'male' | 'female' | 'unknown'
+export type AnimalStatus = 'pound' | 'shelter' | 'adopted' | 'returned' | 'transferred' | 'deceased' | 'euthanized'
+export type AnimalOrigin = 'found' | 'abandoned' | 'transferred_in' | 'surrender'
+export type MovementType = 'pound_entry' | 'shelter_transfer' | 'adoption' | 'return_to_owner' | 'transfer_out' | 'death' | 'euthanasia'
+export type HealthRecordType = 'vaccination' | 'sterilization' | 'antiparasitic' | 'consultation' | 'surgery' | 'medication' | 'behavioral_assessment'
+export type IcadStatus = 'pending' | 'declared' | 'not_required'
+export type BoxSpecies = 'cat' | 'dog' | 'mixed'
+export type BoxStatus = 'available' | 'occupied' | 'maintenance'
+export type EstablishmentType = 'farm' | 'shelter' | 'both'
+
+export interface Animal {
+  id: string
+  establishment_id: string
+  name: string
+  name_secondary: string | null
+  species: AnimalSpecies
+  breed: string | null
+  breed_cross: string | null
+  sex: AnimalSex
+  birth_date: string | null
+  birth_place: string | null
+  color: string | null
+  weight: number | null
+  sterilized: boolean
+  chip_number: string | null
+  tattoo_number: string | null
+  tattoo_position: string | null
+  medal_number: string | null
+  loof_number: string | null
+  passport_number: string | null
+  icad_updated: boolean
+  status: AnimalStatus
+  behavior_score: number | null
+  description: string | null
+  capture_location: string | null
+  capture_circumstances: string | null
+  origin_type: AnimalOrigin
+  box_id: string | null
+  pound_entry_date: string | null
+  shelter_entry_date: string | null
+  exit_date: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AnimalPhoto {
+  id: string
+  animal_id: string
+  url: string
+  is_primary: boolean
+  created_at: string
+}
+
+export interface AnimalMovement {
+  id: string
+  animal_id: string
+  type: MovementType
+  date: string
+  notes: string | null
+  person_name: string | null
+  person_contact: string | null
+  destination: string | null
+  icad_status: IcadStatus
+  created_by: string | null
+  created_at: string
+}
+
+export interface AnimalHealthRecord {
+  id: string
+  animal_id: string
+  type: HealthRecordType
+  date: string
+  description: string
+  veterinarian: string | null
+  next_due_date: string | null
+  cost: number | null
+  notes: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export interface Box {
+  id: string
+  establishment_id: string
+  name: string
+  species_type: BoxSpecies
+  capacity: number
+  status: BoxStatus
+  created_at: string
+  updated_at: string
 }
