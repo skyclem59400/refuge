@@ -16,6 +16,7 @@ import {
   HeartPulse,
   Package,
   BarChart3,
+  Heart,
 } from 'lucide-react'
 
 interface NavItem {
@@ -39,6 +40,7 @@ const shelterItems: NavItem[] = [
   { href: '/pound', label: 'Fourri\u00e8re', Icon: Warehouse, permission: 'canViewPound' },
   { href: '/health', label: 'Sant\u00e9', Icon: HeartPulse, permission: 'canManageHealth' },
   { href: '/boxes', label: 'Box', Icon: Package, permission: 'canManageBoxes' },
+  { href: '/donations', label: 'Dons', Icon: Heart, permission: 'canManageDonations' },
   { href: '/documents', label: 'Documents', Icon: FileText, permission: 'canManageDocuments' },
   { href: '/clients', label: 'R\u00e9pertoire', Icon: Users, permission: 'canManageClients' },
   { href: '/statistiques', label: 'Statistiques', Icon: BarChart3, permission: 'canViewStatistics' },

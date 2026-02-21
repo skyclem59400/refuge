@@ -157,6 +157,10 @@ export type SocialPostType = 'search_owner' | 'adoption'
 export type SocialPlatform = 'facebook' | 'instagram' | 'both'
 export type SocialPostStatus = 'draft' | 'published' | 'archived'
 
+// Donations & CERFA
+export type DonationPaymentMethod = 'cheque' | 'virement' | 'especes' | 'cb' | 'prelevement' | 'autre'
+export type DonationNature = 'numeraire' | 'nature'
+
 export interface Animal {
   id: string
   establishment_id: string
@@ -250,4 +254,26 @@ export interface SocialPost {
   published_at: string | null
   created_by: string | null
   created_at: string
+}
+
+export interface Donation {
+  id: string
+  establishment_id: string
+  donor_name: string
+  donor_email: string | null
+  donor_phone: string | null
+  donor_address: string | null
+  donor_postal_code: string | null
+  donor_city: string | null
+  amount: number
+  date: string
+  payment_method: DonationPaymentMethod
+  nature: DonationNature
+  cerfa_number: string | null
+  cerfa_generated: boolean
+  cerfa_generated_at: string | null
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
 }
