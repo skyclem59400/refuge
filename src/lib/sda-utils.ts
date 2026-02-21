@@ -71,6 +71,34 @@ export function calculateAge(birthDate: string | null): string {
   return `${years} an${years > 1 ? 's' : ''} et ${remainingMonths} mois`
 }
 
+export function getIcadDeclarationTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    pound_entry: 'Entree en fourriere', shelter_transfer: 'Transfert en refuge',
+    adoption: 'Adoption', return_to_owner: 'Restitution proprietaire',
+    transfer_out: 'Transfert sortant', death: 'Deces', euthanasia: 'Euthanasie',
+    identification: 'Identification', owner_change: 'Changement proprietaire',
+    address_change: 'Changement adresse',
+  }
+  return labels[type] || type
+}
+
+export function getIcadStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    pending: 'En attente', submitted: 'Soumise', confirmed: 'Confirmee',
+    rejected: 'Rejetee', error: 'Erreur', not_required: 'Non requise',
+  }
+  return labels[status] || status
+}
+
+export function getIcadStatusColor(status: string): string {
+  const colors: Record<string, string> = {
+    pending: 'bg-warning/15 text-warning', submitted: 'bg-info/15 text-info',
+    confirmed: 'bg-success/15 text-success', rejected: 'bg-error/15 text-error',
+    error: 'bg-error/15 text-error', not_required: 'bg-muted/15 text-muted',
+  }
+  return colors[status] || 'bg-muted/15 text-muted'
+}
+
 export function calculateBusinessDays(startDate: string, endDate?: string): number {
   const start = new Date(startDate)
   const end = endDate ? new Date(endDate) : new Date()

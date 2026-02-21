@@ -161,6 +161,10 @@ export type SocialPostStatus = 'draft' | 'published' | 'archived'
 export type DonationPaymentMethod = 'cheque' | 'virement' | 'especes' | 'cb' | 'prelevement' | 'autre'
 export type DonationNature = 'numeraire' | 'nature'
 
+// I-CAD
+export type IcadDeclarationType = 'pound_entry' | 'shelter_transfer' | 'adoption' | 'return_to_owner' | 'transfer_out' | 'death' | 'euthanasia' | 'identification' | 'owner_change' | 'address_change'
+export type IcadDeclarationStatus = 'pending' | 'submitted' | 'confirmed' | 'rejected' | 'error' | 'not_required'
+
 export interface Animal {
   id: string
   establishment_id: string
@@ -254,6 +258,23 @@ export interface SocialPost {
   published_at: string | null
   created_by: string | null
   created_at: string
+}
+
+export interface IcadDeclaration {
+  id: string
+  animal_id: string
+  movement_id: string | null
+  declaration_type: IcadDeclarationType
+  status: IcadDeclarationStatus
+  icad_reference: string | null
+  submitted_at: string | null
+  confirmed_at: string | null
+  error_message: string | null
+  retry_count: number
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface Donation {

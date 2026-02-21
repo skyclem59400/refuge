@@ -5,7 +5,7 @@ import { getEstablishmentContext } from '@/lib/establishment/context'
 import { AnimalDetailTabs } from '@/components/animals/animal-detail-tabs'
 import { AnimalStatusBadge, SpeciesBadge } from '@/components/animals/animal-status-badge'
 import { getSexIcon, calculateAge, getOriginLabel } from '@/lib/sda-utils'
-import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, Box, SocialPost } from '@/lib/types/database'
+import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, Box, SocialPost, IcadDeclaration } from '@/lib/types/database'
 import { ArrowLeft } from 'lucide-react'
 
 export default async function AnimalDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -21,6 +21,7 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
     { data: healthRecords },
     { data: boxes },
     { data: socialPosts },
+    { data: icadDeclarations },
   ] = await Promise.all([
     admin.from('animals').select('*').eq('id', id).eq('establishment_id', estabId).single(),
     admin.from('animal_photos').select('*').eq('animal_id', id).order('is_primary', { ascending: false }),
@@ -28,6 +29,7 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
     admin.from('animal_health_records').select('*').eq('animal_id', id).order('date', { ascending: false }),
     admin.from('boxes').select('*').eq('establishment_id', estabId).order('name'),
     admin.from('social_posts').select('*').eq('animal_id', id).order('created_at', { ascending: false }),
+    admin.from('icad_declarations').select('*').eq('animal_id', id).order('created_at', { ascending: false }),
   ])
 
   if (!animal) notFound()
@@ -38,6 +40,7 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
   const typedHealth = (healthRecords as AnimalHealthRecord[]) || []
   const typedBoxes = (boxes as Box[]) || []
   const typedPosts = (socialPosts as SocialPost[]) || []
+  const typedIcad = (icadDeclarations as IcadDeclaration[]) || []
 
   const canManageAnimals = ctx!.permissions.canManageAnimals
   const canManageHealth = ctx!.permissions.canManageHealth
@@ -77,6 +80,7 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
         movements={typedMovements}
         healthRecords={typedHealth}
         socialPosts={typedPosts}
+        icadDeclarations={typedIcad}
         boxes={typedBoxes}
         canManageAnimals={canManageAnimals}
         canManageHealth={canManageHealth}

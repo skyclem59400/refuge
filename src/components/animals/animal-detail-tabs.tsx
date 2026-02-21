@@ -14,7 +14,8 @@ import {
   getHealthTypeLabel,
 } from '@/lib/sda-utils'
 import { PostGenerator } from '@/components/social/post-generator'
-import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, Box, SocialPost } from '@/lib/types/database'
+import { IcadDeclarations } from '@/components/icad/icad-declarations'
+import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, Box, SocialPost, IcadDeclaration } from '@/lib/types/database'
 import {
   Fingerprint,
   MapPin,
@@ -30,9 +31,10 @@ import {
   Info,
   ImageIcon,
   Share2,
+  Shield,
 } from 'lucide-react'
 
-type TabId = 'info' | 'photos' | 'health' | 'movements' | 'posts'
+type TabId = 'info' | 'photos' | 'health' | 'movements' | 'posts' | 'icad'
 
 interface AnimalDetailTabsProps {
   animal: Animal
@@ -40,6 +42,7 @@ interface AnimalDetailTabsProps {
   movements: AnimalMovement[]
   healthRecords: AnimalHealthRecord[]
   socialPosts: SocialPost[]
+  icadDeclarations: IcadDeclaration[]
   boxes: Box[]
   canManageAnimals: boolean
   canManageHealth: boolean
@@ -47,12 +50,13 @@ interface AnimalDetailTabsProps {
   canManagePosts: boolean
 }
 
-const tabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'socialPosts' }[] = [
+const tabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'socialPosts' | 'icadDeclarations' }[] = [
   { id: 'info', label: 'Infos', icon: Info },
   { id: 'photos', label: 'Photos', icon: Camera, countKey: 'photos' },
   { id: 'health', label: 'Sante', icon: HeartPulse, countKey: 'healthRecords' },
   { id: 'movements', label: 'Mouvements', icon: ArrowRightLeft, countKey: 'movements' },
   { id: 'posts', label: 'Publications', icon: Share2, countKey: 'socialPosts' },
+  { id: 'icad', label: 'I-CAD', icon: Shield, countKey: 'icadDeclarations' },
 ]
 
 export function AnimalDetailTabs({
@@ -61,6 +65,7 @@ export function AnimalDetailTabs({
   movements,
   healthRecords,
   socialPosts,
+  icadDeclarations,
   boxes,
   canManageAnimals,
   canManageHealth,
@@ -78,6 +83,7 @@ export function AnimalDetailTabs({
     healthRecords: healthRecords.length,
     movements: movements.length,
     socialPosts: socialPosts.length,
+    icadDeclarations: icadDeclarations.length,
   }
 
   const todayDate = new Date()
@@ -202,6 +208,16 @@ export function AnimalDetailTabs({
             photos={photos}
             socialPosts={socialPosts}
             canManagePosts={canManagePosts}
+          />
+        )}
+
+        {activeTab === 'icad' && (
+          <IcadDeclarations
+            animalId={animal.id}
+            animalName={animal.name}
+            chipNumber={animal.chip_number}
+            declarations={icadDeclarations}
+            canManage={canManageMovements}
           />
         )}
       </div>
