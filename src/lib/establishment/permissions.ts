@@ -64,6 +64,15 @@ export async function requirePermission(permission: Permission): Promise<AuthCon
       case 'manage_establishment': return ctx.membership.manage_establishment
       case 'manage_documents': return ctx.membership.manage_documents
       case 'manage_clients': return ctx.membership.manage_clients
+      case 'manage_animals': return ctx.membership.manage_animals
+      case 'view_animals': return ctx.membership.view_animals
+      case 'manage_health': return ctx.membership.manage_health
+      case 'manage_movements': return ctx.membership.manage_movements
+      case 'manage_boxes': return ctx.membership.manage_boxes
+      case 'manage_posts': return ctx.membership.manage_posts
+      case 'manage_donations': return ctx.membership.manage_donations
+      case 'view_pound': return ctx.membership.view_pound
+      case 'view_statistics': return ctx.membership.view_statistics
       default: return false
     }
   })()

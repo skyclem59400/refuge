@@ -11,6 +11,15 @@ function buildPermissions(member: EstablishmentMember): Permissions {
     canManageEstablishment: isAdmin || member.manage_establishment,
     canManageDocuments: isAdmin || member.manage_documents,
     canManageClients: isAdmin || member.manage_clients,
+    canManageAnimals: isAdmin || member.manage_animals,
+    canViewAnimals: isAdmin || member.view_animals,
+    canManageHealth: isAdmin || member.manage_health,
+    canManageMovements: isAdmin || member.manage_movements,
+    canManageBoxes: isAdmin || member.manage_boxes,
+    canManagePosts: isAdmin || member.manage_posts,
+    canManageDonations: isAdmin || member.manage_donations,
+    canViewPound: isAdmin || member.view_pound,
+    canViewStatistics: isAdmin || member.view_statistics,
   }
 }
 

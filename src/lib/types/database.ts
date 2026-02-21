@@ -2,7 +2,7 @@ export type ClientType = 'particulier' | 'organisation'
 export type DocumentType = 'devis' | 'facture' | 'avoir'
 export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'converted' | 'validated'
 export type EstablishmentRole = 'admin' | 'member'
-export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients'
+export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics'
 
 export interface LineItem {
   description: string
