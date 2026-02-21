@@ -153,6 +153,9 @@ export type IcadStatus = 'pending' | 'declared' | 'not_required'
 export type BoxSpecies = 'cat' | 'dog' | 'mixed'
 export type BoxStatus = 'available' | 'occupied' | 'maintenance'
 export type EstablishmentType = 'farm' | 'shelter' | 'both'
+export type SocialPostType = 'search_owner' | 'adoption'
+export type SocialPlatform = 'facebook' | 'instagram' | 'both'
+export type SocialPostStatus = 'draft' | 'published' | 'archived'
 
 export interface Animal {
   id: string
@@ -234,4 +237,17 @@ export interface Box {
   status: BoxStatus
   created_at: string
   updated_at: string
+}
+
+export interface SocialPost {
+  id: string
+  animal_id: string
+  type: SocialPostType
+  platform: SocialPlatform
+  content: string
+  photo_urls: string[]
+  status: SocialPostStatus
+  published_at: string | null
+  created_by: string | null
+  created_at: string
 }

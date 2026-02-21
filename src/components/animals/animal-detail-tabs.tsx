@@ -13,7 +13,8 @@ import {
   getMovementLabel,
   getHealthTypeLabel,
 } from '@/lib/sda-utils'
-import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, Box } from '@/lib/types/database'
+import { PostGenerator } from '@/components/social/post-generator'
+import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, Box, SocialPost } from '@/lib/types/database'
 import {
   Fingerprint,
   MapPin,
@@ -28,26 +29,30 @@ import {
   Plus,
   Info,
   ImageIcon,
+  Share2,
 } from 'lucide-react'
 
-type TabId = 'info' | 'photos' | 'health' | 'movements'
+type TabId = 'info' | 'photos' | 'health' | 'movements' | 'posts'
 
 interface AnimalDetailTabsProps {
   animal: Animal
   photos: AnimalPhoto[]
   movements: AnimalMovement[]
   healthRecords: AnimalHealthRecord[]
+  socialPosts: SocialPost[]
   boxes: Box[]
   canManageAnimals: boolean
   canManageHealth: boolean
   canManageMovements: boolean
+  canManagePosts: boolean
 }
 
-const tabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' }[] = [
+const tabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'socialPosts' }[] = [
   { id: 'info', label: 'Infos', icon: Info },
   { id: 'photos', label: 'Photos', icon: Camera, countKey: 'photos' },
   { id: 'health', label: 'Sante', icon: HeartPulse, countKey: 'healthRecords' },
   { id: 'movements', label: 'Mouvements', icon: ArrowRightLeft, countKey: 'movements' },
+  { id: 'posts', label: 'Publications', icon: Share2, countKey: 'socialPosts' },
 ]
 
 export function AnimalDetailTabs({
@@ -55,10 +60,12 @@ export function AnimalDetailTabs({
   photos,
   movements,
   healthRecords,
+  socialPosts,
   boxes,
   canManageAnimals,
   canManageHealth,
   canManageMovements,
+  canManagePosts,
 }: AnimalDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('info')
   const [showHealthForm, setShowHealthForm] = useState(false)
@@ -70,6 +77,7 @@ export function AnimalDetailTabs({
     photos: photos.length,
     healthRecords: healthRecords.length,
     movements: movements.length,
+    socialPosts: socialPosts.length,
   }
 
   const todayDate = new Date()
@@ -185,6 +193,15 @@ export function AnimalDetailTabs({
             canManageMovements={canManageMovements}
             showForm={showMovementForm}
             onToggleForm={() => setShowMovementForm(!showMovementForm)}
+          />
+        )}
+
+        {activeTab === 'posts' && (
+          <PostsTab
+            animal={animal}
+            photos={photos}
+            socialPosts={socialPosts}
+            canManagePosts={canManagePosts}
           />
         )}
       </div>
@@ -560,6 +577,94 @@ function MovementsTab({
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================
+   Tab 5: Publications
+   ============================================================ */
+
+function PostsTab({
+  animal,
+  photos,
+  socialPosts,
+  canManagePosts,
+}: {
+  animal: Animal
+  photos: AnimalPhoto[]
+  socialPosts: SocialPost[]
+  canManagePosts: boolean
+}) {
+  const [showGenerator, setShowGenerator] = useState(false)
+
+  return (
+    <div className="space-y-4">
+      {/* Generate button */}
+      {canManagePosts && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowGenerator(!showGenerator)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold gradient-primary text-white hover:opacity-90 transition-opacity"
+          >
+            <Plus className="w-4 h-4" />
+            {showGenerator ? 'Masquer le generateur' : 'Nouveau post IA'}
+          </button>
+        </div>
+      )}
+
+      {/* Post generator */}
+      {showGenerator && canManagePosts && (
+        <PostGenerator
+          animalId={animal.id}
+          animalName={animal.name}
+          animalStatus={animal.status}
+          photos={photos}
+          onPostCreated={() => setShowGenerator(false)}
+        />
+      )}
+
+      {/* Existing posts list */}
+      <div className="bg-surface rounded-xl border border-border">
+        <div className="p-5 border-b border-border flex items-center gap-2">
+          <Share2 className="w-4 h-4 text-muted" />
+          <div>
+            <h3 className="font-semibold">Publications</h3>
+            <p className="text-xs text-muted mt-0.5">{socialPosts.length} publication(s)</p>
+          </div>
+        </div>
+
+        {socialPosts.length === 0 ? (
+          <p className="p-5 text-sm text-muted text-center">Aucune publication generee</p>
+        ) : (
+          <div className="divide-y divide-border">
+            {socialPosts.map((post) => (
+              <div key={post.id} className="p-4 hover:bg-surface-hover/30 transition-colors">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                    post.type === 'search_owner' ? 'bg-warning/15 text-warning' : 'bg-success/15 text-success'
+                  }`}>
+                    {post.type === 'search_owner' ? 'Recherche proprio' : 'Adoption'}
+                  </span>
+                  <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-info/15 text-info">
+                    {post.platform === 'facebook' ? 'Facebook' : post.platform === 'instagram' ? 'Instagram' : 'FB + IG'}
+                  </span>
+                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                    post.status === 'draft' ? 'bg-muted/15 text-muted' : post.status === 'published' ? 'bg-success/15 text-success' : 'bg-muted/15 text-muted'
+                  }`}>
+                    {post.status === 'draft' ? 'Brouillon' : post.status === 'published' ? 'Publie' : 'Archive'}
+                  </span>
+                  <span className="text-xs text-muted ml-auto">
+                    {formatDateShort(post.created_at)}
+                  </span>
+                </div>
+                <p className="text-sm text-muted whitespace-pre-wrap line-clamp-4">{post.content}</p>
+              </div>
+            ))}
           </div>
         )}
       </div>
