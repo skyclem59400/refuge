@@ -73,6 +73,32 @@ export async function getUpcomingReminders() {
   }
 }
 
+export async function getOverdueReminders() {
+  try {
+    const { establishmentId } = await requireEstablishment()
+    const supabase = createAdminClient()
+
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+
+    const { data, error } = await supabase
+      .from('animal_health_records')
+      .select('*, animals!inner(id, name, species, establishment_id)')
+      .eq('animals.establishment_id', establishmentId)
+      .not('next_due_date', 'is', null)
+      .lt('next_due_date', todayStr)
+      .order('next_due_date', { ascending: true })
+
+    if (error) {
+      return { error: error.message }
+    }
+
+    return { data }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
 // ============================================
 // Write actions (use createClient)
 // ============================================
@@ -113,6 +139,35 @@ export async function createHealthRecord(data: {
     revalidatePath('/health')
     revalidatePath(`/animals/${data.animal_id}`)
     return { data: record }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+export async function updateHealthRecord(id: string, data: {
+  type?: HealthRecordType
+  date?: string
+  description?: string
+  veterinarian?: string | null
+  next_due_date?: string | null
+  cost?: number | null
+  notes?: string | null
+}) {
+  try {
+    await requirePermission('manage_health')
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('animal_health_records')
+      .update(data)
+      .eq('id', id)
+
+    if (error) {
+      return { error: error.message }
+    }
+
+    revalidatePath('/health')
+    return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
   }

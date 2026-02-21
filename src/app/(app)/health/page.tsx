@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { HeartPulse, AlertTriangle, Stethoscope, Calendar } from 'lucide-react'
-import { getHealthRecords, getUpcomingReminders } from '@/lib/actions/health'
+import { getHealthRecords, getUpcomingReminders, getOverdueReminders } from '@/lib/actions/health'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { getHealthTypeLabel } from '@/lib/sda-utils'
 import { formatDateShort, formatCurrency } from '@/lib/utils'
@@ -63,19 +63,24 @@ export default async function HealthPage({
     filters.type = params.type as HealthRecordType
   }
 
-  const [recordsResult, remindersResult] = await Promise.all([
+  const [recordsResult, remindersResult, overdueResult] = await Promise.all([
     getHealthRecords(filters),
     getUpcomingReminders(),
+    getOverdueReminders(),
   ])
 
   const records = (recordsResult.data as HealthRecordWithAnimal[] | undefined) || []
   const reminders = (remindersResult.data as HealthRecordWithAnimal[] | undefined) || []
+  const overdueReminders = (overdueResult.data as HealthRecordWithAnimal[] | undefined) || []
 
   // Optional search by animal name (client-side-like filtering on server)
   const searchTerm = params.search?.toLowerCase() || ''
   const filteredRecords = searchTerm
     ? records.filter((r) => r.animals?.name?.toLowerCase().includes(searchTerm))
     : records
+
+  // Calculate total cost across all records
+  const totalCost = records.reduce((sum, r) => sum + (r.cost || 0), 0)
 
   return (
     <div className="animate-fade-up">
@@ -93,6 +98,55 @@ export default async function HealthPage({
           </div>
         </div>
       </div>
+
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div className="bg-surface rounded-xl border border-border p-4 text-center">
+          <p className="text-2xl font-bold">{records.length}</p>
+          <p className="text-xs text-muted mt-1">Actes total</p>
+        </div>
+        <div className="bg-surface rounded-xl border border-border p-4 text-center">
+          <p className="text-2xl font-bold text-error">{overdueReminders.length}</p>
+          <p className="text-xs text-muted mt-1">En retard</p>
+        </div>
+        <div className="bg-surface rounded-xl border border-border p-4 text-center">
+          <p className="text-2xl font-bold text-warning">{reminders.length}</p>
+          <p className="text-xs text-muted mt-1">A venir (7j)</p>
+        </div>
+        <div className="bg-surface rounded-xl border border-border p-4 text-center">
+          <p className="text-2xl font-bold">{formatCurrency(totalCost)}</p>
+          <p className="text-xs text-muted mt-1">Cout total</p>
+        </div>
+      </div>
+
+      {/* Overdue reminders section */}
+      {overdueReminders.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted mb-3 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-error" />
+            Rappels en retard ({overdueReminders.length})
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {overdueReminders.map((reminder) => (
+              <div key={reminder.id} className="rounded-xl border border-error/30 bg-error/10 p-4">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <Link href={`/animals/${reminder.animal_id}`} className="font-semibold text-sm hover:text-primary transition-colors">
+                    {reminder.animals?.species === 'cat' ? '\uD83D\uDC31' : '\uD83D\uDC36'} {reminder.animals?.name}
+                  </Link>
+                  <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-error/20 text-error shrink-0">
+                    {getHealthTypeLabel(reminder.type)}
+                  </span>
+                </div>
+                <p className="text-sm text-muted mb-2">{reminder.description}</p>
+                <div className="flex items-center gap-1 text-xs text-error font-medium">
+                  <AlertTriangle className="w-3 h-3" />
+                  <span>Echeance depassee : {formatDateShort(reminder.next_due_date!)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Upcoming reminders section */}
       {reminders.length > 0 && (
