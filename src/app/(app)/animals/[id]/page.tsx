@@ -42,6 +42,23 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
   const typedPosts = (socialPosts as SocialPost[]) || []
   const typedIcad = (icadDeclarations as IcadDeclaration[]) || []
 
+  // Resolve user names for created_by fields
+  const allCreatedByIds = [
+    ...typedMovements.map((m) => m.created_by),
+    ...typedHealth.map((h) => h.created_by),
+  ].filter((id): id is string => !!id)
+  const uniqueUserIds = [...new Set(allCreatedByIds)]
+
+  const userNames: Record<string, string> = {}
+  if (uniqueUserIds.length > 0) {
+    const { data: usersInfo } = await admin.rpc('get_users_info', { user_ids: uniqueUserIds })
+    if (usersInfo && Array.isArray(usersInfo)) {
+      for (const u of usersInfo) {
+        userNames[u.id] = u.raw_user_meta_data?.name || u.email || u.id
+      }
+    }
+  }
+
   const canManageAnimals = ctx!.permissions.canManageAnimals
   const canManageHealth = ctx!.permissions.canManageHealth
   const canManageMovements = ctx!.permissions.canManageMovements
@@ -82,6 +99,9 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
         socialPosts={typedPosts}
         icadDeclarations={typedIcad}
         boxes={typedBoxes}
+        userNames={userNames}
+        establishmentName={ctx!.establishment.name}
+        establishmentPhone={ctx!.establishment.phone}
         canManageAnimals={canManageAnimals}
         canManageHealth={canManageHealth}
         canManageMovements={canManageMovements}

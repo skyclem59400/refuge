@@ -152,10 +152,34 @@ Consignes :
       message.content[0].type === 'text' ? message.content[0].text : ''
 
     return Response.json({ content: generatedText })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('AI generation error:', error)
+
+    const errMsg = error instanceof Error ? error.message : String(error)
+
+    if (errMsg.includes('credit balance') || errMsg.includes('billing')) {
+      return Response.json(
+        { error: 'Solde API Anthropic insuffisant. Ajoutez des credits sur console.anthropic.com/settings/plans' },
+        { status: 402 }
+      )
+    }
+
+    if (errMsg.includes('invalid x-api-key') || errMsg.includes('authentication')) {
+      return Response.json(
+        { error: 'Cle API Anthropic invalide. Verifiez ANTHROPIC_API_KEY dans vos variables d\'environnement.' },
+        { status: 401 }
+      )
+    }
+
+    if (errMsg.includes('rate limit') || errMsg.includes('429')) {
+      return Response.json(
+        { error: 'Limite de requetes atteinte. Reessayez dans quelques instants.' },
+        { status: 429 }
+      )
+    }
+
     return Response.json(
-      { error: 'Erreur lors de la generation' },
+      { error: 'Erreur lors de la generation du texte. Reessayez.' },
       { status: 500 }
     )
   }

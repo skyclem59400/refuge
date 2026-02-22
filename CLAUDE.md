@@ -1,13 +1,13 @@
-# CLAUDE.md - CRM Optimus (La Ferme O 4 Vents)
+# CLAUDE.md - Optimus (Logiciel de refuge)
 
 ## Projet
 
-Application CRM de gestion de factures, devis et clients pour **La Ferme O 4 Vents** (refuge pour animaux, region Nord).
+Application de gestion pour **La Ferme O 4 Vents** (refuge pour animaux, region Nord).
 Nom interne : **Optimus**.
 
 - **Stack** : Next.js 16 (App Router) + TypeScript + Tailwind CSS v4 + Supabase (PostgreSQL, Auth, Storage) + Puppeteer (PDF) + Recharts (graphiques)
 - **Deploiement** : Docker multi-stage via Coolify sur VPS, auto-deploy sur push main
-- **Repo** : `https://github.com/skyclem59400/CRM_ferme.git`
+- **Repo** : `https://github.com/skyclem59400/refuge.git`
 - **Admin principal** : `clement.scailteux@gmail.com`
 - **URL prod** : `https://crm.skyclem.fr`
 - **Supabase** : `https://zzevrtrgtgnlxxuwbnge.supabase.co`
@@ -24,7 +24,7 @@ npm run lint     # ESLint
 ## Architecture
 
 ```
-crm-ferme/
+refuge/
 ├── middleware.ts                      # Auth : redirige /login si non connecte
 ├── next.config.ts                     # output: standalone, puppeteer external
 ├── Dockerfile                         # 3 stages: deps → builder → runner (Chrome pour PDF)
@@ -189,7 +189,7 @@ Ce fichier est **OBSOLETE**. Il a ete remplace par les 3 scripts sequentiels ci-
 ## Git
 
 ```
-Remote: https://github.com/skyclem59400/CRM_ferme.git
+Remote: https://github.com/skyclem59400/refuge.git
 Branch: main
 user.name: skyclem59400
 user.email: c.scailteux@sda-nord.com
@@ -216,6 +216,24 @@ user.email: c.scailteux@sda-nord.com
 - [x] Upload logo etablissement + avatar utilisateur
 - [x] Theme clair/sombre avec persistance
 - [x] Donnees de test (40 clients, 15 devis, 40 factures, 1 avoir)
+
+## Methode de travail
+
+### Skills disponibles
+Avant toute tache complexe, consulte les skills dans `~/.gemini/antigravity/scratch/skills/superpowers/`. Lis le SKILL.md correspondant avant d'agir.
+
+### Agents paralleles
+Pour toute tache touchant **2+ fichiers independants**, utilise le pattern de dispatching d'agents paralleles (Task tool) :
+- Un agent par fichier/domaine independant
+- Prompt specifique avec contexte, contraintes et output attendu
+- Review + build de verification apres integration
+
+### Workflow type pour une feature
+1. Creer une branche `feature/nom`
+2. Si complexe : `writing-plans` → plan d'implementation
+3. Dispatcher les agents en parallele sur les sous-taches independantes
+4. Integrer, verifier le build (`npm run build`)
+5. Merge sur `main` et push (auto-deploy Coolify)
 
 ## Idees / TODO potentiel
 

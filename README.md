@@ -1,4 +1,4 @@
-# Optimus - CRM Refuge & Ferme
+# Optimus - Logiciel de refuge
 
 Application de gestion multi-etablissement pour **La Ferme O 4 Vents** (exploitation agricole) et **SDA Estormel** (refuge animalier).
 
@@ -278,7 +278,7 @@ Securite a 3 niveaux :
 ## Structure du projet
 
 ```
-crm-ferme/
+refuge/
 ├── Dockerfile
 ├── .dockerignore
 ├── middleware.ts

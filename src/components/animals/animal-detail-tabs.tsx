@@ -1,11 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import Image from 'next/image'
 import { AnimalPhotos } from '@/components/animals/animal-photos'
 import { AnimalForm } from '@/components/animals/animal-form'
 import { HealthRecordForm } from '@/components/health/health-record-form'
 import { MovementForm } from '@/components/animals/movement-form'
+import { updatePost, deletePost } from '@/lib/actions/social-posts'
 import { formatDateShort, formatCurrency } from '@/lib/utils'
 import {
   getOriginLabel,
@@ -32,6 +35,12 @@ import {
   ImageIcon,
   Share2,
   Shield,
+  Trash2,
+  Copy,
+  Phone,
+  Save,
+  X,
+  Loader2,
 } from 'lucide-react'
 
 type TabId = 'info' | 'photos' | 'health' | 'movements' | 'posts' | 'icad'
@@ -44,6 +53,9 @@ interface AnimalDetailTabsProps {
   socialPosts: SocialPost[]
   icadDeclarations: IcadDeclaration[]
   boxes: Box[]
+  userNames: Record<string, string>
+  establishmentName: string
+  establishmentPhone: string
   canManageAnimals: boolean
   canManageHealth: boolean
   canManageMovements: boolean
@@ -67,6 +79,9 @@ export function AnimalDetailTabs({
   socialPosts,
   icadDeclarations,
   boxes,
+  userNames,
+  establishmentName,
+  establishmentPhone,
   canManageAnimals,
   canManageHealth,
   canManageMovements,
@@ -196,6 +211,7 @@ export function AnimalDetailTabs({
           <MovementsTab
             animal={animal}
             movements={movements}
+            userNames={userNames}
             canManageMovements={canManageMovements}
             showForm={showMovementForm}
             onToggleForm={() => setShowMovementForm(!showMovementForm)}
@@ -207,6 +223,8 @@ export function AnimalDetailTabs({
             animal={animal}
             photos={photos}
             socialPosts={socialPosts}
+            establishmentName={establishmentName}
+            establishmentPhone={establishmentPhone}
             canManagePosts={canManagePosts}
           />
         )}
@@ -520,12 +538,14 @@ function HealthTab({
 function MovementsTab({
   animal,
   movements,
+  userNames,
   canManageMovements,
   showForm,
   onToggleForm,
 }: {
   animal: Animal
   movements: AnimalMovement[]
+  userNames: Record<string, string>
   canManageMovements: boolean
   showForm: boolean
   onToggleForm: () => void
@@ -587,7 +607,7 @@ function MovementsTab({
                   <tr key={mv.id} className="hover:bg-surface-hover/30 transition-colors">
                     <td className="px-4 py-3 font-medium">{getMovementLabel(mv.type)}</td>
                     <td className="px-4 py-3 text-muted">{formatDateShort(mv.date)}</td>
-                    <td className="px-4 py-3 text-muted">{mv.person_name || '-'}</td>
+                    <td className="px-4 py-3 text-muted">{mv.person_name || (mv.created_by && userNames[mv.created_by]) || '-'}</td>
                     <td className="px-4 py-3 text-muted text-xs max-w-xs truncate">{mv.notes || '-'}</td>
                   </tr>
                 ))}
@@ -608,17 +628,81 @@ function PostsTab({
   animal,
   photos,
   socialPosts,
+  establishmentName,
+  establishmentPhone,
   canManagePosts,
 }: {
   animal: Animal
   photos: AnimalPhoto[]
   socialPosts: SocialPost[]
+  establishmentName: string
+  establishmentPhone: string
   canManagePosts: boolean
 }) {
   const [showGenerator, setShowGenerator] = useState(false)
+  const [editingPostId, setEditingPostId] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState('')
+  const [isPending, startTransition] = useTransition()
+  const router = useRouter()
+
+  const captureDate = animal.pound_entry_date
+    ? new Date(animal.pound_entry_date).toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : null
+
+  const postTypeBadges: Record<string, string> = {
+    search_owner: 'RECHERCHE PROPRIETAIRE',
+    adoption: 'A L\'ADOPTION',
+  }
+
+  function handleStartEdit(post: SocialPost) {
+    setEditingPostId(post.id)
+    setEditContent(post.content)
+  }
+
+  function handleCancelEdit() {
+    setEditingPostId(null)
+    setEditContent('')
+  }
+
+  function handleSaveEdit(postId: string) {
+    if (!editContent.trim()) return
+    startTransition(async () => {
+      const result = await updatePost(postId, { content: editContent.trim() })
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Publication mise a jour')
+        setEditingPostId(null)
+        setEditContent('')
+        router.refresh()
+      }
+    })
+  }
+
+  function handleDelete(postId: string) {
+    if (!window.confirm('Supprimer cette publication ?')) return
+    startTransition(async () => {
+      const result = await deletePost(postId)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Publication supprimee')
+        router.refresh()
+      }
+    })
+  }
+
+  function handleCopy(content: string) {
+    navigator.clipboard.writeText(content)
+    toast.success('Texte copie dans le presse-papier')
+  }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Generate button */}
       {canManagePosts && (
         <div>
@@ -636,54 +720,195 @@ function PostsTab({
       {/* Post generator */}
       {showGenerator && canManagePosts && (
         <PostGenerator
-          animalId={animal.id}
-          animalName={animal.name}
-          animalStatus={animal.status}
+          animal={animal}
           photos={photos}
+          establishmentName={establishmentName}
+          establishmentPhone={establishmentPhone}
           onPostCreated={() => setShowGenerator(false)}
         />
       )}
 
-      {/* Existing posts list */}
-      <div className="bg-surface rounded-xl border border-border">
-        <div className="p-5 border-b border-border flex items-center gap-2">
-          <Share2 className="w-4 h-4 text-muted" />
-          <div>
-            <h3 className="font-semibold">Publications</h3>
-            <p className="text-xs text-muted mt-0.5">{socialPosts.length} publication(s)</p>
-          </div>
+      {/* Existing posts */}
+      {socialPosts.length === 0 ? (
+        <div className="bg-surface rounded-xl border border-border p-8 text-center">
+          <Share2 className="w-8 h-8 text-muted/30 mx-auto mb-3" />
+          <p className="text-sm text-muted">Aucune publication generee</p>
         </div>
+      ) : (
+        <div className="space-y-8">
+          {socialPosts.map((post) => {
+            const photoUrl = post.photo_urls?.[0] || null
+            const isEditing = editingPostId === post.id
 
-        {socialPosts.length === 0 ? (
-          <p className="p-5 text-sm text-muted text-center">Aucune publication generee</p>
-        ) : (
-          <div className="divide-y divide-border">
-            {socialPosts.map((post) => (
-              <div key={post.id} className="p-4 hover:bg-surface-hover/30 transition-colors">
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                    post.type === 'search_owner' ? 'bg-warning/15 text-warning' : 'bg-success/15 text-success'
-                  }`}>
-                    {post.type === 'search_owner' ? 'Recherche proprio' : 'Adoption'}
-                  </span>
-                  <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-info/15 text-info">
-                    {post.platform === 'facebook' ? 'Facebook' : post.platform === 'instagram' ? 'Instagram' : 'FB + IG'}
-                  </span>
-                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                    post.status === 'draft' ? 'bg-muted/15 text-muted' : post.status === 'published' ? 'bg-success/15 text-success' : 'bg-muted/15 text-muted'
-                  }`}>
-                    {post.status === 'draft' ? 'Brouillon' : post.status === 'published' ? 'Publie' : 'Archive'}
-                  </span>
-                  <span className="text-xs text-muted ml-auto">
-                    {formatDateShort(post.created_at)}
-                  </span>
+            return (
+              <div key={post.id} className="space-y-3">
+                {/* Visual card */}
+                <div className="mx-auto max-w-md">
+                  <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-surface-dark shadow-xl">
+                    {/* Photo background */}
+                    {photoUrl ? (
+                      <Image
+                        src={photoUrl}
+                        alt={animal.name}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 448px) 100vw, 448px"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-surface-dark">
+                        <Camera className="h-20 w-20 text-muted/20" />
+                      </div>
+                    )}
+
+                    {/* Dark gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+
+                    {/* Top branding + status */}
+                    <div className="absolute top-0 left-0 right-0 p-4 flex items-start justify-between">
+                      <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md rounded-full px-3.5 py-1.5">
+                        <div className="w-5 h-5 rounded-full gradient-primary flex items-center justify-center shrink-0">
+                          <span className="text-white text-[7px] font-extrabold leading-none">SDA</span>
+                        </div>
+                        <span className="text-white text-xs font-bold tracking-wider uppercase">
+                          {establishmentName}
+                        </span>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold backdrop-blur-sm ${
+                        post.status === 'draft'
+                          ? 'bg-white/20 text-white'
+                          : post.status === 'published'
+                            ? 'bg-success/80 text-white'
+                            : 'bg-white/10 text-white/60'
+                      }`}>
+                        {post.status === 'draft' ? 'Brouillon' : post.status === 'published' ? 'Publie' : 'Archive'}
+                      </span>
+                    </div>
+
+                    {/* Bottom content */}
+                    <div className="absolute bottom-0 left-0 right-0 p-5 space-y-2.5">
+                      {/* Type badge */}
+                      <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/80 text-white backdrop-blur-sm">
+                        {postTypeBadges[post.type] || post.type}
+                      </span>
+
+                      {/* Animal name */}
+                      <h2 className="text-3xl font-extrabold text-white tracking-tight">
+                        {animal.name}
+                      </h2>
+
+                      {/* Location & date */}
+                      <div className="flex flex-wrap gap-3 text-white/80 text-sm">
+                        {animal.capture_location && (
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 shrink-0" />
+                            {animal.capture_location}
+                          </span>
+                        )}
+                        {captureDate && (
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 shrink-0" />
+                            {captureDate}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Text preview */}
+                      <p className="text-white/90 text-sm leading-relaxed line-clamp-3">
+                        {post.content}
+                      </p>
+
+                      {/* Footer */}
+                      <div className="pt-2 border-t border-white/20 flex items-center gap-2 text-white/50 text-xs">
+                        <span className="font-medium">{establishmentName}</span>
+                        {establishmentPhone && (
+                          <>
+                            <span>·</span>
+                            <span className="flex items-center gap-1">
+                              <Phone className="w-3 h-3" />
+                              {establishmentPhone}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm text-muted whitespace-pre-wrap line-clamp-4">{post.content}</p>
+
+                {/* Actions & editor below the card */}
+                <div className="mx-auto max-w-md space-y-3">
+                  {isEditing ? (
+                    <div className="bg-surface rounded-xl border border-border p-4 space-y-3">
+                      <textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        rows={8}
+                        className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveEdit(post.id)}
+                          disabled={isPending || !editContent.trim()}
+                          className="flex-1 gradient-primary hover:opacity-90 transition-opacity text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                          Sauvegarder
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCancelEdit}
+                          className="px-3 py-2 rounded-lg text-sm font-medium text-muted border border-border hover:bg-surface-dark transition-colors flex items-center gap-2"
+                        >
+                          <X className="w-4 h-4" />
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2">
+                      {canManagePosts && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(post)}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-muted border border-border hover:bg-surface-dark hover:text-text transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            Modifier
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(post.content)}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-muted border border-border hover:bg-surface-dark hover:text-text transition-colors"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            Copier
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(post.id)}
+                            disabled={isPending}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-muted border border-border hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/30 transition-colors disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Supprimer
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Date & platform info */}
+                  <p className="text-center text-xs text-muted">
+                    Cree le {formatDateShort(post.created_at)}
+                    {post.platform === 'facebook' ? ' · Facebook' : post.platform === 'instagram' ? ' · Instagram' : ' · FB + IG'}
+                  </p>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

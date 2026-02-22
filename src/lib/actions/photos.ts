@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
 
 // ============================================
@@ -31,13 +31,13 @@ export async function getAnimalPhotos(animalId: string) {
 }
 
 // ============================================
-// Write actions (use createClient)
+// Write actions (use adminClient — permission checked via requirePermission)
 // ============================================
 
 export async function uploadAnimalPhoto(animalId: string, formData: FormData) {
   try {
     const { establishmentId } = await requirePermission('manage_animals')
-    const supabase = await createClient()
+    const adminClient = createAdminClient()
 
     // Extract file from FormData
     const file = formData.get('file') as File | null
@@ -60,8 +60,8 @@ export async function uploadAnimalPhoto(animalId: string, formData: FormData) {
     const randomId = crypto.randomUUID()
     const path = `${establishmentId}/${animalId}/${randomId}.${ext}`
 
-    // Upload to Supabase Storage bucket "animal-photos"
-    const { error: uploadError } = await supabase.storage
+    // Upload to Supabase Storage bucket "animal-photos" (use adminClient to bypass storage policies)
+    const { error: uploadError } = await adminClient.storage
       .from('animal-photos')
       .upload(path, file, { upsert: false })
 
@@ -70,12 +70,11 @@ export async function uploadAnimalPhoto(animalId: string, formData: FormData) {
     }
 
     // Get public URL
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl } } = adminClient.storage
       .from('animal-photos')
       .getPublicUrl(path)
 
     // Check if this is the first photo (to set as primary)
-    const adminClient = createAdminClient()
     const { data: existingPhotos, error: countError } = await adminClient
       .from('animal_photos')
       .select('id')
@@ -87,8 +86,8 @@ export async function uploadAnimalPhoto(animalId: string, formData: FormData) {
 
     const isFirst = !existingPhotos || existingPhotos.length === 0
 
-    // Insert into animal_photos table
-    const { data: photo, error: insertError } = await supabase
+    // Insert into animal_photos table (use adminClient to bypass RLS — permission already checked)
+    const { data: photo, error: insertError } = await adminClient
       .from('animal_photos')
       .insert({
         animal_id: animalId,
@@ -100,7 +99,7 @@ export async function uploadAnimalPhoto(animalId: string, formData: FormData) {
 
     if (insertError) {
       // Attempt to clean up uploaded file on DB insert failure
-      await supabase.storage.from('animal-photos').remove([path])
+      await adminClient.storage.from('animal-photos').remove([path])
       return { error: insertError.message }
     }
 
@@ -115,10 +114,9 @@ export async function uploadAnimalPhoto(animalId: string, formData: FormData) {
 export async function deleteAnimalPhoto(photoId: string) {
   try {
     await requirePermission('manage_animals')
-    const supabase = await createClient()
+    const adminClient = createAdminClient()
 
     // Fetch the photo record to get the URL and animal_id
-    const adminClient = createAdminClient()
     const { data: photo, error: fetchError } = await adminClient
       .from('animal_photos')
       .select('*')
@@ -133,11 +131,11 @@ export async function deleteAnimalPhoto(photoId: string) {
     const urlParts = photo.url.split('/animal-photos/')
     if (urlParts.length > 1) {
       const storagePath = urlParts[1].split('?')[0] // Remove query params if any
-      await supabase.storage.from('animal-photos').remove([storagePath])
+      await adminClient.storage.from('animal-photos').remove([storagePath])
     }
 
-    // Delete from DB
-    const { error: deleteError } = await supabase
+    // Delete from DB (use adminClient to bypass RLS — permission already checked)
+    const { error: deleteError } = await adminClient
       .from('animal_photos')
       .delete()
       .eq('id', photoId)
@@ -157,10 +155,10 @@ export async function deleteAnimalPhoto(photoId: string) {
 export async function setPrimaryAnimalPhoto(photoId: string, animalId: string) {
   try {
     await requirePermission('manage_animals')
-    const supabase = await createClient()
+    const adminClient = createAdminClient()
 
     // First, set all photos for this animal to is_primary: false
-    const { error: resetError } = await supabase
+    const { error: resetError } = await adminClient
       .from('animal_photos')
       .update({ is_primary: false })
       .eq('animal_id', animalId)
@@ -170,7 +168,7 @@ export async function setPrimaryAnimalPhoto(photoId: string, animalId: string) {
     }
 
     // Then set this photo to is_primary: true
-    const { error: setError } = await supabase
+    const { error: setError } = await adminClient
       .from('animal_photos')
       .update({ is_primary: true })
       .eq('id', photoId)

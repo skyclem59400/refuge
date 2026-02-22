@@ -4,7 +4,7 @@
 
 **Goal:** Ajouter au CRM existant un module complet de gestion d'animaux avec workflow fourriere/refuge, sidebar dynamique par type d'etablissement, et gestion des box.
 
-**Architecture:** Extension du CRM-Ferme Next.js 16 + Supabase existant. Nouvelles tables Supabase, nouvelles pages dans l'App Router, sidebar conditionnelle selon `establishment.type`, systeme de permissions etendu.
+**Architecture:** Extension du logiciel de refuge Next.js 16 + Supabase existant. Nouvelles tables Supabase, nouvelles pages dans l'App Router, sidebar conditionnelle selon `establishment.type`, systeme de permissions etendu.
 
 **Tech Stack:** Next.js 16, React 19, Supabase (PostgreSQL + Auth + Storage + Edge Functions), Tailwind CSS v4, TypeScript 5, Puppeteer (PDF), Sonner (toasts), Lucide React (icons)
 
@@ -597,7 +597,7 @@ export function Sidebar({ establishments, currentEstablishment, permissions, use
 
 **Step 2: Verifier que l'app compile**
 
-Run: `cd /Users/clement/.gemini/antigravity/scratch/crm-ferme && npm run build`
+Run: `cd /Users/clement/.gemini/antigravity/scratch/refuge && npm run build`
 Expected: Build reussi (ou warnings seulement)
 
 **Step 3: Commit**

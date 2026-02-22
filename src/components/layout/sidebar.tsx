@@ -62,9 +62,16 @@ function getNavItems(type: EstablishmentType, permissions: Permissions): NavItem
     case 'shelter':
       typeItems = shelterItems
       break
-    case 'both':
-      typeItems = [...farmItems, ...shelterItems]
+    case 'both': {
+      const seen = new Set<string>()
+      typeItems = [...shelterItems, ...farmItems].filter((item) => {
+        const key = item.href + item.label
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
       break
+    }
     default:
       typeItems = farmItems
   }

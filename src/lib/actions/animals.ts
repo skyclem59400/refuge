@@ -158,8 +158,17 @@ export async function createAnimal(data: {
     const supabase = await createClient()
 
     const now = new Date().toISOString()
+
+    // Auto-generate medal number
+    const admin = createAdminClient()
+    const { data: nextMedal } = await admin.rpc('get_next_medal_number', {
+      est_id: establishmentId,
+    })
+    const medalNumber = nextMedal ? String(nextMedal) : data.medal_number
+
     const animalData = {
       ...data,
+      medal_number: medalNumber,
       establishment_id: establishmentId,
       pound_entry_date: data.status === 'pound' ? now : null,
     }

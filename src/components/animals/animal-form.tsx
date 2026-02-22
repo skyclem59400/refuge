@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createAnimal, updateAnimal } from '@/lib/actions/animals'
+import { CommuneAutocomplete } from '@/components/ui/commune-autocomplete'
 import type { Animal, Box, AnimalSpecies, AnimalSex, AnimalOrigin } from '@/lib/types/database'
 
 interface AnimalFormProps {
@@ -339,13 +340,18 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
           {/* Numero de medaille */}
           <div>
             <label className={labelClass}>Numero de medaille</label>
-            <input
-              type="text"
-              value={medalNumber}
-              onChange={(e) => setMedalNumber(e.target.value)}
-              placeholder="Numero de medaille"
-              className={inputClass}
-            />
+            {isEditing ? (
+              <input
+                type="text"
+                value={medalNumber}
+                readOnly
+                className={`${inputClass} opacity-60 cursor-not-allowed`}
+              />
+            ) : (
+              <div className={`${inputClass} opacity-60 cursor-not-allowed text-muted`}>
+                Auto-genere
+              </div>
+            )}
           </div>
 
           {/* Numero LOOF */}
@@ -383,11 +389,10 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
             {/* Lieu de capture */}
             <div>
               <label className={labelClass}>Lieu de capture</label>
-              <input
-                type="text"
+              <CommuneAutocomplete
                 value={captureLocation}
-                onChange={(e) => setCaptureLocation(e.target.value)}
-                placeholder="Adresse ou lieu de capture"
+                onChange={setCaptureLocation}
+                placeholder="Commune de capture"
                 className={inputClass}
               />
             </div>

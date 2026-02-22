@@ -1,7 +1,6 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
 import type {
@@ -49,7 +48,7 @@ export async function createPost(data: {
 }) {
   try {
     const { userId } = await requirePermission('manage_posts')
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data: post, error } = await supabase
       .from('social_posts')
@@ -84,7 +83,7 @@ export async function updatePost(id: string, data: {
 }) {
   try {
     await requirePermission('manage_posts')
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data: post, error } = await supabase
       .from('social_posts')
@@ -107,7 +106,7 @@ export async function updatePost(id: string, data: {
 export async function deletePost(id: string) {
   try {
     await requirePermission('manage_posts')
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     // Get animal_id before deleting for revalidation
     const { data: post, error: fetchError } = await supabase
@@ -139,7 +138,7 @@ export async function deletePost(id: string) {
 export async function publishPost(id: string) {
   try {
     await requirePermission('manage_posts')
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data: post, error } = await supabase
       .from('social_posts')
@@ -165,7 +164,7 @@ export async function publishPost(id: string) {
 export async function archivePost(id: string) {
   try {
     await requirePermission('manage_posts')
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data: post, error } = await supabase
       .from('social_posts')
