@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import Image from 'next/image'
+import html2canvas from 'html2canvas'
 import {
   Sparkles,
   Save,
@@ -13,9 +13,11 @@ import {
   Calendar,
   Phone,
   Pencil,
-  Camera,
+  Download,
+  PawPrint,
 } from 'lucide-react'
 import { createPost } from '@/lib/actions/social-posts'
+import { getSpeciesLabel, getSexLabel, calculateAge } from '@/lib/sda-utils'
 import type { Animal, SocialPostType, SocialPlatform } from '@/lib/types/database'
 
 interface PostGeneratorProps {
@@ -36,6 +38,11 @@ const postTypeBadges: Record<SocialPostType, string> = {
   adoption: 'A L\'ADOPTION',
 }
 
+const postTypeBadgeColors: Record<SocialPostType, string> = {
+  search_owner: '#ef4444',
+  adoption: '#22c55e',
+}
+
 const platformLabels: Record<SocialPlatform, string> = {
   facebook: 'Facebook',
   instagram: 'Instagram',
@@ -51,15 +58,18 @@ export function PostGenerator({
 }: PostGeneratorProps) {
   const defaultPostType: SocialPostType = animal.status === 'pound' ? 'search_owner' : 'adoption'
   const primaryPhoto = photos.find((p) => p.is_primary) || photos[0] || null
+  const photoUrl = primaryPhoto?.url || animal.photo_url || null
 
   const [postType, setPostType] = useState<SocialPostType>(defaultPostType)
   const [platform, setPlatform] = useState<SocialPlatform>('both')
   const [additionalNotes, setAdditionalNotes] = useState('')
   const [generatedContent, setGeneratedContent] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
   const [showEditor, setShowEditor] = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+  const cardRef = useRef<HTMLDivElement>(null)
 
   const captureDate = animal.pound_entry_date
     ? new Date(animal.pound_entry_date).toLocaleDateString('fr-FR', {
@@ -99,13 +109,37 @@ export function PostGenerator({
     }
   }
 
+  async function handleDownload() {
+    if (!cardRef.current) return
+    setIsDownloading(true)
+
+    try {
+      const canvas = await html2canvas(cardRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+      })
+
+      const link = document.createElement('a')
+      link.download = `${animal.name.toLowerCase()}-${postType}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+      toast.success('Visuel telecharge')
+    } catch {
+      toast.error('Erreur lors du telechargement')
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
   function handleSaveDraft() {
     if (!generatedContent.trim()) {
       toast.error('Le contenu ne peut pas etre vide')
       return
     }
 
-    const selectedUrls = primaryPhoto ? [primaryPhoto.url] : []
+    const selectedUrls = photoUrl ? [photoUrl] : []
 
     startTransition(async () => {
       const result = await createPost({
@@ -129,6 +163,8 @@ export function PostGenerator({
   const inputClass =
     'w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50'
   const labelClass = 'block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5'
+
+  const badgeColor = postTypeBadgeColors[postType]
 
   return (
     <div className="space-y-6">
@@ -211,30 +247,34 @@ export function PostGenerator({
         <div className="space-y-4 animate-fade-up">
           {/* Card */}
           <div className="mx-auto max-w-md">
-            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-surface-dark shadow-xl">
+            <div
+              ref={cardRef}
+              className="relative overflow-hidden rounded-2xl shadow-2xl"
+              style={{ aspectRatio: '4/5' }}
+            >
               {/* Photo background */}
-              {primaryPhoto ? (
-                <Image
-                  src={primaryPhoto.url}
+              {photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={photoUrl}
                   alt={animal.name}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 448px) 100vw, 448px"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  crossOrigin="anonymous"
                 />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-surface-dark">
-                  <Camera className="h-20 w-20 text-muted/20" />
+                <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)' }}>
+                  <PawPrint className="h-32 w-32 text-white/10" />
                 </div>
               )}
 
-              {/* Dark gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+              {/* Gradient overlays */}
+              <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 40%, rgba(0,0,0,0.15) 70%, rgba(0,0,0,0.3) 100%)' }} />
 
-              {/* Top branding bar */}
-              <div className="absolute top-0 left-0 right-0 p-4">
-                <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md rounded-full px-3.5 py-1.5">
-                  <div className="w-5 h-5 rounded-full gradient-primary flex items-center justify-center shrink-0">
-                    <span className="text-white text-[7px] font-extrabold leading-none">SDA</span>
+              {/* Top bar */}
+              <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
+                <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md rounded-full px-3.5 py-1.5">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #7c3aed, #6366f1)' }}>
+                    <span className="text-white text-[8px] font-extrabold leading-none">SDA</span>
                   </div>
                   <span className="text-white text-xs font-bold tracking-wider uppercase">
                     {establishmentName}
@@ -242,17 +282,40 @@ export function PostGenerator({
                 </div>
               </div>
 
-              {/* Bottom content overlay */}
-              <div className="absolute bottom-0 left-0 right-0 p-5 space-y-2.5">
+              {/* Bottom content */}
+              <div className="absolute bottom-0 left-0 right-0 p-5 space-y-3">
                 {/* Type badge */}
-                <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/80 text-white backdrop-blur-sm">
+                <span
+                  className="inline-block px-4 py-1.5 rounded-full text-[11px] font-extrabold uppercase tracking-widest text-white shadow-lg"
+                  style={{ backgroundColor: badgeColor }}
+                >
                   {postTypeBadges[postType]}
                 </span>
 
                 {/* Animal name */}
-                <h2 className="text-3xl font-extrabold text-white tracking-tight">
-                  {animal.name}
+                <h2 className="text-4xl font-black text-white tracking-tight leading-none" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
+                  {animal.name.toUpperCase()}
                 </h2>
+
+                {/* Animal info pills */}
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-medium">
+                    {animal.species === 'cat' ? '🐱' : '🐶'} {getSpeciesLabel(animal.species)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-medium">
+                    {getSexLabel(animal.sex)}
+                  </span>
+                  {animal.birth_date && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-medium">
+                      {calculateAge(animal.birth_date)}
+                    </span>
+                  )}
+                  {animal.breed && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-medium">
+                      {animal.breed}
+                    </span>
+                  )}
+                </div>
 
                 {/* Location & date */}
                 <div className="flex flex-wrap gap-3 text-white/80 text-sm">
@@ -270,29 +333,43 @@ export function PostGenerator({
                   )}
                 </div>
 
-                {/* Short text preview */}
+                {/* Text preview */}
                 <p className="text-white/90 text-sm leading-relaxed line-clamp-3">
                   {generatedContent}
                 </p>
 
-                {/* Footer with contact */}
-                <div className="pt-2 border-t border-white/20 flex items-center gap-2 text-white/50 text-xs">
-                  <span className="font-medium">{establishmentName}</span>
+                {/* Footer */}
+                <div className="pt-2.5 border-t border-white/20 flex items-center justify-between">
+                  <span className="text-white/70 text-xs font-semibold">{establishmentName}</span>
                   {establishmentPhone && (
-                    <>
-                      <span>·</span>
-                      <span className="flex items-center gap-1">
-                        <Phone className="w-3 h-3" />
-                        {establishmentPhone}
-                      </span>
-                    </>
+                    <span className="flex items-center gap-1.5 text-white/70 text-xs">
+                      <Phone className="w-3 h-3" />
+                      {establishmentPhone}
+                    </span>
                   )}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Editor & actions */}
+          {/* Download button */}
+          <div className="flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-surface border border-border hover:bg-surface-hover transition-colors disabled:opacity-50"
+            >
+              {isDownloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Telecharger le visuel
+            </button>
+          </div>
+
+          {/* Editor & save */}
           <div className="bg-surface rounded-xl border border-border p-5 space-y-4">
             <button
               type="button"

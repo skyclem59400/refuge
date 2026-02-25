@@ -189,6 +189,8 @@ export async function createAnimal(data: {
       abandoned: 'Animal abandonne - entree en fourriere',
       transferred_in: 'Transfert entrant - entree en fourriere',
       surrender: 'Cession par le proprietaire - entree en fourriere',
+      requisition: 'Requisition - entree en fourriere',
+      divagation: 'Divagation - entree en fourriere',
     }
 
     const { error: movementError } = await supabase

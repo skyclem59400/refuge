@@ -47,6 +47,7 @@ export function getOriginLabel(origin: string): string {
   const labels: Record<string, string> = {
     found: 'Trouvé', abandoned: 'Abandonné',
     transferred_in: 'Transféré (entrant)', surrender: 'Remis volontairement',
+    requisition: 'Réquisition', divagation: 'Divagation',
   }
   return labels[origin] || origin
 }

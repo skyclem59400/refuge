@@ -146,7 +146,7 @@ export interface CompanyInfo {
 export type AnimalSpecies = 'cat' | 'dog'
 export type AnimalSex = 'male' | 'female' | 'unknown'
 export type AnimalStatus = 'pound' | 'shelter' | 'foster_family' | 'boarding' | 'adopted' | 'returned' | 'transferred' | 'deceased' | 'euthanized'
-export type AnimalOrigin = 'found' | 'abandoned' | 'transferred_in' | 'surrender'
+export type AnimalOrigin = 'found' | 'abandoned' | 'transferred_in' | 'surrender' | 'requisition' | 'divagation'
 export type MovementType = 'pound_entry' | 'shelter_transfer' | 'adoption' | 'return_to_owner' | 'transfer_out' | 'death' | 'euthanasia'
 export type HealthRecordType = 'vaccination' | 'sterilization' | 'antiparasitic' | 'consultation' | 'surgery' | 'medication' | 'behavioral_assessment'
 export type IcadStatus = 'pending' | 'declared' | 'not_required'

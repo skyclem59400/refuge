@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createAnimal, updateAnimal } from '@/lib/actions/animals'
 import { CommuneAutocomplete } from '@/components/ui/commune-autocomplete'
+import { getBreedsForSpecies } from '@/lib/breeds'
 import type { Animal, Box, AnimalSpecies, AnimalSex, AnimalOrigin } from '@/lib/types/database'
 
 interface AnimalFormProps {
@@ -111,7 +112,11 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
     abandoned: 'Abandonne',
     transferred_in: 'Transfert entrant',
     surrender: 'Cession',
+    requisition: 'Requisition',
+    divagation: 'Divagation',
   }
+
+  const breedSuggestions = getBreedsForSpecies(species)
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl">
@@ -180,11 +185,17 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
             <label className={labelClass}>Race</label>
             <input
               type="text"
+              list="breed-list"
               value={breed}
               onChange={(e) => setBreed(e.target.value)}
-              placeholder="Race"
+              placeholder="Rechercher une race..."
               className={inputClass}
             />
+            <datalist id="breed-list">
+              {breedSuggestions.map((b) => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
           </div>
 
           {/* Croisement */}
@@ -192,11 +203,17 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
             <label className={labelClass}>Croisement</label>
             <input
               type="text"
+              list="breed-cross-list"
               value={breedCross}
               onChange={(e) => setBreedCross(e.target.value)}
               placeholder="Croise avec..."
               className={inputClass}
             />
+            <datalist id="breed-cross-list">
+              {breedSuggestions.map((b) => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
           </div>
 
           {/* Date de naissance */}
