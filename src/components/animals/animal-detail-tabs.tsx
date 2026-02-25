@@ -92,9 +92,10 @@ export function AnimalDetailTabs({
   const [showMovementForm, setShowMovementForm] = useState(false)
 
   const primaryPhoto = photos.find((p) => p.is_primary) || photos[0] || null
+  const displayPhotoUrl = primaryPhoto?.url || animal.photo_url || null
 
   const counts: Record<string, number> = {
-    photos: photos.length,
+    photos: photos.length || (animal.photo_url ? 1 : 0),
     healthRecords: healthRecords.length,
     movements: movements.length,
     socialPosts: socialPosts.length,
@@ -109,20 +110,20 @@ export function AnimalDetailTabs({
 
   return (
     <div className="space-y-0">
-      {/* Quick info bar with thumbnail */}
-      <div className="flex items-center gap-4 mb-4">
-        <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-border bg-surface-dark flex-shrink-0">
-          {primaryPhoto ? (
+      {/* Photo + quick info */}
+      <div className="flex gap-5 mb-6">
+        <div className="relative w-40 h-40 rounded-xl overflow-hidden border border-border bg-surface-dark flex-shrink-0">
+          {displayPhotoUrl ? (
             <Image
-              src={primaryPhoto.url}
+              src={displayPhotoUrl}
               alt={animal.name}
               fill
               className="object-cover"
-              sizes="64px"
+              sizes="160px"
             />
           ) : (
             <div className="flex items-center justify-center h-full w-full">
-              <ImageIcon className="w-6 h-6 text-muted/30" />
+              <ImageIcon className="w-10 h-10 text-muted/30" />
             </div>
           )}
         </div>
@@ -416,7 +417,7 @@ function PhotosTab({
 }) {
   return (
     <div className="max-w-2xl">
-      <AnimalPhotos animalId={animal.id} photos={photos} canManage={canManageAnimals} />
+      <AnimalPhotos animalId={animal.id} photos={photos} canManage={canManageAnimals} fallbackPhotoUrl={animal.photo_url} />
     </div>
   )
 }

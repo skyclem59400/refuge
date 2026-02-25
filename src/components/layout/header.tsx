@@ -13,7 +13,7 @@ import type { Establishment, Permissions } from '@/lib/types/database'
 const baseNavItems: { href: string; label: string; Icon: ComponentType<{ className?: string }> }[] = [
   { href: '/dashboard', label: 'Dashboard', Icon: ChartBarIcon },
   { href: '/documents', label: 'Documents', Icon: DocumentTextIcon },
-  { href: '/clients', label: 'Clients', Icon: UsersIcon },
+  { href: '/clients', label: 'Répertoire', Icon: UsersIcon },
 ]
 
 interface HeaderProps {

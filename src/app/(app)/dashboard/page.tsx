@@ -139,7 +139,10 @@ export default async function DashboardPage() {
       {showShelter && (
         <div className={showFarm ? 'mb-8' : ''}>
           {showFarm && (
-            <h2 className="text-lg font-semibold mb-4">Refuge / Fourriere</h2>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-6 rounded-full bg-primary" />
+              <h2 className="text-lg font-bold text-text">Refuge / Fourriere</h2>
+            </div>
           )}
           <ShelterDashboard
             stats={shelterStats}
@@ -154,7 +157,10 @@ export default async function DashboardPage() {
       {showFarm && (
         <div>
           {showShelter && (
-            <h2 className="text-lg font-semibold mb-4">Facturation</h2>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-6 rounded-full bg-secondary" />
+              <h2 className="text-lg font-bold text-text">Facturation</h2>
+            </div>
           )}
           <StatsCards stats={farmStats} />
 

@@ -33,7 +33,7 @@ const commonItems: NavItem[] = [
 
 const farmItems: NavItem[] = [
   { href: '/documents', label: 'Documents', Icon: FileText, permission: 'canManageDocuments' },
-  { href: '/clients', label: 'Clients', Icon: Users, permission: 'canManageClients' },
+  { href: '/clients', label: 'Répertoire', Icon: Users, permission: 'canManageClients' },
 ]
 
 const shelterItems: NavItem[] = [

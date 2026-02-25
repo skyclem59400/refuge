@@ -14,7 +14,7 @@ interface AnimalListProps {
 }
 
 const ALL_STATUSES: AnimalStatus[] = [
-  'pound', 'shelter', 'adopted', 'returned', 'transferred', 'deceased', 'euthanized',
+  'pound', 'shelter', 'foster_family', 'boarding', 'adopted', 'returned', 'transferred', 'deceased', 'euthanized',
 ]
 
 export function AnimalList({ animals }: AnimalListProps) {
@@ -49,9 +49,14 @@ export function AnimalList({ animals }: AnimalListProps) {
   }, [animals, search, speciesFilter, statusFilter])
 
   function getPrimaryPhoto(animal: AnimalWithPhotos): string | null {
-    if (!animal.animal_photos || animal.animal_photos.length === 0) return null
-    const primary = animal.animal_photos.find((p) => p.is_primary)
-    return primary ? primary.url : animal.animal_photos[0].url
+    // Check local photos first
+    if (animal.animal_photos && animal.animal_photos.length > 0) {
+      const primary = animal.animal_photos.find((p) => p.is_primary)
+      return primary ? primary.url : animal.animal_photos[0].url
+    }
+    // Fallback to Hunimalis photo_url
+    if (animal.photo_url) return animal.photo_url
+    return null
   }
 
   function getFallbackEmoji(species: string): string {
@@ -60,6 +65,12 @@ export function AnimalList({ animals }: AnimalListProps) {
 
   return (
     <div>
+      {/* Count */}
+      <p className="text-sm text-muted mb-4">
+        {filtered.length} animal{filtered.length !== 1 ? 'x' : ''} {statusFilter !== 'all' || speciesFilter !== 'all' || search.length >= 2 ? 'trouvé' : 'enregistré'}{filtered.length !== 1 ? 's' : ''}
+        {(statusFilter !== 'all' || speciesFilter !== 'all' || search.length >= 2) && ` sur ${animals.length}`}
+      </p>
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <input
@@ -127,7 +138,7 @@ export function AnimalList({ animals }: AnimalListProps) {
                   )}
                   {/* Status badge overlay */}
                   <div className="absolute top-2 right-2">
-                    <AnimalStatusBadge status={animal.status} />
+                    <AnimalStatusBadge status={animal.status} overlay />
                   </div>
                 </div>
 

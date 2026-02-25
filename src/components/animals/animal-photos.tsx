@@ -16,15 +16,17 @@ interface AnimalPhotosProps {
     created_at: string
   }[]
   canManage: boolean
+  fallbackPhotoUrl?: string | null
 }
 
-export function AnimalPhotos({ animalId, photos, canManage }: AnimalPhotosProps) {
+export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: AnimalPhotosProps) {
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
   const primaryPhoto = photos.find((p) => p.is_primary) || photos[0] || null
+  const displayUrl = primaryPhoto?.url || fallbackPhotoUrl || null
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -99,9 +101,9 @@ export function AnimalPhotos({ animalId, photos, canManage }: AnimalPhotosProps)
     <div className="space-y-4">
       {/* Primary photo (large) */}
       <div className="aspect-square w-full overflow-hidden rounded-xl border border-border bg-surface">
-        {primaryPhoto ? (
+        {displayUrl ? (
           <Image
-            src={primaryPhoto.url}
+            src={displayUrl}
             alt="Photo principale"
             width={600}
             height={600}

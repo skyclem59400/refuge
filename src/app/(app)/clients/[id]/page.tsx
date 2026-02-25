@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { ClientForm } from '@/components/clients/client-form'
 import { TypeBadge, StatusBadge } from '@/components/documents/status-badge'
+import { getCategoryLabel, getCategoryColor } from '@/lib/sda-utils'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
 import type { Client, Document } from '@/lib/types/database'
 
@@ -41,7 +42,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         </Link>
         <div>
           <h1 className="text-2xl font-bold">{typedClient.name}</h1>
-          <p className="text-sm text-muted mt-1">Fiche client</p>
+          <p className="text-sm text-muted mt-1">Fiche contact</p>
         </div>
       </div>
 
@@ -57,12 +58,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               <div>
                 <h3 className="font-semibold">{typedClient.name}</h3>
                 {typedClient.type && (
-                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                    typedClient.type === 'organisation'
-                      ? 'bg-info/15 text-info'
-                      : 'bg-secondary/15 text-secondary'
-                  }`}>
-                    {typedClient.type === 'organisation' ? 'Organisation' : 'Particulier'}
+                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getCategoryColor(typedClient.type)}`}>
+                    {getCategoryLabel(typedClient.type)}
                   </span>
                 )}
               </div>
@@ -105,7 +102,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           {canEditClients && (
             <details className="bg-surface rounded-xl border border-border">
               <summary className="p-4 cursor-pointer text-sm font-medium text-muted hover:text-text transition-colors">
-                Modifier le client
+                Modifier le contact
               </summary>
               <div className="px-4 pb-4">
                 <ClientForm client={typedClient} />

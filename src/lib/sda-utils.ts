@@ -15,8 +15,8 @@ export function getSexIcon(sex: string): string {
 
 export function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
-    pound: 'Fourrière', shelter: 'Refuge', adopted: 'Adopté', returned: 'Restitué',
-    transferred: 'Transféré', deceased: 'Décédé', euthanized: 'Euthanasié',
+    pound: 'Fourrière', shelter: 'Refuge', foster_family: 'Famille d\'accueil', boarding: 'Pension',
+    adopted: 'Adopté', returned: 'Restitué', transferred: 'Transféré', deceased: 'Décédé', euthanized: 'Euthanasié',
   }
   return labels[status] || status
 }
@@ -24,11 +24,23 @@ export function getStatusLabel(status: string): string {
 export function getStatusColor(status: string): string {
   const colors: Record<string, string> = {
     pound: 'bg-warning/15 text-warning', shelter: 'bg-info/15 text-info',
+    foster_family: 'bg-violet-500/15 text-violet-500', boarding: 'bg-teal-500/15 text-teal-500',
     adopted: 'bg-success/15 text-success', returned: 'bg-success/15 text-success',
     transferred: 'bg-secondary/15 text-secondary',
     deceased: 'bg-error/15 text-error', euthanized: 'bg-error/15 text-error',
   }
   return colors[status] || 'bg-muted/15 text-muted'
+}
+
+export function getStatusColorOverlay(status: string): string {
+  const colors: Record<string, string> = {
+    pound: 'bg-warning text-white shadow-sm', shelter: 'bg-info text-white shadow-sm',
+    foster_family: 'bg-violet-500 text-white shadow-sm', boarding: 'bg-teal-500 text-white shadow-sm',
+    adopted: 'bg-success text-white shadow-sm', returned: 'bg-success text-white shadow-sm',
+    transferred: 'bg-secondary text-white shadow-sm',
+    deceased: 'bg-error text-white shadow-sm', euthanized: 'bg-error text-white shadow-sm',
+  }
+  return colors[status] || 'bg-muted text-white shadow-sm'
 }
 
 export function getOriginLabel(origin: string): string {
@@ -112,3 +124,22 @@ export function calculateBusinessDays(startDate: string, endDate?: string): numb
   }
   return count
 }
+
+export function getCategoryLabel(category: string | null): string {
+  const labels: Record<string, string> = {
+    client: 'Client', member: 'Adhérent', volunteer: 'Bénévole',
+    board_member: 'Membre CA', foster_family: 'Famille d\'accueil', veterinarian: 'Vétérinaire',
+  }
+  return category ? labels[category] || category : '-'
+}
+
+export function getCategoryColor(category: string): string {
+  const colors: Record<string, string> = {
+    client: 'bg-secondary/15 text-secondary', member: 'bg-primary/15 text-primary',
+    volunteer: 'bg-success/15 text-success', board_member: 'bg-warning/15 text-warning',
+    foster_family: 'bg-violet-500/15 text-violet-500', veterinarian: 'bg-teal-500/15 text-teal-500',
+  }
+  return colors[category] || 'bg-muted/15 text-muted'
+}
+
+export const ALL_CONTACT_CATEGORIES = ['client', 'member', 'volunteer', 'board_member', 'foster_family', 'veterinarian'] as const

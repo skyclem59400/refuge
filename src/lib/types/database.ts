@@ -1,4 +1,4 @@
-export type ClientType = 'particulier' | 'organisation'
+export type ContactCategory = 'client' | 'member' | 'volunteer' | 'board_member' | 'foster_family' | 'veterinarian'
 export type DocumentType = 'devis' | 'facture' | 'avoir'
 export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'converted' | 'validated'
 export type EstablishmentRole = 'admin' | 'member'
@@ -19,7 +19,7 @@ export interface Client {
   address: string | null
   postal_code: string | null
   city: string | null
-  type: ClientType | null
+  type: ContactCategory | null
   notes: string | null
   establishment_id: string
   created_at: string
@@ -145,7 +145,7 @@ export interface CompanyInfo {
 
 export type AnimalSpecies = 'cat' | 'dog'
 export type AnimalSex = 'male' | 'female' | 'unknown'
-export type AnimalStatus = 'pound' | 'shelter' | 'adopted' | 'returned' | 'transferred' | 'deceased' | 'euthanized'
+export type AnimalStatus = 'pound' | 'shelter' | 'foster_family' | 'boarding' | 'adopted' | 'returned' | 'transferred' | 'deceased' | 'euthanized'
 export type AnimalOrigin = 'found' | 'abandoned' | 'transferred_in' | 'surrender'
 export type MovementType = 'pound_entry' | 'shelter_transfer' | 'adoption' | 'return_to_owner' | 'transfer_out' | 'death' | 'euthanasia'
 export type HealthRecordType = 'vaccination' | 'sterilization' | 'antiparasitic' | 'consultation' | 'surgery' | 'medication' | 'behavioral_assessment'
@@ -196,6 +196,10 @@ export interface Animal {
   pound_entry_date: string | null
   shelter_entry_date: string | null
   exit_date: string | null
+  // Hunimalis sync fields
+  hunimalis_id: number | null
+  photo_url: string | null
+  last_synced_at: string | null
   created_at: string
   updated_at: string
 }

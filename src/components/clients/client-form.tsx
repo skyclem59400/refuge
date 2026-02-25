@@ -4,7 +4,8 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClientAction, updateClientAction } from '@/lib/actions/clients'
-import type { Client, ClientType } from '@/lib/types/database'
+import { getCategoryLabel, ALL_CONTACT_CATEGORIES } from '@/lib/sda-utils'
+import type { Client, ContactCategory } from '@/lib/types/database'
 
 interface ClientFormProps {
   client?: Client
@@ -17,7 +18,7 @@ export function ClientForm({ client }: ClientFormProps) {
   const [address, setAddress] = useState(client?.address || '')
   const [postalCode, setPostalCode] = useState(client?.postal_code || '')
   const [city, setCity] = useState(client?.city || '')
-  const [type, setType] = useState<ClientType | ''>(client?.type || '')
+  const [type, setType] = useState<ContactCategory | ''>(client?.type || '')
   const [notes, setNotes] = useState(client?.notes || '')
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -39,7 +40,7 @@ export function ClientForm({ client }: ClientFormProps) {
         address: address || null,
         postal_code: postalCode || null,
         city: city || null,
-        type: (type || null) as ClientType | null,
+        type: (type || null) as ContactCategory | null,
         notes: notes || null,
       }
 
@@ -50,7 +51,7 @@ export function ClientForm({ client }: ClientFormProps) {
       if (result.error) {
         toast.error(result.error)
       } else {
-        toast.success(isEditing ? 'Client mis a jour' : 'Client cree')
+        toast.success(isEditing ? 'Contact mis a jour' : 'Contact cree')
         router.push('/clients')
       }
     })
@@ -69,7 +70,7 @@ export function ClientForm({ client }: ClientFormProps) {
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Nom du client"
+          placeholder="Nom du contact"
           required
           className={inputClass}
         />
@@ -145,33 +146,21 @@ export function ClientForm({ client }: ClientFormProps) {
         </div>
       </div>
 
-      {/* Type */}
+      {/* Category */}
       <div>
         <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
-          Type
+          Categorie
         </label>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setType('particulier')}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all
-              ${type === 'particulier'
-                ? 'bg-secondary/15 text-secondary border border-secondary/30'
-                : 'bg-surface-dark text-muted border border-border hover:border-secondary/30'}`}
-          >
-            Particulier
-          </button>
-          <button
-            type="button"
-            onClick={() => setType('organisation')}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all
-              ${type === 'organisation'
-                ? 'bg-info/15 text-info border border-info/30'
-                : 'bg-surface-dark text-muted border border-border hover:border-info/30'}`}
-          >
-            Organisation
-          </button>
-        </div>
+        <select
+          value={type}
+          onChange={(e) => setType(e.target.value as ContactCategory | '')}
+          className={inputClass}
+        >
+          <option value="">-- Aucune categorie --</option>
+          {ALL_CONTACT_CATEGORIES.map((cat) => (
+            <option key={cat} value={cat}>{getCategoryLabel(cat)}</option>
+          ))}
+        </select>
       </div>
 
       {/* Notes */}
@@ -182,7 +171,7 @@ export function ClientForm({ client }: ClientFormProps) {
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notes sur le client..."
+          placeholder="Notes sur le contact..."
           rows={3}
           className={`${inputClass} resize-y`}
         />
@@ -197,7 +186,7 @@ export function ClientForm({ client }: ClientFormProps) {
           disabled:opacity-50 disabled:cursor-not-allowed
           shadow-lg shadow-primary/25"
       >
-        {isPending ? 'Enregistrement...' : isEditing ? 'Mettre a jour' : 'Creer le client'}
+        {isPending ? 'Enregistrement...' : isEditing ? 'Mettre a jour' : 'Creer le contact'}
       </button>
     </form>
   )

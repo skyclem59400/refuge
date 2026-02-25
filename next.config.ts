@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
         hostname: 'zzevrtrgtgnlxxuwbnge.supabase.co',
         pathname: '/storage/v1/object/public/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'app.hunimalis.com',
+        pathname: '/app/ajax/media.php',
+      },
     ],
   },
 };

@@ -127,18 +127,18 @@ export default async function PoundPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {animalsWithDays.map((a) => {
-                  const primaryPhoto = a.animal_photos?.find((p) => p.is_primary) || a.animal_photos?.[0]
+                  const photoUrl = a.animal_photos?.find((p) => p.is_primary)?.url || a.animal_photos?.[0]?.url || a.photo_url || null
 
                   return (
                     <tr key={a.id} className="hover:bg-surface-hover transition-colors">
                       {/* Animal column */}
                       <td className="px-4 py-3">
-                        <Link href={`/animaux/${a.id}`} className="flex items-center gap-3 group">
+                        <Link href={`/animals/${a.id}`} className="flex items-center gap-3 group">
                           {/* Photo thumbnail */}
                           <div className="w-10 h-10 rounded-lg bg-muted/10 overflow-hidden shrink-0 flex items-center justify-center">
-                            {primaryPhoto ? (
+                            {photoUrl ? (
                               <img
-                                src={primaryPhoto.url}
+                                src={photoUrl}
                                 alt={a.name}
                                 className="w-full h-full object-cover"
                               />

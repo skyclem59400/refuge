@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/establishment/permissions'
-import type { ClientType } from '@/lib/types/database'
+import type { ContactCategory } from '@/lib/types/database'
 
 export async function createClientAction(data: {
   name: string
@@ -12,7 +12,7 @@ export async function createClientAction(data: {
   address?: string | null
   postal_code?: string | null
   city?: string | null
-  type?: ClientType | null
+  type?: ContactCategory | null
   notes?: string | null
 }) {
   try {
@@ -43,7 +43,7 @@ export async function updateClientAction(id: string, data: {
   address?: string | null
   postal_code?: string | null
   city?: string | null
-  type?: ClientType | null
+  type?: ContactCategory | null
   notes?: string | null
 }) {
   try {

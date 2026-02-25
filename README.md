@@ -241,6 +241,19 @@ Securite a 3 niveaux :
 - Generation PDF via Puppeteer
 - Telechargement direct depuis la liste des dons
 
+#### Statistiques (`/statistics`)
+
+- Repartition par espece (diagramme circulaire)
+- Repartition par statut (diagramme en barres)
+- Tendances mensuelles d'entrees/sorties (graphique lineaire)
+- Filtrable par periode et espece
+
+#### Repertoire (`/clients`)
+
+- 6 categories de contacts : adoptant, famille d'accueil, benevole, veterinaire, partenaire, autre
+- Recherche en temps reel par nom, telephone, email
+- Fiche contact avec historique des interactions
+
 #### Publications IA (`/animals/[id]` > onglet Publications)
 
 - Generation assistee par **Claude AI** (modele Haiku 4.5)
@@ -248,6 +261,15 @@ Securite a 3 niveaux :
 - Multi-plateforme : Facebook, Instagram, Twitter
 - Flux en 3 etapes : configuration → generation → apercu/edition
 - Historique des publications dans la fiche animal
+
+#### Synchronisation automatique Hunimalis (Trigger.dev)
+
+- Synchronisation automatique des donnees animales depuis l'API Hunimalis toutes les **6 heures**
+- Delta check intelligent : seuls les animaux nouveaux ou modifies sont mis a jour (~3s au lieu de ~36s)
+- Dashboard de monitoring avec logs detailles sur [cloud.trigger.dev](https://cloud.trigger.dev)
+- Retry automatique (3 tentatives, backoff exponentiel)
+- Synchronisation manuelle toujours disponible via le bouton dans l'interface
+- Documentation detaillee : voir `trigger-agents/HUNIMALIS-SYNC.md`
 
 ### Gestion de l'etablissement (`/etablissement`)
 
@@ -535,6 +557,10 @@ L'application est deployee via **Coolify** sur un VPS avec un Dockerfile multi-s
 |----------|-------------|
 | `SUPABASE_SERVICE_ROLE_KEY` | Cle admin Supabase (server-side only) |
 | `ANTHROPIC_API_KEY` | Cle API Claude (generation IA) |
+| `HUNIMALIS_API_URL` | URL de l'API Hunimalis (`https://www.hunimalis.com/api`) |
+| `HUNIMALIS_USERNAME` | Identifiant Hunimalis |
+| `HUNIMALIS_PASSWORD` | Mot de passe Hunimalis |
+| `ESTABLISHMENT_ID` | UUID de l'etablissement dans Supabase |
 
 ### Build et lancement
 

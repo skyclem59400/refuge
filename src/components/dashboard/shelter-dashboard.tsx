@@ -188,9 +188,7 @@ export function ShelterDashboard({
           <div className="divide-y divide-border">
             {recentAnimals.length > 0 ? (
               recentAnimals.map((animal) => {
-                const primaryPhoto =
-                  animal.animal_photos?.find((p) => p.is_primary) ||
-                  animal.animal_photos?.[0]
+                const photoUrl = animal.animal_photos?.find((p) => p.is_primary)?.url || animal.animal_photos?.[0]?.url || animal.photo_url || null
 
                 return (
                   <Link
@@ -200,9 +198,9 @@ export function ShelterDashboard({
                   >
                     {/* Photo thumbnail */}
                     <div className="w-10 h-10 rounded-lg bg-muted/10 overflow-hidden shrink-0 flex items-center justify-center">
-                      {primaryPhoto ? (
+                      {photoUrl ? (
                         <img
-                          src={primaryPhoto.url}
+                          src={photoUrl}
                           alt={animal.name}
                           className="w-full h-full object-cover"
                         />

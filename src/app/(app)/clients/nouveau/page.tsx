@@ -12,8 +12,8 @@ export default function NouveauClientPage() {
           ← Retour
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Nouveau client</h1>
-          <p className="text-sm text-muted mt-1">Ajouter un client a votre base</p>
+          <h1 className="text-2xl font-bold">Nouveau contact</h1>
+          <p className="text-sm text-muted mt-1">Ajouter un contact au répertoire</p>
         </div>
       </div>
 

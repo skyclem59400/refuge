@@ -19,15 +19,15 @@ export default async function ClientsPage() {
     <div className="animate-fade-up">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Clients</h1>
-          <p className="text-sm text-muted mt-1">Gerez votre base clients</p>
+          <h1 className="text-2xl font-bold">Répertoire</h1>
+          <p className="text-sm text-muted mt-1">Gérez vos contacts</p>
         </div>
         {ctx!.permissions.canManageClients && (
           <Link
             href="/clients/nouveau"
             className="px-4 py-2 rounded-lg font-semibold text-white text-sm gradient-primary hover:opacity-90 transition-opacity shadow-lg shadow-primary/25"
           >
-            + Nouveau client
+            + Nouveau contact
           </Link>
         )}
       </div>
