@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
-import { ClientList } from '@/components/clients/client-list'
+import { getEstablishmentMembers } from '@/lib/actions/establishments'
+import { RepertoireTabs } from '@/components/clients/repertoire-tabs'
 import type { Client } from '@/lib/types/database'
 
 export default async function ClientsPage() {
@@ -9,11 +10,14 @@ export default async function ClientsPage() {
   const estabId = ctx!.establishment.id
   const admin = createAdminClient()
 
-  const { data: clients } = await admin
-    .from('clients')
-    .select('*')
-    .eq('establishment_id', estabId)
-    .order('name')
+  const [{ data: clients }, { data: members }] = await Promise.all([
+    admin
+      .from('clients')
+      .select('*')
+      .eq('establishment_id', estabId)
+      .order('name'),
+    getEstablishmentMembers(),
+  ])
 
   return (
     <div className="animate-fade-up">
@@ -32,8 +36,9 @@ export default async function ClientsPage() {
         )}
       </div>
 
-      <ClientList
-        initialData={(clients as Client[]) || []}
+      <RepertoireTabs
+        clients={(clients as Client[]) || []}
+        members={members || []}
         canEdit={ctx!.permissions.canManageClients}
         establishmentId={estabId}
       />
