@@ -66,14 +66,25 @@ export async function createDonation(data: {
   try {
     const { establishmentId } = await requirePermission('manage_donations')
     const supabase = await createClient()
+    const admin = createAdminClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    const { data: donation, error } = await supabase
+    // Get CERFA number before insert
+    const { data: cerfaNumber, error: rpcError } = await admin.rpc('get_next_cerfa_number', {
+      est_id: establishmentId,
+    })
+
+    if (rpcError) return { error: 'Erreur de numerotation CERFA: ' + rpcError.message }
+
+    const { data: donation, error } = await admin
       .from('donations')
       .insert({
         ...data,
         establishment_id: establishmentId,
         created_by: user?.id,
+        cerfa_number: cerfaNumber,
+        cerfa_generated: true,
+        cerfa_generated_at: new Date().toISOString(),
       })
       .select()
       .single()
