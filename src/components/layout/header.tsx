@@ -6,24 +6,100 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/components/theme-provider'
-import { ChartBarIcon, DocumentTextIcon, UsersIcon, BuildingIcon } from '@/components/icons'
+import { EstablishmentSwitcher } from '@/components/establishment/establishment-switcher'
 import type { ComponentType } from 'react'
-import type { Establishment, Permissions } from '@/lib/types/database'
+import type { Establishment, EstablishmentType, Permissions } from '@/lib/types/database'
+import {
+  LayoutDashboard,
+  FileText,
+  Users,
+  Building2,
+  PawPrint,
+  Warehouse,
+  HeartPulse,
+  Package,
+  BarChart3,
+  Heart,
+  Shield,
+  Share2,
+  PhoneCall,
+} from 'lucide-react'
 
-const baseNavItems: { href: string; label: string; Icon: ComponentType<{ className?: string }> }[] = [
-  { href: '/dashboard', label: 'Dashboard', Icon: ChartBarIcon },
-  { href: '/documents', label: 'Documents', Icon: DocumentTextIcon },
-  { href: '/clients', label: 'Répertoire', Icon: UsersIcon },
+interface NavItem {
+  href: string
+  label: string
+  Icon: ComponentType<{ className?: string }>
+  permission?: keyof Permissions
+}
+
+const commonItems: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
 ]
+
+const farmItems: NavItem[] = [
+  { href: '/documents', label: 'Documents', Icon: FileText, permission: 'canManageDocuments' },
+  { href: '/clients', label: 'Répertoire', Icon: Users, permission: 'canManageClients' },
+]
+
+const shelterItems: NavItem[] = [
+  { href: '/animals', label: 'Animaux', Icon: PawPrint, permission: 'canViewAnimals' },
+  { href: '/pound', label: 'Fourrière', Icon: Warehouse, permission: 'canViewPound' },
+  { href: '/health', label: 'Santé', Icon: HeartPulse, permission: 'canManageHealth' },
+  { href: '/boxes', label: 'Box', Icon: Package, permission: 'canManageBoxes' },
+  { href: '/donations', label: 'Dons', Icon: Heart, permission: 'canManageDonations' },
+  { href: '/publications', label: 'Publications', Icon: Share2, permission: 'canManagePosts' },
+  { href: '/appels', label: 'Appels IA', Icon: PhoneCall, permission: 'canManageEstablishment' },
+  { href: '/icad', label: 'I-CAD', Icon: Shield, permission: 'canManageMovements' },
+  { href: '/documents', label: 'Documents', Icon: FileText, permission: 'canManageDocuments' },
+  { href: '/clients', label: 'Répertoire', Icon: Users, permission: 'canManageClients' },
+  { href: '/statistiques', label: 'Statistiques', Icon: BarChart3, permission: 'canViewStatistics' },
+]
+
+const adminItems: NavItem[] = [
+  { href: '/etablissement', label: 'Établissement', Icon: Building2, permission: 'canManageEstablishment' },
+]
+
+function getNavItems(type: EstablishmentType, permissions: Permissions): NavItem[] {
+  let typeItems: NavItem[]
+
+  switch (type) {
+    case 'farm':
+      typeItems = farmItems
+      break
+    case 'shelter':
+      typeItems = shelterItems
+      break
+    case 'both': {
+      const seen = new Set<string>()
+      typeItems = [...shelterItems, ...farmItems].filter((item) => {
+        const key = item.href + item.label
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      break
+    }
+    default:
+      typeItems = farmItems
+  }
+
+  const allItems = [...commonItems, ...typeItems, ...adminItems]
+
+  return allItems.filter((item) => {
+    if (!item.permission) return true
+    return permissions[item.permission]
+  })
+}
 
 interface HeaderProps {
   userEmail: string
   userAvatarUrl?: string | null
   permissions: Permissions
   currentEstablishment: Establishment
+  establishments: Establishment[]
 }
 
-export function Header({ userEmail, userAvatarUrl, permissions, currentEstablishment }: HeaderProps) {
+export function Header({ userEmail, userAvatarUrl, permissions, currentEstablishment, establishments }: HeaderProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showMobileNav, setShowMobileNav] = useState(false)
   const router = useRouter()
@@ -31,12 +107,8 @@ export function Header({ userEmail, userAvatarUrl, permissions, currentEstablish
   const supabase = createClient()
   const { theme, toggleTheme } = useTheme()
 
-  const navItems = [
-    ...baseNavItems,
-    ...(permissions.canManageEstablishment
-      ? [{ href: '/etablissement', label: 'Etablissement', Icon: BuildingIcon }]
-      : []),
-  ]
+  const establishmentType: EstablishmentType = currentEstablishment.type || 'farm'
+  const navItems = getNavItems(establishmentType, permissions)
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -58,19 +130,13 @@ export function Header({ userEmail, userAvatarUrl, permissions, currentEstablish
           </svg>
         </button>
 
-        {/* Mobile brand */}
-        <div className="lg:hidden flex items-center gap-2">
-          {currentEstablishment.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={currentEstablishment.logo_url} alt="Logo" className="w-7 h-7 rounded-full object-cover" />
-          ) : (
-            <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-xs font-bold text-white">
-              {currentEstablishment.name[0]?.toUpperCase()}
-            </div>
-          )}
-          <span className="font-semibold text-sm text-primary-light truncate max-w-[150px]">
-            {currentEstablishment.name}
-          </span>
+        {/* Mobile establishment switcher */}
+        <div className="lg:hidden flex-1 mx-3">
+          <EstablishmentSwitcher
+            establishments={establishments}
+            currentEstablishment={currentEstablishment}
+            userEmail={userEmail}
+          />
         </div>
 
         {/* Spacer for desktop */}

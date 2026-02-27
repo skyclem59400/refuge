@@ -43,6 +43,7 @@ export default async function AppLayout({
           userAvatarUrl={user.user_metadata?.avatar_url}
           permissions={ctx.permissions}
           currentEstablishment={ctx.establishment}
+          establishments={establishments}
         />
         <main className="p-6">
           {children}
