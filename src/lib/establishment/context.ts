@@ -18,6 +18,7 @@ function buildPermissions(member: EstablishmentMember): Permissions {
     canManageBoxes: isAdmin || member.manage_boxes,
     canManagePosts: isAdmin || member.manage_posts,
     canManageDonations: isAdmin || member.manage_donations,
+    canManageOutings: isAdmin || member.manage_outings,
     canViewPound: isAdmin || member.view_pound,
     canViewStatistics: isAdmin || member.view_statistics,
   }

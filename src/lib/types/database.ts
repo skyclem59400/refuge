@@ -2,7 +2,7 @@ export type ContactCategory = 'client' | 'member' | 'volunteer' | 'board_member'
 export type DocumentType = 'devis' | 'facture' | 'avoir'
 export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'converted' | 'validated'
 export type EstablishmentRole = 'admin' | 'member'
-export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics'
+export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings'
 
 export interface LineItem {
   description: string
@@ -87,6 +87,7 @@ export interface EstablishmentMember {
   manage_boxes: boolean
   manage_posts: boolean
   manage_donations: boolean
+  manage_outings: boolean
   view_pound: boolean
   view_statistics: boolean
   created_at: string
@@ -108,6 +109,7 @@ export interface Permissions {
   canManageBoxes: boolean
   canManagePosts: boolean
   canManageDonations: boolean
+  canManageOutings: boolean
   canViewPound: boolean
   canViewStatistics: boolean
   isAdmin: boolean
@@ -224,6 +226,17 @@ export interface AnimalMovement {
   destination: string | null
   icad_status: IcadStatus
   created_by: string | null
+  created_at: string
+}
+
+export interface AnimalOuting {
+  id: string
+  animal_id: string
+  walked_by: string
+  started_at: string
+  ended_at: string | null
+  duration_minutes: number | null
+  notes: string | null
   created_at: string
 }
 

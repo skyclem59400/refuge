@@ -258,3 +258,41 @@ export function maskPhone(phone: string): string {
   if (phone.length <= 6) return phone
   return phone.slice(0, 6) + ' ** ** ' + phone.slice(-2)
 }
+
+// ============================================
+// Outings (Sorties) Helpers
+// ============================================
+
+export type OutingUrgency = 'critical' | 'warning' | 'ok' | 'never'
+
+export function getOutingUrgencyLevel(daysSinceLastOuting: number | null): OutingUrgency {
+  if (daysSinceLastOuting === null) return 'never'
+  if (daysSinceLastOuting >= 3) return 'critical'
+  if (daysSinceLastOuting >= 2) return 'warning'
+  return 'ok'
+}
+
+export function getOutingUrgencyColor(level: OutingUrgency): string {
+  const colors: Record<OutingUrgency, string> = {
+    critical: 'bg-error/15 text-error border-error/30',
+    warning: 'bg-warning/15 text-warning border-warning/30',
+    ok: 'bg-success/15 text-success border-success/30',
+    never: 'bg-error/15 text-error border-error/30',
+  }
+  return colors[level]
+}
+
+export function getOutingUrgencyLabel(daysSinceLastOuting: number | null): string {
+  if (daysSinceLastOuting === null) return 'Jamais sorti'
+  if (daysSinceLastOuting === 0) return "Sorti aujourd'hui"
+  if (daysSinceLastOuting === 1) return 'Sorti hier'
+  return `${daysSinceLastOuting}j sans sortie`
+}
+
+export function formatOutingDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (m === 0) return `${h}h`
+  return `${h}h${m.toString().padStart(2, '0')}`
+}

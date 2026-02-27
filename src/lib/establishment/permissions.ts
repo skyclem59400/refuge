@@ -73,6 +73,7 @@ export async function requirePermission(permission: Permission): Promise<AuthCon
       case 'manage_donations': return ctx.membership.manage_donations
       case 'view_pound': return ctx.membership.view_pound
       case 'view_statistics': return ctx.membership.view_statistics
+      case 'manage_outings': return ctx.membership.manage_outings
       default: return false
     }
   })()

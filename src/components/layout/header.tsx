@@ -23,6 +23,7 @@ import {
   Shield,
   Share2,
   PhoneCall,
+  Footprints,
 } from 'lucide-react'
 
 interface NavItem {
@@ -46,6 +47,7 @@ const shelterItems: NavItem[] = [
   { href: '/pound', label: 'Fourrière', Icon: Warehouse, permission: 'canViewPound' },
   { href: '/health', label: 'Santé', Icon: HeartPulse, permission: 'canManageHealth' },
   { href: '/boxes', label: 'Box', Icon: Package, permission: 'canManageBoxes' },
+  { href: '/sorties', label: 'Sorties', Icon: Footprints, permission: 'canManageOutings' },
   { href: '/donations', label: 'Dons', Icon: Heart, permission: 'canManageDonations' },
   { href: '/publications', label: 'Publications', Icon: Share2, permission: 'canManagePosts' },
   { href: '/appels', label: 'Appels IA', Icon: PhoneCall, permission: 'canManageEstablishment' },
