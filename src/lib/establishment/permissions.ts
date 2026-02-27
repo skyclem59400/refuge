@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
-import type { Permission, EstablishmentMember } from '@/lib/types/database'
+import type { Permission, EstablishmentMember, PermissionGroup } from '@/lib/types/database'
 
 const COOKIE_NAME = 'current-establishment-id'
 
@@ -57,26 +57,27 @@ export async function requireEstablishment(): Promise<AuthContext> {
 export async function requirePermission(permission: Permission): Promise<AuthContext> {
   const ctx = await resolveAuth()
 
-  if (ctx.membership.role === 'admin') return ctx
+  // Fetch member's groups
+  const supabase = await createClient()
+  const { data: memberGroups } = await supabase
+    .from('member_groups')
+    .select('group_id')
+    .eq('member_id', ctx.membership.id)
 
-  const hasPermission = (() => {
-    switch (permission) {
-      case 'manage_establishment': return ctx.membership.manage_establishment
-      case 'manage_documents': return ctx.membership.manage_documents
-      case 'manage_clients': return ctx.membership.manage_clients
-      case 'manage_animals': return ctx.membership.manage_animals
-      case 'view_animals': return ctx.membership.view_animals
-      case 'manage_health': return ctx.membership.manage_health
-      case 'manage_movements': return ctx.membership.manage_movements
-      case 'manage_boxes': return ctx.membership.manage_boxes
-      case 'manage_posts': return ctx.membership.manage_posts
-      case 'manage_donations': return ctx.membership.manage_donations
-      case 'view_pound': return ctx.membership.view_pound
-      case 'view_statistics': return ctx.membership.view_statistics
-      case 'manage_outings': return ctx.membership.manage_outings
-      default: return false
-    }
-  })()
+  const groupIds = (memberGroups || []).map((mg: { group_id: string }) => mg.group_id)
+
+  if (groupIds.length === 0) {
+    throw new Error('Permissions insuffisantes')
+  }
+
+  const { data: groups } = await supabase
+    .from('permission_groups')
+    .select('*')
+    .in('id', groupIds)
+
+  const hasPermission = (groups as PermissionGroup[] || []).some(
+    (g) => g[permission] === true
+  )
 
   if (!hasPermission) {
     throw new Error('Permissions insuffisantes')

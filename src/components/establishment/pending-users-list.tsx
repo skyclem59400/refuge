@@ -4,46 +4,47 @@ import { useState, useEffect, useTransition } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { addPendingUser } from '@/lib/actions/establishments'
-import type { UnassignedUser } from '@/lib/types/database'
+import type { UnassignedUser, PermissionGroup } from '@/lib/types/database'
 
 interface PendingUsersListProps {
   users: UnassignedUser[]
+  groups: PermissionGroup[]
 }
 
-export function PendingUsersList({ users }: PendingUsersListProps) {
+export function PendingUsersList({ users, groups }: PendingUsersListProps) {
   const [list, setList] = useState(users)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
   useEffect(() => { setList(users) }, [users])
 
-  const [permissionsMap, setPermissionsMap] = useState<Record<string, {
-    manage_documents: boolean
-    manage_clients: boolean
-    manage_establishment: boolean
-  }>>({})
+  // Track selected groups per user
+  const [selectedGroupsMap, setSelectedGroupsMap] = useState<Record<string, Set<string>>>({})
 
-  function getPermissions(userId: string) {
-    return permissionsMap[userId] || {
-      manage_documents: false,
-      manage_clients: false,
-      manage_establishment: false,
-    }
+  function getSelectedGroups(userId: string): Set<string> {
+    if (selectedGroupsMap[userId]) return selectedGroupsMap[userId]
+    // Default: select the "Membre" group
+    const membreGroup = groups.find(g => g.name === 'Membre' && !g.is_system)
+    return membreGroup ? new Set([membreGroup.id]) : new Set()
   }
 
-  function togglePermission(userId: string, field: 'manage_documents' | 'manage_clients' | 'manage_establishment') {
-    setPermissionsMap(prev => ({
-      ...prev,
-      [userId]: {
-        ...getPermissions(userId),
-        [field]: !getPermissions(userId)[field],
-      },
-    }))
+  function toggleGroup(userId: string, groupId: string) {
+    setSelectedGroupsMap(prev => {
+      const current = getSelectedGroups(userId)
+      const next = new Set(current)
+      if (next.has(groupId)) {
+        next.delete(groupId)
+      } else {
+        next.add(groupId)
+      }
+      return { ...prev, [userId]: next }
+    })
   }
 
   function handleAdd(userId: string) {
+    const groupIds = Array.from(getSelectedGroups(userId))
     startTransition(async () => {
-      const result = await addPendingUser(userId, getPermissions(userId))
+      const result = await addPendingUser(userId, groupIds)
       if (result.error) {
         toast.error(result.error)
       } else {
@@ -65,7 +66,7 @@ export function PendingUsersList({ users }: PendingUsersListProps) {
   return (
     <div className="space-y-3">
       {list.map((user) => {
-        const perms = getPermissions(user.id)
+        const selected = getSelectedGroups(user.id)
         return (
           <div key={user.id} className="p-4 bg-surface-dark rounded-lg border border-border space-y-3">
             <div className="flex items-center gap-3">
@@ -91,34 +92,21 @@ export function PendingUsersList({ users }: PendingUsersListProps) {
             </div>
 
             <div className="flex items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={perms.manage_documents}
-                    onChange={() => togglePermission(user.id, 'manage_documents')}
-                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs">Documents</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={perms.manage_clients}
-                    onChange={() => togglePermission(user.id, 'manage_clients')}
-                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs">Clients</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={perms.manage_establishment}
-                    onChange={() => togglePermission(user.id, 'manage_establishment')}
-                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs">Admin</span>
-                </label>
+              <div className="flex flex-wrap gap-2">
+                {groups.map((group) => (
+                  <button
+                    key={group.id}
+                    type="button"
+                    onClick={() => toggleGroup(user.id, group.id)}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors
+                      ${selected.has(group.id)
+                        ? 'bg-primary/15 text-primary border border-primary/30'
+                        : 'bg-surface-hover text-muted border border-border hover:text-text'
+                      }`}
+                  >
+                    {group.name}
+                  </button>
+                ))}
               </div>
 
               <button

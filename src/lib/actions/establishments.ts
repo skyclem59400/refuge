@@ -3,7 +3,11 @@
 import { revalidatePath } from 'next/cache'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requirePermission, requireEstablishment } from '@/lib/establishment/permissions'
-import type { EstablishmentMember, UnassignedUser } from '@/lib/types/database'
+import type { EstablishmentMember, UnassignedUser, PermissionGroup, Permission } from '@/lib/types/database'
+
+// ============================================================
+// Establishment CRUD
+// ============================================================
 
 export async function updateEstablishment(data: {
   name: string
@@ -68,29 +72,244 @@ export async function createEstablishment(data: {
 
   if (error) return { error: error.message }
 
-  // Creator becomes admin
-  const { error: memberError } = await admin
+  // Create default permission groups
+  const { data: adminGroup, error: adminGroupError } = await admin
+    .from('permission_groups')
+    .insert({
+      establishment_id: establishment.id,
+      name: 'Administrateur',
+      description: 'Acces complet a toutes les fonctionnalites',
+      is_system: true,
+      manage_documents: true,
+      manage_clients: true,
+      manage_establishment: true,
+      manage_animals: true,
+      view_animals: true,
+      manage_health: true,
+      manage_movements: true,
+      manage_boxes: true,
+      manage_posts: true,
+      manage_donations: true,
+      manage_outings: true,
+      view_pound: true,
+      view_statistics: true,
+    })
+    .select()
+    .single()
+
+  if (adminGroupError) return { error: adminGroupError.message }
+
+  await admin
+    .from('permission_groups')
+    .insert({
+      establishment_id: establishment.id,
+      name: 'Membre',
+      description: 'Acces en lecture seule',
+      is_system: false,
+      view_animals: true,
+      view_pound: true,
+      view_statistics: true,
+    })
+
+  // Creator becomes member + assigned to admin group
+  const { data: member, error: memberError } = await admin
     .from('establishment_members')
     .insert({
       establishment_id: establishment.id,
       user_id: user.id,
-      role: 'admin',
-      manage_documents: true,
-      manage_clients: true,
-      manage_establishment: true,
     })
+    .select()
+    .single()
 
   if (memberError) return { error: memberError.message }
+
+  await admin
+    .from('member_groups')
+    .insert({
+      member_id: member.id,
+      group_id: adminGroup.id,
+    })
 
   revalidatePath('/')
   return { data: establishment }
 }
 
-export async function addMember(email: string, permissions: {
-  manage_documents?: boolean
-  manage_clients?: boolean
-  manage_establishment?: boolean
-}) {
+// ============================================================
+// Permission Groups CRUD
+// ============================================================
+
+export async function getPermissionGroups() {
+  try {
+    const { establishmentId } = await requireEstablishment()
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('permission_groups')
+      .select('*')
+      .eq('establishment_id', establishmentId)
+      .order('is_system', { ascending: false })
+      .order('name')
+
+    if (error) return { error: error.message }
+    return { data: (data as PermissionGroup[]) || [] }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+export async function createPermissionGroup(data: {
+  name: string
+  description?: string
+} & Partial<Record<Permission, boolean>>) {
+  try {
+    const { establishmentId } = await requirePermission('manage_establishment')
+    const admin = createAdminClient()
+
+    const { data: group, error } = await admin
+      .from('permission_groups')
+      .insert({
+        establishment_id: establishmentId,
+        name: data.name,
+        description: data.description || '',
+        manage_documents: data.manage_documents ?? false,
+        manage_clients: data.manage_clients ?? false,
+        manage_establishment: data.manage_establishment ?? false,
+        manage_animals: data.manage_animals ?? false,
+        view_animals: data.view_animals ?? false,
+        manage_health: data.manage_health ?? false,
+        manage_movements: data.manage_movements ?? false,
+        manage_boxes: data.manage_boxes ?? false,
+        manage_posts: data.manage_posts ?? false,
+        manage_donations: data.manage_donations ?? false,
+        manage_outings: data.manage_outings ?? false,
+        view_pound: data.view_pound ?? false,
+        view_statistics: data.view_statistics ?? false,
+      })
+      .select()
+      .single()
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/etablissement')
+    return { data: group as PermissionGroup }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+export async function updatePermissionGroup(groupId: string, data: Partial<{
+  name: string
+  description: string
+} & Record<Permission, boolean>>) {
+  try {
+    await requirePermission('manage_establishment')
+    const admin = createAdminClient()
+
+    // Block editing system group name
+    const { data: existing } = await admin
+      .from('permission_groups')
+      .select('is_system')
+      .eq('id', groupId)
+      .single()
+
+    if (existing?.is_system && data.name) {
+      return { error: 'Impossible de renommer un groupe systeme' }
+    }
+
+    const { error } = await admin
+      .from('permission_groups')
+      .update(data)
+      .eq('id', groupId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/etablissement')
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+export async function deletePermissionGroup(groupId: string) {
+  try {
+    await requirePermission('manage_establishment')
+    const admin = createAdminClient()
+
+    // Block deleting system groups
+    const { data: existing } = await admin
+      .from('permission_groups')
+      .select('is_system')
+      .eq('id', groupId)
+      .single()
+
+    if (existing?.is_system) {
+      return { error: 'Impossible de supprimer un groupe systeme' }
+    }
+
+    const { error } = await admin
+      .from('permission_groups')
+      .delete()
+      .eq('id', groupId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/etablissement')
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ============================================================
+// Member-Group assignment
+// ============================================================
+
+export async function assignMemberToGroup(memberId: string, groupId: string) {
+  try {
+    await requirePermission('manage_establishment')
+    const admin = createAdminClient()
+
+    const { error } = await admin
+      .from('member_groups')
+      .insert({ member_id: memberId, group_id: groupId })
+
+    if (error) {
+      if (error.code === '23505') return { error: 'Deja dans ce groupe' }
+      return { error: error.message }
+    }
+
+    revalidatePath('/etablissement')
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+export async function removeMemberFromGroup(memberId: string, groupId: string) {
+  try {
+    await requirePermission('manage_establishment')
+    const admin = createAdminClient()
+
+    const { error } = await admin
+      .from('member_groups')
+      .delete()
+      .eq('member_id', memberId)
+      .eq('group_id', groupId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/etablissement')
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ============================================================
+// Members management
+// ============================================================
+
+export async function addMember(email: string, groupIds: string[]) {
   try {
     const { establishmentId } = await requirePermission('manage_establishment')
     const supabase = await createClient()
@@ -117,41 +336,25 @@ export async function addMember(email: string, permissions: {
       return { error: 'Cet utilisateur est deja membre de cet etablissement' }
     }
 
-    const { error } = await admin
+    const { data: member, error } = await admin
       .from('establishment_members')
       .insert({
         establishment_id: establishmentId,
         user_id: userId,
-        role: 'member',
-        manage_documents: permissions.manage_documents ?? false,
-        manage_clients: permissions.manage_clients ?? false,
-        manage_establishment: permissions.manage_establishment ?? false,
       })
+      .select()
+      .single()
 
     if (error) return { error: error.message }
 
-    revalidatePath('/etablissement')
-    return { success: true }
-  } catch (e) {
-    return { error: (e as Error).message }
-  }
-}
+    // Assign to groups
+    if (groupIds.length > 0) {
+      const { error: groupError } = await admin
+        .from('member_groups')
+        .insert(groupIds.map(gid => ({ member_id: member.id, group_id: gid })))
 
-export async function updateMemberPermissions(memberId: string, permissions: {
-  manage_documents?: boolean
-  manage_clients?: boolean
-  manage_establishment?: boolean
-}) {
-  try {
-    await requirePermission('manage_establishment')
-    const admin = createAdminClient()
-
-    const { error } = await admin
-      .from('establishment_members')
-      .update(permissions)
-      .eq('id', memberId)
-
-    if (error) return { error: error.message }
+      if (groupError) return { error: groupError.message }
+    }
 
     revalidatePath('/etablissement')
     return { success: true }
@@ -229,6 +432,36 @@ export async function getEstablishmentMembers() {
           }
         }
       }
+
+      // Enrich with groups
+      const memberIds = typedMembers.map(m => m.id)
+      const { data: allMemberGroups } = await supabase
+        .from('member_groups')
+        .select('member_id, group_id')
+        .in('member_id', memberIds)
+
+      if (allMemberGroups && allMemberGroups.length > 0) {
+        const allGroupIds = [...new Set(allMemberGroups.map((mg: { group_id: string }) => mg.group_id))]
+        const { data: groups } = await supabase
+          .from('permission_groups')
+          .select('*')
+          .in('id', allGroupIds)
+
+        const groupMap = new Map((groups as PermissionGroup[] || []).map(g => [g.id, g]))
+
+        for (const member of typedMembers) {
+          const memberGroupIds = allMemberGroups
+            .filter((mg: { member_id: string }) => mg.member_id === member.id)
+            .map((mg: { group_id: string }) => mg.group_id)
+          member.groups = memberGroupIds
+            .map((gid: string) => groupMap.get(gid))
+            .filter(Boolean) as PermissionGroup[]
+        }
+      } else {
+        for (const member of typedMembers) {
+          member.groups = []
+        }
+      }
     }
 
     return { data: typedMembers }
@@ -286,11 +519,7 @@ export async function getInvitableUsers() {
   }
 }
 
-export async function addMemberById(userId: string, permissions: {
-  manage_documents?: boolean
-  manage_clients?: boolean
-  manage_establishment?: boolean
-}) {
+export async function addMemberById(userId: string, groupIds: string[]) {
   try {
     const { establishmentId } = await requirePermission('manage_establishment')
     const admin = createAdminClient()
@@ -307,18 +536,25 @@ export async function addMemberById(userId: string, permissions: {
       return { error: 'Cet utilisateur est deja membre de cet etablissement' }
     }
 
-    const { error } = await admin
+    const { data: member, error } = await admin
       .from('establishment_members')
       .insert({
         establishment_id: establishmentId,
         user_id: userId,
-        role: 'member',
-        manage_documents: permissions.manage_documents ?? false,
-        manage_clients: permissions.manage_clients ?? false,
-        manage_establishment: permissions.manage_establishment ?? false,
       })
+      .select()
+      .single()
 
     if (error) return { error: error.message }
+
+    // Assign to groups
+    if (groupIds.length > 0) {
+      const { error: groupError } = await admin
+        .from('member_groups')
+        .insert(groupIds.map(gid => ({ member_id: member.id, group_id: gid })))
+
+      if (groupError) return { error: groupError.message }
+    }
 
     revalidatePath('/etablissement')
     return { success: true }
@@ -327,11 +563,7 @@ export async function addMemberById(userId: string, permissions: {
   }
 }
 
-export async function addPendingUser(userId: string, permissions: {
-  manage_documents?: boolean
-  manage_clients?: boolean
-  manage_establishment?: boolean
-}) {
+export async function addPendingUser(userId: string, groupIds: string[]) {
   try {
     const { establishmentId } = await requirePermission('manage_establishment')
     // Use admin client to bypass RLS (self-referencing policies cause infinite recursion)
@@ -349,18 +581,25 @@ export async function addPendingUser(userId: string, permissions: {
       return { error: 'Cet utilisateur est deja membre d\'un etablissement' }
     }
 
-    const { error } = await admin
+    const { data: member, error } = await admin
       .from('establishment_members')
       .insert({
         establishment_id: establishmentId,
         user_id: userId,
-        role: 'member',
-        manage_documents: permissions.manage_documents ?? false,
-        manage_clients: permissions.manage_clients ?? false,
-        manage_establishment: permissions.manage_establishment ?? false,
       })
+      .select()
+      .single()
 
     if (error) return { error: error.message }
+
+    // Assign to groups
+    if (groupIds.length > 0) {
+      const { error: groupError } = await admin
+        .from('member_groups')
+        .insert(groupIds.map(gid => ({ member_id: member.id, group_id: gid })))
+
+      if (groupError) return { error: groupError.message }
+    }
 
     revalidatePath('/etablissement')
     return { success: true }

@@ -4,29 +4,33 @@ import { useState, useEffect, useRef, useTransition } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { addMemberById } from '@/lib/actions/establishments'
-import type { UnassignedUser } from '@/lib/types/database'
+import type { UnassignedUser, PermissionGroup } from '@/lib/types/database'
 
 interface InviteMemberSearchProps {
   users: UnassignedUser[]
+  groups: PermissionGroup[]
 }
 
-export function InviteMemberSearch({ users: initialUsers }: InviteMemberSearchProps) {
+export function InviteMemberSearch({ users: initialUsers, groups }: InviteMemberSearchProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<UnassignedUser[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [selected, setSelected] = useState<UnassignedUser | null>(null)
   const [isPending, startTransition] = useTransition()
   const [users, setUsers] = useState(initialUsers)
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set())
   const wrapperRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
   useEffect(() => { setUsers(initialUsers) }, [initialUsers])
 
-  const [permissions, setPermissions] = useState({
-    manage_documents: false,
-    manage_clients: false,
-    manage_establishment: false,
-  })
+  // Pre-select the default "Membre" group
+  useEffect(() => {
+    const membreGroup = groups.find(g => g.name === 'Membre' && !g.is_system)
+    if (membreGroup) {
+      setSelectedGroupIds(new Set([membreGroup.id]))
+    }
+  }, [groups])
 
   useEffect(() => {
     if (query.length === 0) {
@@ -58,20 +62,32 @@ export function InviteMemberSearch({ users: initialUsers }: InviteMemberSearchPr
 
   function handleClear() {
     setSelected(null)
-    setPermissions({ manage_documents: false, manage_clients: false, manage_establishment: false })
+    const membreGroup = groups.find(g => g.name === 'Membre' && !g.is_system)
+    setSelectedGroupIds(membreGroup ? new Set([membreGroup.id]) : new Set())
+  }
+
+  function toggleGroup(groupId: string) {
+    setSelectedGroupIds(prev => {
+      const next = new Set(prev)
+      if (next.has(groupId)) {
+        next.delete(groupId)
+      } else {
+        next.add(groupId)
+      }
+      return next
+    })
   }
 
   function handleAdd() {
     if (!selected) return
     startTransition(async () => {
-      const result = await addMemberById(selected.id, permissions)
+      const result = await addMemberById(selected.id, Array.from(selectedGroupIds))
       if (result.error) {
         toast.error(result.error)
       } else {
         toast.success('Membre ajoute avec succes')
         setUsers(prev => prev.filter(u => u.id !== selected.id))
-        setSelected(null)
-        setPermissions({ manage_documents: false, manage_clients: false, manage_establishment: false })
+        handleClear()
         router.refresh()
       }
     })
@@ -105,34 +121,21 @@ export function InviteMemberSearch({ users: initialUsers }: InviteMemberSearchPr
         </div>
 
         <div className="flex items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={permissions.manage_documents}
-                onChange={(e) => setPermissions(p => ({ ...p, manage_documents: e.target.checked }))}
-                className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-              />
-              <span className="text-xs">Documents</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={permissions.manage_clients}
-                onChange={(e) => setPermissions(p => ({ ...p, manage_clients: e.target.checked }))}
-                className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-              />
-              <span className="text-xs">Clients</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={permissions.manage_establishment}
-                onChange={(e) => setPermissions(p => ({ ...p, manage_establishment: e.target.checked }))}
-                className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-              />
-              <span className="text-xs">Admin</span>
-            </label>
+          <div className="flex flex-wrap gap-2">
+            {groups.map((group) => (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => toggleGroup(group.id)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors
+                  ${selectedGroupIds.has(group.id)
+                    ? 'bg-primary/15 text-primary border border-primary/30'
+                    : 'bg-surface-hover text-muted border border-border hover:text-text'
+                  }`}
+              >
+                {group.name}
+              </button>
+            ))}
           </div>
 
           <button

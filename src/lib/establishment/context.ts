@@ -1,27 +1,46 @@
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
-import type { Establishment, EstablishmentMember, EstablishmentContext, Permissions } from '@/lib/types/database'
+import type { Establishment, EstablishmentMember, EstablishmentContext, Permissions, PermissionGroup } from '@/lib/types/database'
 
 const COOKIE_NAME = 'current-establishment-id'
 
-function buildPermissions(member: EstablishmentMember): Permissions {
-  const isAdmin = member.role === 'admin'
+function buildPermissions(groups: PermissionGroup[]): Permissions {
+  const has = (field: keyof PermissionGroup) =>
+    groups.some(g => g[field] === true)
+
   return {
-    isAdmin,
-    canManageEstablishment: isAdmin || member.manage_establishment,
-    canManageDocuments: isAdmin || member.manage_documents,
-    canManageClients: isAdmin || member.manage_clients,
-    canManageAnimals: isAdmin || member.manage_animals,
-    canViewAnimals: isAdmin || member.view_animals,
-    canManageHealth: isAdmin || member.manage_health,
-    canManageMovements: isAdmin || member.manage_movements,
-    canManageBoxes: isAdmin || member.manage_boxes,
-    canManagePosts: isAdmin || member.manage_posts,
-    canManageDonations: isAdmin || member.manage_donations,
-    canManageOutings: isAdmin || member.manage_outings,
-    canViewPound: isAdmin || member.view_pound,
-    canViewStatistics: isAdmin || member.view_statistics,
+    isAdmin: groups.some(g => g.is_system && g.name === 'Administrateur'),
+    canManageEstablishment: has('manage_establishment'),
+    canManageDocuments: has('manage_documents'),
+    canManageClients: has('manage_clients'),
+    canManageAnimals: has('manage_animals'),
+    canViewAnimals: has('manage_animals') || has('view_animals'),
+    canManageHealth: has('manage_health'),
+    canManageMovements: has('manage_movements'),
+    canManageBoxes: has('manage_boxes'),
+    canManagePosts: has('manage_posts'),
+    canManageDonations: has('manage_donations'),
+    canManageOutings: has('manage_outings'),
+    canViewPound: has('view_pound'),
+    canViewStatistics: has('view_statistics'),
   }
+}
+
+async function fetchMemberGroups(supabase: Awaited<ReturnType<typeof createClient>>, memberId: string): Promise<PermissionGroup[]> {
+  const { data: memberGroups } = await supabase
+    .from('member_groups')
+    .select('group_id')
+    .eq('member_id', memberId)
+
+  const groupIds = (memberGroups || []).map((mg: { group_id: string }) => mg.group_id)
+  if (groupIds.length === 0) return []
+
+  const { data: groups } = await supabase
+    .from('permission_groups')
+    .select('*')
+    .in('id', groupIds)
+
+  return (groups as PermissionGroup[]) || []
 }
 
 export async function getCurrentEstablishmentId(): Promise<string | null> {
@@ -113,9 +132,12 @@ export async function getEstablishmentContext(): Promise<EstablishmentContext | 
     }
   }
 
+  // Fetch member's groups and build permissions
+  const groups = await fetchMemberGroups(supabase, membership.id)
+
   return {
     establishment: establishment as Establishment,
     membership,
-    permissions: buildPermissions(membership),
+    permissions: buildPermissions(groups),
   }
 }

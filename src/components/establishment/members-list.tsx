@@ -1,56 +1,143 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useRef, useTransition } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { updateMemberPermissions, removeMember } from '@/lib/actions/establishments'
-import type { EstablishmentMember } from '@/lib/types/database'
+import { assignMemberToGroup, removeMemberFromGroup, removeMember } from '@/lib/actions/establishments'
+import type { EstablishmentMember, PermissionGroup } from '@/lib/types/database'
 
 interface MembersListProps {
   members: EstablishmentMember[]
+  groups: PermissionGroup[]
   currentUserId: string
 }
 
-function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
+function GroupDropdown({
+  member,
+  allGroups,
+  onAssign,
+  onRemove,
+  disabled,
+}: {
+  member: EstablishmentMember
+  allGroups: PermissionGroup[]
+  onAssign: (memberId: string, groupId: string) => void
+  onRemove: (memberId: string, groupId: string) => void
+  disabled: boolean
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const memberGroupIds = new Set((member.groups || []).map(g => g.id))
+
   return (
-    <button
-      type="button"
-      onClick={onChange}
-      disabled={disabled}
-      className={`relative w-9 h-5 rounded-full transition-colors shrink-0
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-        ${checked ? 'bg-primary' : 'bg-border'}`}
-    >
-      <span
-        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform shadow-sm
-          ${checked ? 'translate-x-4' : 'translate-x-0'}`}
-      />
-    </button>
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={disabled}
+        className="px-2 py-1 rounded text-xs font-medium bg-surface-hover hover:bg-border transition-colors disabled:opacity-50"
+      >
+        + Groupe
+      </button>
+      {isOpen && (
+        <div className="absolute top-full right-0 mt-1 bg-surface border border-border rounded-lg shadow-xl z-20 min-w-[200px] py-1">
+          {allGroups.map((group) => {
+            const isMember = memberGroupIds.has(group.id)
+            return (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => {
+                  if (isMember) {
+                    onRemove(member.id, group.id)
+                  } else {
+                    onAssign(member.id, group.id)
+                  }
+                }}
+                disabled={disabled}
+                className="w-full text-left px-3 py-2 hover:bg-surface-hover transition-colors flex items-center justify-between gap-2"
+              >
+                <span className="text-xs font-medium truncate">{group.name}</span>
+                {isMember && (
+                  <span className="text-primary text-xs shrink-0">&#10003;</span>
+                )}
+              </button>
+            )
+          })}
+          {allGroups.length === 0 && (
+            <p className="px-3 py-2 text-xs text-muted">Aucun groupe</p>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
-export function MembersList({ members, currentUserId }: MembersListProps) {
+export function MembersList({ members, groups, currentUserId }: MembersListProps) {
   const [list, setList] = useState(members)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
   useEffect(() => { setList(members) }, [members])
 
-  function handleToggle(memberId: string, field: 'manage_documents' | 'manage_clients' | 'manage_establishment', currentValue: boolean) {
+  function handleAssignGroup(memberId: string, groupId: string) {
+    // Optimistic update
+    const group = groups.find(g => g.id === groupId)
+    if (group) {
+      setList(prev => prev.map(m =>
+        m.id === memberId
+          ? { ...m, groups: [...(m.groups || []), group] }
+          : m
+      ))
+    }
+
     startTransition(async () => {
-      const result = await updateMemberPermissions(memberId, { [field]: !currentValue })
+      const result = await assignMemberToGroup(memberId, groupId)
       if (result.error) {
         toast.error(result.error)
-      } else {
+        // Revert
         setList(prev => prev.map(m =>
-          m.id === memberId ? { ...m, [field]: !currentValue } : m
+          m.id === memberId
+            ? { ...m, groups: (m.groups || []).filter(g => g.id !== groupId) }
+            : m
         ))
-        toast.success('Permissions mises a jour')
+      } else {
+        toast.success('Groupe assigne')
       }
     })
   }
 
-  function handleRemove(memberId: string) {
+  function handleRemoveGroup(memberId: string, groupId: string) {
+    // Optimistic update
+    setList(prev => prev.map(m =>
+      m.id === memberId
+        ? { ...m, groups: (m.groups || []).filter(g => g.id !== groupId) }
+        : m
+    ))
+
+    startTransition(async () => {
+      const result = await removeMemberFromGroup(memberId, groupId)
+      if (result.error) {
+        toast.error(result.error)
+        router.refresh()
+      } else {
+        toast.success('Groupe retire')
+      }
+    })
+  }
+
+  function handleRemoveMember(memberId: string) {
     if (!confirm('Supprimer ce membre ?')) return
     startTransition(async () => {
       const result = await removeMember(memberId)
@@ -71,94 +158,81 @@ export function MembersList({ members, currentUserId }: MembersListProps) {
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-surface-hover/50">
-            <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Membre</th>
-            <th className="text-center px-3 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Documents</th>
-            <th className="text-center px-3 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Clients</th>
-            <th className="text-center px-3 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Admin</th>
-            <th className="text-right px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {list.map((member) => {
-            const isCurrentUser = member.user_id === currentUserId
-            const isAdmin = member.role === 'admin'
-            return (
-              <tr key={member.id} className="hover:bg-surface-hover/30 transition-colors">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    {member.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={member.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
-                    ) : (
-                      <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
-                        {(member.full_name || member.email || '?')[0].toUpperCase()}
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {member.full_name || member.email || member.user_id.slice(0, 8)}
-                        {isCurrentUser && <span className="text-muted text-xs ml-1">(vous)</span>}
-                      </p>
-                      <p className="text-xs text-muted">
-                        {isAdmin ? (
-                          <span className="text-primary font-medium">Admin</span>
-                        ) : (
-                          'Membre'
-                        )}
-                        {member.email && member.full_name && (
-                          <span className="ml-1">· {member.email}</span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <div className="flex justify-center">
-                    <ToggleSwitch
-                      checked={isAdmin || member.manage_documents}
-                      onChange={() => handleToggle(member.id, 'manage_documents', member.manage_documents)}
-                      disabled={isPending || isAdmin}
-                    />
-                  </div>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <div className="flex justify-center">
-                    <ToggleSwitch
-                      checked={isAdmin || member.manage_clients}
-                      onChange={() => handleToggle(member.id, 'manage_clients', member.manage_clients)}
-                      disabled={isPending || isAdmin}
-                    />
-                  </div>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <div className="flex justify-center">
-                    <ToggleSwitch
-                      checked={isAdmin || member.manage_establishment}
-                      onChange={() => handleToggle(member.id, 'manage_establishment', member.manage_establishment)}
-                      disabled={isPending || isAdmin}
-                    />
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {!isAdmin && !isCurrentUser && (
+    <div className="space-y-3">
+      {list.map((member) => {
+        const isCurrentUser = member.user_id === currentUserId
+        const isAdmin = (member.groups || []).some(g => g.is_system && g.name === 'Administrateur')
+
+        return (
+          <div key={member.id} className="p-4 bg-surface-dark rounded-lg border border-border space-y-3">
+            <div className="flex items-center gap-3">
+              {member.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={member.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+              ) : (
+                <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
+                  {(member.full_name || member.email || '?')[0].toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">
+                  {member.full_name || member.email || member.user_id.slice(0, 8)}
+                  {isCurrentUser && <span className="text-muted text-xs ml-1">(vous)</span>}
+                </p>
+                <p className="text-xs text-muted">
+                  {member.email && member.full_name && member.email}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <GroupDropdown
+                  member={member}
+                  allGroups={groups}
+                  onAssign={handleAssignGroup}
+                  onRemove={handleRemoveGroup}
+                  disabled={isPending}
+                />
+                {!isAdmin && !isCurrentUser && (
+                  <button
+                    onClick={() => handleRemoveMember(member.id)}
+                    disabled={isPending}
+                    className="px-2 py-1 rounded text-xs font-medium bg-danger/15 text-danger hover:bg-danger/25 transition-colors disabled:opacity-50"
+                  >
+                    Retirer
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Group badges */}
+            <div className="flex flex-wrap gap-1.5">
+              {(member.groups || []).map((group) => (
+                <span
+                  key={group.id}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium
+                    ${group.is_system
+                      ? 'bg-primary/15 text-primary'
+                      : 'bg-surface-hover text-text border border-border'
+                    }`}
+                >
+                  {group.name}
+                  {!group.is_system && !isCurrentUser && (
                     <button
-                      onClick={() => handleRemove(member.id)}
+                      onClick={() => handleRemoveGroup(member.id, group.id)}
                       disabled={isPending}
-                      className="px-2 py-1 rounded text-xs font-medium bg-danger/15 text-danger hover:bg-danger/25 transition-colors disabled:opacity-50"
+                      className="hover:text-danger transition-colors ml-0.5 disabled:opacity-50"
                     >
-                      Retirer
+                      &times;
                     </button>
                   )}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                </span>
+              ))}
+              {(member.groups || []).length === 0 && (
+                <span className="text-[11px] text-muted italic">Aucun groupe</span>
+              )}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

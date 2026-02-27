@@ -6,14 +6,13 @@ interface TeamMemberListProps {
   members: EstablishmentMember[]
 }
 
-function getRoleLabel(role: string): string {
-  return role === 'admin' ? 'Administrateur' : 'Membre'
+function getGroupLabel(member: EstablishmentMember): string {
+  if (!member.groups || member.groups.length === 0) return 'Aucun groupe'
+  return member.groups.map(g => g.name).join(', ')
 }
 
-function getRoleColor(role: string): string {
-  return role === 'admin'
-    ? 'bg-warning/15 text-warning'
-    : 'bg-primary/15 text-primary'
+function isAdmin(member: EstablishmentMember): boolean {
+  return (member.groups || []).some(g => g.is_system && g.name === 'Administrateur')
 }
 
 export function TeamMemberList({ members }: TeamMemberListProps) {
@@ -32,7 +31,7 @@ export function TeamMemberList({ members }: TeamMemberListProps) {
           <tr className="bg-surface-hover/50">
             <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Membre</th>
             <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Email</th>
-            <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Role</th>
+            <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Groupes</th>
             <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Depuis</th>
           </tr>
         </thead>
@@ -60,9 +59,23 @@ export function TeamMemberList({ members }: TeamMemberListProps) {
               </td>
               <td className="px-4 py-3 text-muted">{member.email || '-'}</td>
               <td className="px-4 py-3">
-                <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getRoleColor(member.role)}`}>
-                  {getRoleLabel(member.role)}
-                </span>
+                <div className="flex flex-wrap gap-1">
+                  {(member.groups || []).map((group) => (
+                    <span
+                      key={group.id}
+                      className={`inline-block px-2 py-0.5 rounded text-xs font-medium
+                        ${group.is_system
+                          ? 'bg-warning/15 text-warning'
+                          : 'bg-primary/15 text-primary'
+                        }`}
+                    >
+                      {group.name}
+                    </span>
+                  ))}
+                  {(!member.groups || member.groups.length === 0) && (
+                    <span className="text-xs text-muted italic">Aucun groupe</span>
+                  )}
+                </div>
               </td>
               <td className="px-4 py-3 text-muted">
                 {new Date(member.created_at).toLocaleDateString('fr-FR', {

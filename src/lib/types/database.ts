@@ -1,7 +1,6 @@
 export type ContactCategory = 'client' | 'member' | 'volunteer' | 'board_member' | 'foster_family' | 'veterinarian'
 export type DocumentType = 'devis' | 'facture' | 'avoir'
 export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'converted' | 'validated'
-export type EstablishmentRole = 'admin' | 'member'
 export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings'
 
 export interface LineItem {
@@ -72,11 +71,12 @@ export interface Establishment {
   updated_at: string
 }
 
-export interface EstablishmentMember {
+export interface PermissionGroup {
   id: string
   establishment_id: string
-  user_id: string
-  role: EstablishmentRole
+  name: string
+  description: string
+  is_system: boolean
   manage_documents: boolean
   manage_clients: boolean
   manage_establishment: boolean
@@ -92,10 +92,27 @@ export interface EstablishmentMember {
   view_statistics: boolean
   created_at: string
   updated_at: string
+}
+
+export interface MemberGroup {
+  id: string
+  member_id: string
+  group_id: string
+  created_at: string
+}
+
+export interface EstablishmentMember {
+  id: string
+  establishment_id: string
+  user_id: string
+  created_at: string
+  updated_at: string
   // Enriched from auth.users via RPC
   email?: string
   full_name?: string | null
   avatar_url?: string | null
+  // Enriched from group resolution
+  groups?: PermissionGroup[]
 }
 
 export interface Permissions {

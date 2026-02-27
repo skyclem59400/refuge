@@ -4,14 +4,29 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { addMember } from '@/lib/actions/establishments'
+import type { PermissionGroup } from '@/lib/types/database'
 
-export function AddMemberForm() {
+interface AddMemberFormProps {
+  groups: PermissionGroup[]
+}
+
+export function AddMemberForm({ groups }: AddMemberFormProps) {
   const [email, setEmail] = useState('')
-  const [manageDocuments, setManageDocuments] = useState(false)
-  const [manageClients, setManageClients] = useState(false)
-  const [manageEstablishment, setManageEstablishment] = useState(false)
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set())
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+
+  function toggleGroup(groupId: string) {
+    setSelectedGroupIds(prev => {
+      const next = new Set(prev)
+      if (next.has(groupId)) {
+        next.delete(groupId)
+      } else {
+        next.add(groupId)
+      }
+      return next
+    })
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -21,20 +36,14 @@ export function AddMemberForm() {
     }
 
     startTransition(async () => {
-      const result = await addMember(email.trim(), {
-        manage_documents: manageDocuments,
-        manage_clients: manageClients,
-        manage_establishment: manageEstablishment,
-      })
+      const result = await addMember(email.trim(), Array.from(selectedGroupIds))
 
       if (result.error) {
         toast.error(result.error)
       } else {
         toast.success('Membre ajoute avec succes')
         setEmail('')
-        setManageDocuments(false)
-        setManageClients(false)
-        setManageEstablishment(false)
+        setSelectedGroupIds(new Set())
         router.refresh()
       }
     })
@@ -63,36 +72,23 @@ export function AddMemberForm() {
 
       <div>
         <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-2">
-          Permissions
+          Groupes
         </label>
-        <div className="flex flex-wrap gap-3">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={manageDocuments}
-              onChange={(e) => setManageDocuments(e.target.checked)}
-              className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-            />
-            <span className="text-sm">Documents</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={manageClients}
-              onChange={(e) => setManageClients(e.target.checked)}
-              className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-            />
-            <span className="text-sm">Clients</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={manageEstablishment}
-              onChange={(e) => setManageEstablishment(e.target.checked)}
-              className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-            />
-            <span className="text-sm">Administration</span>
-          </label>
+        <div className="flex flex-wrap gap-2">
+          {groups.map((group) => (
+            <button
+              key={group.id}
+              type="button"
+              onClick={() => toggleGroup(group.id)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors
+                ${selectedGroupIds.has(group.id)
+                  ? 'bg-primary/15 text-primary border border-primary/30'
+                  : 'bg-surface-hover text-muted border border-border hover:text-text'
+                }`}
+            >
+              {group.name}
+            </button>
+          ))}
         </div>
       </div>
 
