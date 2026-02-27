@@ -18,6 +18,8 @@ import {
   BarChart3,
   Heart,
   Shield,
+  Share2,
+  PhoneCall,
 } from 'lucide-react'
 
 interface NavItem {
@@ -42,6 +44,8 @@ const shelterItems: NavItem[] = [
   { href: '/health', label: 'Sant\u00e9', Icon: HeartPulse, permission: 'canManageHealth' },
   { href: '/boxes', label: 'Box', Icon: Package, permission: 'canManageBoxes' },
   { href: '/donations', label: 'Dons', Icon: Heart, permission: 'canManageDonations' },
+  { href: '/publications', label: 'Publications', Icon: Share2, permission: 'canManagePosts' },
+  { href: '/appels', label: 'Appels IA', Icon: PhoneCall, permission: 'canManageEstablishment' },
   { href: '/icad', label: 'I-CAD', Icon: Shield, permission: 'canManageMovements' },
   { href: '/documents', label: 'Documents', Icon: FileText, permission: 'canManageDocuments' },
   { href: '/clients', label: 'R\u00e9pertoire', Icon: Users, permission: 'canManageClients' },

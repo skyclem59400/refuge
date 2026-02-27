@@ -1,13 +1,17 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { deleteDonation, generateCerfa } from '@/lib/actions/donations'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
 import type { Donation } from '@/lib/types/database'
-import { Trash2, FileText, Download, Plus } from 'lucide-react'
+import { Trash2, FileText, Download, Plus, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { HelloAssoBadge } from './helloasso-badge'
+
+type SortKey = 'donor_name' | 'amount' | 'date'
+type SortDir = 'asc' | 'desc'
 
 interface DonationListProps {
   donations: Donation[]
@@ -20,6 +24,7 @@ const paymentMethodLabels: Record<string, string> = {
   especes: 'Especes',
   cb: 'CB',
   prelevement: 'Prelevement',
+  helloasso: 'HelloAsso',
   autre: 'Autre',
 }
 
@@ -27,6 +32,38 @@ export function DonationList({ donations, canManage }: DonationListProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<string | null>(null)
+  const [sortKey, setSortKey] = useState<SortKey>('date')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'donor_name' ? 'asc' : 'desc')
+    }
+  }
+
+  const sortedDonations = useMemo(() => {
+    const sorted = [...donations].sort((a, b) => {
+      switch (sortKey) {
+        case 'donor_name':
+          return a.donor_name.localeCompare(b.donor_name, 'fr')
+        case 'amount':
+          return Number(a.amount) - Number(b.amount)
+        case 'date':
+          return a.date.localeCompare(b.date)
+      }
+    })
+    return sortDir === 'desc' ? sorted.reverse() : sorted
+  }, [donations, sortKey, sortDir])
+
+  function SortIcon({ column }: { column: SortKey }) {
+    if (sortKey !== column) return <ArrowUpDown className="w-3.5 h-3.5 text-muted/40" />
+    return sortDir === 'asc'
+      ? <ArrowUp className="w-3.5 h-3.5" />
+      : <ArrowDown className="w-3.5 h-3.5" />
+  }
 
   function handleDelete(id: string, donorName: string) {
     if (!confirm(`Supprimer le don de ${donorName} ?`)) return
@@ -82,16 +119,29 @@ export function DonationList({ donations, canManage }: DonationListProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-left">
-              <th className="px-4 py-3 font-semibold text-muted">Donateur</th>
-              <th className="px-4 py-3 font-semibold text-muted text-right">Montant</th>
-              <th className="px-4 py-3 font-semibold text-muted">Date</th>
+              <th className="px-4 py-3 font-semibold text-muted">
+                <button onClick={() => toggleSort('donor_name')} className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+                  Donateur <SortIcon column="donor_name" />
+                </button>
+              </th>
+              <th className="px-4 py-3 font-semibold text-muted text-right">
+                <button onClick={() => toggleSort('amount')} className="inline-flex items-center gap-1 hover:text-foreground transition-colors ml-auto">
+                  Montant <SortIcon column="amount" />
+                </button>
+              </th>
+              <th className="px-4 py-3 font-semibold text-muted">
+                <button onClick={() => toggleSort('date')} className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+                  Date <SortIcon column="date" />
+                </button>
+              </th>
               <th className="px-4 py-3 font-semibold text-muted">Paiement</th>
+              <th className="px-4 py-3 font-semibold text-muted">Source</th>
               <th className="px-4 py-3 font-semibold text-muted">CERFA</th>
               <th className="px-4 py-3 font-semibold text-muted text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {donations.map((donation) => (
+            {sortedDonations.map((donation) => (
               <tr key={donation.id} className="hover:bg-surface-hover transition-colors">
                 {/* Donor */}
                 <td className="px-4 py-3">
@@ -116,6 +166,11 @@ export function DonationList({ donations, canManage }: DonationListProps) {
                   <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-info/15 text-info">
                     {paymentMethodLabels[donation.payment_method] || donation.payment_method}
                   </span>
+                </td>
+
+                {/* Source */}
+                <td className="px-4 py-3">
+                  <HelloAssoBadge source={donation.source} />
                 </td>
 
                 {/* CERFA */}

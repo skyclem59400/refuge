@@ -144,3 +144,117 @@ export function getCategoryColor(category: string): string {
 }
 
 export const ALL_CONTACT_CATEGORIES = ['client', 'member', 'volunteer', 'board_member', 'foster_family', 'veterinarian'] as const
+
+// ============================================
+// Social Posts Helpers
+// ============================================
+
+export function getSocialPostTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    search_owner: 'Recherche proprietaire',
+    adoption: 'A l\'adoption',
+    event: 'Evenement',
+    info: 'Information',
+    other: 'Autre',
+  }
+  return labels[type] || type
+}
+
+export function getSocialPostStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    draft: 'Brouillon',
+    scheduled: 'Programme',
+    publishing: 'Publication...',
+    published: 'Publie',
+    failed: 'Echec',
+    archived: 'Archive',
+  }
+  return labels[status] || status
+}
+
+export function getSocialPostStatusColor(status: string): string {
+  const colors: Record<string, string> = {
+    draft: 'bg-muted/15 text-muted',
+    scheduled: 'bg-info/15 text-info',
+    publishing: 'bg-warning/15 text-warning',
+    published: 'bg-success/15 text-success',
+    failed: 'bg-error/15 text-error',
+    archived: 'bg-muted/15 text-muted',
+  }
+  return colors[status] || 'bg-muted/15 text-muted'
+}
+
+export function getPlatformLabel(platform: string): string {
+  const labels: Record<string, string> = {
+    facebook: 'Facebook',
+    instagram: 'Instagram',
+    both: 'Facebook + Instagram',
+  }
+  return labels[platform] || platform
+}
+
+// ============================================
+// Phone Agent System
+// ============================================
+
+export function getCallStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    ringing: 'Sonne',
+    in_progress: 'En cours',
+    completed: 'Termine',
+    failed: 'Echoue',
+    voicemail: 'Repondeur',
+    no_answer: 'Pas de reponse',
+  }
+  return labels[status] || status
+}
+
+export function getCallStatusColor(status: string): string {
+  const colors: Record<string, string> = {
+    ringing: 'text-amber-500 bg-amber-500/10',
+    in_progress: 'text-green-500 bg-green-500/10',
+    completed: 'text-muted bg-muted/10',
+    failed: 'text-red-500 bg-red-500/10',
+    voicemail: 'text-purple-500 bg-purple-500/10',
+    no_answer: 'text-muted bg-muted/10',
+  }
+  return colors[status] || 'text-muted bg-muted/10'
+}
+
+export function getAgentStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    idle: 'Disponible',
+    in_call: 'En appel',
+    processing: 'Traitement',
+  }
+  return labels[status] || status
+}
+
+export function getSentimentLabel(sentiment: string): string {
+  const labels: Record<string, string> = {
+    positive: 'Positif',
+    neutral: 'Neutre',
+    negative: 'Negatif',
+  }
+  return labels[sentiment] || sentiment
+}
+
+export function getSentimentColor(sentiment: string): string {
+  const colors: Record<string, string> = {
+    positive: 'text-green-500 bg-green-500/10',
+    neutral: 'text-muted bg-muted/10',
+    negative: 'text-red-500 bg-red-500/10',
+  }
+  return colors[sentiment] || 'text-muted bg-muted/10'
+}
+
+export function formatCallDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+export function maskPhone(phone: string): string {
+  if (phone.length <= 6) return phone
+  return phone.slice(0, 6) + ' ** ** ' + phone.slice(-2)
+}

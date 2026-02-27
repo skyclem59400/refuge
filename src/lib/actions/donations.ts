@@ -202,6 +202,28 @@ export async function generateCerfa(donationId: string) {
   }
 }
 
+export async function getDonationYears(): Promise<number[]> {
+  try {
+    const { establishmentId } = await requireEstablishment()
+    const supabase = createAdminClient()
+
+    const { data, error } = await supabase
+      .from('donations')
+      .select('date')
+      .eq('establishment_id', establishmentId)
+      .order('date', { ascending: false })
+
+    if (error || !data) return [new Date().getFullYear()]
+
+    const years = [...new Set(data.map((d) => new Date(d.date).getFullYear()))]
+    years.sort((a, b) => b - a)
+
+    return years.length > 0 ? years : [new Date().getFullYear()]
+  } catch {
+    return [new Date().getFullYear()]
+  }
+}
+
 export async function getDonationStats(year?: number) {
   try {
     const { establishmentId } = await requireEstablishment()

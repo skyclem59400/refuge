@@ -1,9 +1,12 @@
 import Link from 'next/link'
-import { Heart, Plus, TrendingUp, FileCheck, Calendar } from 'lucide-react'
-import { getDonations, getDonationStats } from '@/lib/actions/donations'
+import { Heart, Plus, TrendingUp, FileCheck, Calendar, ExternalLink } from 'lucide-react'
+import { getDonations, getDonationStats, getDonationYears } from '@/lib/actions/donations'
+import { getHelloAssoConnection, getHelloAssoStats } from '@/lib/actions/helloasso'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { formatCurrency } from '@/lib/utils'
 import { DonationList } from '@/components/donations/donation-list'
+import { HelloAssoSettings } from '@/components/donations/helloasso-settings'
+import { YearFilter } from '@/components/donations/year-filter'
 import type { Donation } from '@/lib/types/database'
 
 export default async function DonationsPage({
@@ -17,17 +20,18 @@ export default async function DonationsPage({
 
   const selectedYear = params.year ? parseInt(params.year) : new Date().getFullYear()
 
-  const [donationsResult, statsResult] = await Promise.all([
+  const [donationsResult, statsResult, helloAssoConnectionResult, helloAssoStatsResult, yearOptions] = await Promise.all([
     getDonations({ year: selectedYear }),
     getDonationStats(selectedYear),
+    getHelloAssoConnection(),
+    getHelloAssoStats(selectedYear),
+    getDonationYears(),
   ])
 
   const donations = (donationsResult.data as Donation[]) || []
   const stats = statsResult.data || { totalAmount: 0, totalCount: 0, cerfaCount: 0, year: selectedYear }
-
-  // Build year options (current year and 2 previous)
-  const currentYear = new Date().getFullYear()
-  const yearOptions = [currentYear, currentYear - 1, currentYear - 2]
+  const helloAssoConnection = helloAssoConnectionResult.data ?? null
+  const helloAssoStats = helloAssoStatsResult.data || { helloassoCount: 0, helloassoTotal: 0, lastSyncAt: null }
 
   return (
     <div className="animate-fade-up">
@@ -57,7 +61,7 @@ export default async function DonationsPage({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
         <div className="bg-surface rounded-xl border border-border p-4 text-center">
           <TrendingUp className="w-5 h-5 text-primary mx-auto mb-1" />
           <p className="text-2xl font-bold">{formatCurrency(stats.totalAmount)}</p>
@@ -80,24 +84,26 @@ export default async function DonationsPage({
           </p>
           <p className="text-xs text-muted mt-1">Don moyen</p>
         </div>
+        <div className="bg-surface rounded-xl border border-border p-4 text-center">
+          <ExternalLink className="w-5 h-5 text-success mx-auto mb-1" />
+          <p className="text-2xl font-bold">{helloAssoStats.helloassoCount}</p>
+          <p className="text-xs text-muted mt-1">
+            HelloAsso ({formatCurrency(helloAssoStats.helloassoTotal)})
+          </p>
+        </div>
       </div>
 
       {/* Year filter */}
-      <form className="mb-6">
-        <select
-          name="year"
-          defaultValue={selectedYear}
-          onChange={(e) => {
-            const form = e.target.form
-            if (form) form.submit()
-          }}
-          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-        >
-          {yearOptions.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
-      </form>
+      <div className="mb-6">
+        <YearFilter selectedYear={selectedYear} yearOptions={yearOptions} />
+      </div>
+
+      {/* HelloAsso Settings */}
+      {canManage && (
+        <div className="mb-6">
+          <HelloAssoSettings connection={helloAssoConnection} canManage={canManage} />
+        </div>
+      )}
 
       {/* List */}
       <DonationList donations={donations} canManage={canManage} />

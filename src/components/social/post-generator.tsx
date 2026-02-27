@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { createPost } from '@/lib/actions/social-posts'
 import { getSpeciesLabel, getSexLabel, calculateAge } from '@/lib/sda-utils'
-import type { Animal, SocialPostType, SocialPlatform } from '@/lib/types/database'
+import type { Animal, SocialPlatform } from '@/lib/types/database'
 
 interface PostGeneratorProps {
   animal: Animal
@@ -28,17 +28,19 @@ interface PostGeneratorProps {
   onPostCreated?: () => void
 }
 
-const postTypeLabels: Record<SocialPostType, string> = {
+type AnimalPostType = 'search_owner' | 'adoption'
+
+const postTypeLabels: Record<AnimalPostType, string> = {
   search_owner: 'Recherche proprietaire',
   adoption: 'A l\'adoption',
 }
 
-const postTypeBadges: Record<SocialPostType, string> = {
+const postTypeBadges: Record<AnimalPostType, string> = {
   search_owner: 'RECHERCHE PROPRIETAIRE',
   adoption: 'A L\'ADOPTION',
 }
 
-const postTypeBadgeColors: Record<SocialPostType, string> = {
+const postTypeBadgeColors: Record<AnimalPostType, string> = {
   search_owner: '#ef4444',
   adoption: '#22c55e',
 }
@@ -56,11 +58,11 @@ export function PostGenerator({
   establishmentPhone,
   onPostCreated,
 }: PostGeneratorProps) {
-  const defaultPostType: SocialPostType = animal.status === 'pound' ? 'search_owner' : 'adoption'
+  const defaultPostType: AnimalPostType = animal.status === 'pound' ? 'search_owner' : 'adoption'
   const primaryPhoto = photos.find((p) => p.is_primary) || photos[0] || null
   const photoUrl = primaryPhoto?.url || animal.photo_url || null
 
-  const [postType, setPostType] = useState<SocialPostType>(defaultPostType)
+  const [postType, setPostType] = useState<AnimalPostType>(defaultPostType)
   const [platform, setPlatform] = useState<SocialPlatform>('both')
   const [additionalNotes, setAdditionalNotes] = useState('')
   const [generatedContent, setGeneratedContent] = useState('')
@@ -175,7 +177,7 @@ export function PostGenerator({
             <label className={labelClass}>Type de publication</label>
             <select
               value={postType}
-              onChange={(e) => setPostType(e.target.value as SocialPostType)}
+              onChange={(e) => setPostType(e.target.value as AnimalPostType)}
               className={inputClass}
               disabled={isGenerating}
             >
