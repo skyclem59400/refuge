@@ -31,7 +31,8 @@ interface OutingWithAnimal {
 interface OutingHistoryProps {
   outings: OutingWithAnimal[]
   userNames: Record<string, string>
-  canManageOutings: boolean
+  isAdmin: boolean
+  currentUserId: string
 }
 
 function getAnimalPhoto(animal: OutingWithAnimal['animals']): string | null {
@@ -41,10 +42,16 @@ function getAnimalPhoto(animal: OutingWithAnimal['animals']): string | null {
   return animal.photo_url
 }
 
-export function OutingHistory({ outings, userNames, canManageOutings }: OutingHistoryProps) {
+export function OutingHistory({ outings, userNames, isAdmin, currentUserId }: OutingHistoryProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [pendingId, setPendingId] = useState<string | null>(null)
+
+  function canDelete(outing: OutingWithAnimal): boolean {
+    return isAdmin || outing.walked_by === currentUserId
+  }
+
+  const showActionsColumn = outings.some(canDelete)
 
   function handleDelete(id: string, animalName: string) {
     if (!confirm(`Supprimer la sortie de ${animalName} ?`)) return
@@ -82,7 +89,7 @@ export function OutingHistory({ outings, userNames, canManageOutings }: OutingHi
                   <th className="px-4 py-3 font-semibold text-muted">Duree</th>
                   <th className="px-4 py-3 font-semibold text-muted">Date</th>
                   <th className="px-4 py-3 font-semibold text-muted">Notes</th>
-                  {canManageOutings && (
+                  {showActionsColumn && (
                     <th className="px-4 py-3 font-semibold text-muted text-right">Actions</th>
                   )}
                 </tr>
@@ -90,6 +97,7 @@ export function OutingHistory({ outings, userNames, canManageOutings }: OutingHi
               <tbody className="divide-y divide-border">
                 {outings.map((outing) => {
                   const photo = getAnimalPhoto(outing.animals)
+                  const deletable = canDelete(outing)
                   return (
                     <tr key={outing.id} className="hover:bg-surface-hover transition-colors">
                       <td className="px-4 py-3">
@@ -127,16 +135,18 @@ export function OutingHistory({ outings, userNames, canManageOutings }: OutingHi
                       <td className="px-4 py-3 text-muted text-xs max-w-[200px] truncate">
                         {outing.notes || '-'}
                       </td>
-                      {canManageOutings && (
+                      {showActionsColumn && (
                         <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => handleDelete(outing.id, outing.animals.name)}
-                            disabled={isPending && pendingId === outing.id}
-                            className="text-muted hover:text-error transition-colors disabled:opacity-50"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {deletable ? (
+                            <button
+                              onClick={() => handleDelete(outing.id, outing.animals.name)}
+                              disabled={isPending && pendingId === outing.id}
+                              className="text-muted hover:text-error transition-colors disabled:opacity-50"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          ) : null}
                         </td>
                       )}
                     </tr>

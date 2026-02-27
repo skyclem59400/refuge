@@ -54,7 +54,7 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
     const { data: usersInfo } = await admin.rpc('get_users_info', { user_ids: uniqueUserIds })
     if (usersInfo && Array.isArray(usersInfo)) {
       for (const u of usersInfo) {
-        userNames[u.id] = u.raw_user_meta_data?.name || u.email || u.id
+        userNames[u.id] = u.full_name || u.email || u.id
       }
     }
   }

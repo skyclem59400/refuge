@@ -3,13 +3,12 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Clock, PawPrint, Loader2 } from 'lucide-react'
+import { Clock, PawPrint, Loader2, Search } from 'lucide-react'
 import { createOuting } from '@/lib/actions/outings'
 import {
   getOutingUrgencyLevel,
   getOutingUrgencyColor,
   getOutingUrgencyLabel,
-  getSpeciesLabel,
 } from '@/lib/sda-utils'
 
 interface AnimalWithPriority {
@@ -48,11 +47,11 @@ export function OutingPriorityList({ animals, canManageOutings }: OutingPriority
   const [isPending, startTransition] = useTransition()
   const [activeAnimalId, setActiveAnimalId] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
-  const [speciesFilter, setSpeciesFilter] = useState<'all' | 'dog' | 'cat'>('all')
+  const [search, setSearch] = useState('')
 
-  const filtered = speciesFilter === 'all'
-    ? animals
-    : animals.filter((a) => a.species === speciesFilter)
+  const filtered = search.trim()
+    ? animals.filter((a) => a.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : animals
 
   function handleRecord(animalId: string, duration: number) {
     startTransition(async () => {
@@ -74,29 +73,26 @@ export function OutingPriorityList({ animals, canManageOutings }: OutingPriority
 
   return (
     <div className="mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">Priorite de sortie</h2>
-        <div className="flex gap-1">
-          {(['all', 'dog', 'cat'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setSpeciesFilter(f)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors
-                ${speciesFilter === f
-                  ? 'bg-primary/15 text-primary'
-                  : 'text-muted hover:text-text hover:bg-surface-hover'
-                }`}
-            >
-              {f === 'all' ? 'Tous' : f === 'dog' ? 'Chiens' : 'Chats'}
-            </button>
-          ))}
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <h2 className="text-lg font-semibold shrink-0">Priorite de sortie</h2>
+        <div className="relative max-w-xs w-full">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un chien..."
+            className="w-full pl-8 pr-3 py-1.5 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
+          />
         </div>
       </div>
 
       {filtered.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-8 text-center">
           <PawPrint className="w-10 h-10 text-muted mx-auto mb-3" />
-          <p className="text-muted text-sm">Aucun animal actif</p>
+          <p className="text-muted text-sm">
+            {search.trim() ? 'Aucun chien trouve' : 'Aucun chien actif'}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -127,7 +123,6 @@ export function OutingPriorityList({ animals, canManageOutings }: OutingPriority
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-sm truncate">{animal.name}</p>
-                    <p className="text-xs opacity-75">{getSpeciesLabel(animal.species)}</p>
                   </div>
                 </div>
 
