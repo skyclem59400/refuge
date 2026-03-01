@@ -42,15 +42,19 @@ export async function saveRingoverConnection(data: {
     const { establishmentId } = await requirePermission('manage_establishment')
     const supabase = createAdminClient()
 
-    // Validate the API key by calling /numbers
-    const testResponse = await fetch(`${RINGOVER_API_BASE}/numbers`, {
+    // Validate the API key by calling /teams (basic endpoint, no specific right needed)
+    const testResponse = await fetch(`${RINGOVER_API_BASE}/teams`, {
       headers: { Authorization: data.api_key },
     })
 
     if (!testResponse.ok) {
       const body = await testResponse.text()
       console.error('[Ringover] API key validation failed:', testResponse.status, body)
-      return { error: 'Cle API Ringover invalide. Verifiez votre cle dans le Dashboard Ringover.' }
+
+      if (testResponse.status === 401 || testResponse.status === 403) {
+        return { error: 'Cle API Ringover invalide ou droits insuffisants. Verifiez votre cle et ses droits dans le Dashboard Ringover > Developpeur.' }
+      }
+      return { error: `Erreur API Ringover (${testResponse.status}): ${body.slice(0, 200)}` }
     }
 
     const { data: connection, error } = await supabase
@@ -73,6 +77,7 @@ export async function saveRingoverConnection(data: {
 
     revalidatePath('/pound')
     revalidatePath('/pound/interventions')
+    revalidatePath('/appels')
     return { data: connection as RingoverConnection }
   } catch (e) {
     return { error: (e as Error).message }
