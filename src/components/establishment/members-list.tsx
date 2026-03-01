@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useTransition } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { assignMemberToGroup, removeMemberFromGroup, removeMember } from '@/lib/actions/establishments'
+import { MemberAvatar } from '@/components/ui/member-avatar'
 import type { EstablishmentMember, PermissionGroup } from '@/lib/types/database'
 
 interface MembersListProps {
@@ -166,14 +167,11 @@ export function MembersList({ members, groups, currentUserId }: MembersListProps
         return (
           <div key={member.id} className="p-4 bg-surface-dark rounded-lg border border-border space-y-3">
             <div className="flex items-center gap-3">
-              {member.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={member.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-              ) : (
-                <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
-                  {(member.full_name || member.email || '?')[0].toUpperCase()}
-                </div>
-              )}
+              <MemberAvatar
+                src={member.avatar_url}
+                name={member.full_name || member.email || '?'}
+                size={32}
+              />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium truncate">
                   {member.full_name || member.email || member.user_id.slice(0, 8)}

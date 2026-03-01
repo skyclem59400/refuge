@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Warehouse, AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Warehouse } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { calculateBusinessDays, getSexIcon, calculateAge, getOriginLabel } from '@/lib/sda-utils'
@@ -62,21 +62,10 @@ export default async function PoundPage() {
   const alertAnimals = animalsWithDays.filter((a) => a.businessDays >= 6)
 
   return (
-    <div className="animate-fade-up">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-warning/15">
-            <Warehouse className="w-6 h-6 text-warning" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Fourriere</h1>
-            <p className="text-sm text-muted mt-1">
-              {animals.length} {animals.length <= 1 ? 'animal' : 'animaux'} en fourriere
-            </p>
-          </div>
-        </div>
-      </div>
+    <div>
+      <p className="text-sm text-muted mb-6">
+        {animals.length} {animals.length <= 1 ? 'animal' : 'animaux'} en fourriere
+      </p>
 
       {/* Alert section – imminent end of pound period */}
       {alertAnimals.length > 0 && (

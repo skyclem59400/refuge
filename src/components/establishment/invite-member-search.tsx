@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useTransition } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { addMemberById } from '@/lib/actions/establishments'
+import { MemberAvatar } from '@/components/ui/member-avatar'
 import type { UnassignedUser, PermissionGroup } from '@/lib/types/database'
 
 interface InviteMemberSearchProps {
@@ -97,14 +98,11 @@ export function InviteMemberSearch({ users: initialUsers, groups }: InviteMember
     return (
       <div className="p-4 bg-surface-dark rounded-lg border border-border space-y-3">
         <div className="flex items-center gap-3">
-          {selected.avatar_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={selected.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-          ) : (
-            <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
-              {(selected.full_name || selected.email)[0].toUpperCase()}
-            </div>
-          )}
+          <MemberAvatar
+            src={selected.avatar_url}
+            name={selected.full_name || selected.email}
+            size={32}
+          />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{selected.full_name || selected.email}</p>
             {selected.full_name && (
@@ -174,14 +172,11 @@ export function InviteMemberSearch({ users: initialUsers, groups }: InviteMember
               onClick={() => handleSelect(user)}
               className="w-full text-left px-4 py-2.5 hover:bg-surface-hover transition-colors flex items-center gap-3"
             >
-              {user.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
-              ) : (
-                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-                  {(user.full_name || user.email)[0].toUpperCase()}
-                </div>
-              )}
+              <MemberAvatar
+                src={user.avatar_url}
+                name={user.full_name || user.email}
+                size={28}
+              />
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{user.full_name || user.email}</p>
                 {user.full_name && (

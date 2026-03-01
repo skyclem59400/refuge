@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { addPendingUser } from '@/lib/actions/establishments'
+import { MemberAvatar } from '@/components/ui/member-avatar'
 import type { UnassignedUser, PermissionGroup } from '@/lib/types/database'
 
 interface PendingUsersListProps {
@@ -70,14 +71,11 @@ export function PendingUsersList({ users, groups }: PendingUsersListProps) {
         return (
           <div key={user.id} className="p-4 bg-surface-dark rounded-lg border border-border space-y-3">
             <div className="flex items-center gap-3">
-              {user.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-              ) : (
-                <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
-                  {(user.full_name || user.email || '?')[0].toUpperCase()}
-                </div>
-              )}
+              <MemberAvatar
+                src={user.avatar_url}
+                name={user.full_name || user.email || '?'}
+                size={32}
+              />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium truncate">
                   {user.full_name || user.email}
