@@ -43,9 +43,19 @@ export async function saveRingoverConnection(data: {
     const supabase = createAdminClient()
 
     // Validate the API key by calling /teams (basic endpoint, no specific right needed)
-    const testResponse = await fetch(`${RINGOVER_API_BASE}/teams`, {
-      headers: { Authorization: data.api_key },
-    })
+    console.log('[Ringover] Validating API key against /teams...')
+    let testResponse: Response
+    try {
+      testResponse = await fetch(`${RINGOVER_API_BASE}/teams`, {
+        headers: { Authorization: data.api_key },
+        signal: AbortSignal.timeout(10000),
+      })
+    } catch (fetchError) {
+      console.error('[Ringover] Fetch error:', fetchError)
+      return { error: `Impossible de contacter l'API Ringover: ${(fetchError as Error).message}` }
+    }
+
+    console.log('[Ringover] Response status:', testResponse.status)
 
     if (!testResponse.ok) {
       const body = await testResponse.text()
@@ -56,6 +66,7 @@ export async function saveRingoverConnection(data: {
       }
       return { error: `Erreur API Ringover (${testResponse.status}): ${body.slice(0, 200)}` }
     }
+    console.log('[Ringover] API key validated successfully')
 
     const { data: connection, error } = await supabase
       .from('ringover_connections')
