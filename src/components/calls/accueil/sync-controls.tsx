@@ -19,6 +19,9 @@ export function SyncControls({ connection }: SyncControlsProps) {
   const [apiKey, setApiKey] = useState('')
   const [numbers, setNumbers] = useState<RingoverNumber[]>([])
   const [selectedNumber, setSelectedNumber] = useState('')
+  const [manualNumber, setManualNumber] = useState('')
+  const [manualLabel, setManualLabel] = useState('')
+  const [showManual, setShowManual] = useState(false)
   const [showConfig, setShowConfig] = useState(false)
 
   // ── State 1: No connection at all → API key form ──
@@ -84,8 +87,37 @@ export function SyncControls({ connection }: SyncControlsProps) {
     )
   }
 
-  // ── State 2: Connected but no accueil number → number selection ──
+  // ── State 2: Connected but no accueil number → number config ──
   if (!connection.accueil_number) {
+    const handleSaveNumber = () => {
+      if (showManual) {
+        if (!manualNumber.trim()) return
+        setPendingAction('save')
+        startTransition(async () => {
+          const r = await saveAccueilNumber({
+            accueil_number: manualNumber.trim(),
+            accueil_label: manualLabel.trim() || undefined,
+          })
+          if (r.error) toast.error(r.error)
+          else { toast.success("Numero d'accueil configure"); router.refresh() }
+          setPendingAction(null)
+        })
+      } else {
+        if (!selectedNumber) return
+        const chosen = numbers.find((n) => n.number === selectedNumber)
+        setPendingAction('save')
+        startTransition(async () => {
+          const r = await saveAccueilNumber({
+            accueil_number: selectedNumber,
+            accueil_label: chosen?.label,
+          })
+          if (r.error) toast.error(r.error)
+          else { toast.success("Numero d'accueil configure"); router.refresh() }
+          setPendingAction(null)
+        })
+      }
+    }
+
     return (
       <div className="bg-surface rounded-xl border border-primary/20 p-6 space-y-4 max-w-lg mx-auto">
         <div className="text-center">
@@ -94,77 +126,100 @@ export function SyncControls({ connection }: SyncControlsProps) {
           </div>
           <h3 className="text-base font-semibold">Ringover connecte</h3>
           <p className="text-xs text-muted mt-1">
-            Selectionnez le numero d&apos;accueil a suivre pour activer le dashboard
+            Configurez le numero d&apos;accueil a suivre pour activer le dashboard
           </p>
         </div>
 
-        {numbers.length === 0 ? (
-          <button
-            onClick={() => {
-              setPendingAction('load')
-              startTransition(async () => {
-                const r = await getRingoverNumbers()
-                if (r.error) toast.error(r.error)
-                else setNumbers(r.data || [])
-                setPendingAction(null)
-              })
-            }}
-            disabled={isPending}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
-              bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors disabled:opacity-50"
-          >
-            {pendingAction === 'load' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Settings className="w-4 h-4" />}
-            Charger les numeros disponibles
-          </button>
+        {!showManual ? (
+          <div className="space-y-3">
+            {numbers.length === 0 ? (
+              <>
+                <button
+                  onClick={() => {
+                    setPendingAction('load')
+                    startTransition(async () => {
+                      const r = await getRingoverNumbers()
+                      if (r.error) {
+                        toast.error(r.error)
+                        setShowManual(true)
+                      } else if ((r.data || []).length === 0) {
+                        toast.info('Aucun numero trouve, saisie manuelle')
+                        setShowManual(true)
+                      } else {
+                        setNumbers(r.data || [])
+                      }
+                      setPendingAction(null)
+                    })
+                  }}
+                  disabled={isPending}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
+                    bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors disabled:opacity-50"
+                >
+                  {pendingAction === 'load' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Settings className="w-4 h-4" />}
+                  Charger les numeros disponibles
+                </button>
+                <button
+                  onClick={() => setShowManual(true)}
+                  className="w-full text-xs text-muted hover:text-primary transition-colors text-center"
+                >
+                  Ou saisir le numero manuellement
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="max-h-48 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
+                  {numbers.map((num) => (
+                    <label
+                      key={num.number}
+                      className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors ${
+                        selectedNumber === num.number
+                          ? 'bg-primary/10 border border-primary/20'
+                          : 'hover:bg-surface-hover border border-transparent'
+                      }`}
+                    >
+                      <input type="radio" name="accueil" value={num.number} checked={selectedNumber === num.number} onChange={(e) => setSelectedNumber(e.target.value)} className="accent-primary" />
+                      <div>
+                        <p className="text-sm font-medium">{num.label || num.number}</p>
+                        <p className="text-xs text-muted">{num.number}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <button onClick={handleSaveNumber} disabled={isPending || !selectedNumber} className="w-full px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors disabled:opacity-50">
+                  {pendingAction === 'save' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Valider ce numero'}
+                </button>
+              </>
+            )}
+          </div>
         ) : (
           <div className="space-y-3">
-            <div className="max-h-48 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
-              {numbers.map((num) => (
-                <label
-                  key={num.number}
-                  className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors ${
-                    selectedNumber === num.number
-                      ? 'bg-primary/10 border border-primary/20'
-                      : 'hover:bg-surface-hover border border-transparent'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="accueil"
-                    value={num.number}
-                    checked={selectedNumber === num.number}
-                    onChange={(e) => setSelectedNumber(e.target.value)}
-                    className="accent-primary"
-                  />
-                  <div>
-                    <p className="text-sm font-medium">{num.label || num.number}</p>
-                    <p className="text-xs text-muted">{num.number}</p>
-                  </div>
-                </label>
-              ))}
+            <div>
+              <label className="text-xs font-medium text-muted block mb-1.5">Numero de telephone</label>
+              <input
+                type="tel"
+                value={manualNumber}
+                onChange={(e) => setManualNumber(e.target.value)}
+                placeholder="+33 1 23 45 67 89"
+                className="w-full px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
+                  focus:border-primary focus:ring-1 focus:ring-primary transition-colors placeholder:text-muted/50"
+              />
             </div>
-            <button
-              onClick={() => {
-                const chosen = numbers.find((n) => n.number === selectedNumber)
-                setPendingAction('save')
-                startTransition(async () => {
-                  const r = await saveAccueilNumber({
-                    accueil_number: selectedNumber,
-                    accueil_label: chosen?.label,
-                  })
-                  if (r.error) toast.error(r.error)
-                  else {
-                    toast.success("Numero d'accueil configure")
-                    router.refresh()
-                  }
-                  setPendingAction(null)
-                })
-              }}
-              disabled={isPending || !selectedNumber}
-              className="w-full px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-medium
-                hover:bg-primary-dark transition-colors disabled:opacity-50"
-            >
+            <div>
+              <label className="text-xs font-medium text-muted block mb-1.5">Libelle (optionnel)</label>
+              <input
+                type="text"
+                value={manualLabel}
+                onChange={(e) => setManualLabel(e.target.value)}
+                placeholder="ex: Accueil SDA"
+                className="w-full px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
+                  focus:border-primary focus:ring-1 focus:ring-primary transition-colors placeholder:text-muted/50"
+              />
+            </div>
+            <button onClick={handleSaveNumber} disabled={isPending || !manualNumber.trim()} className="w-full px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors disabled:opacity-50">
               {pendingAction === 'save' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Valider ce numero'}
+            </button>
+            <button onClick={() => setShowManual(false)} className="w-full text-xs text-muted hover:text-primary transition-colors text-center">
+              Charger depuis Ringover
             </button>
           </div>
         )}
