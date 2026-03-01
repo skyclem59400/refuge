@@ -42,32 +42,7 @@ export async function saveRingoverConnection(data: {
     const { establishmentId } = await requirePermission('manage_establishment')
     const supabase = createAdminClient()
 
-    // Validate the API key by calling /teams (basic endpoint, no specific right needed)
-    console.log('[Ringover] Validating API key against /teams...')
-    let testResponse: Response
-    try {
-      testResponse = await fetch(`${RINGOVER_API_BASE}/teams`, {
-        headers: { Authorization: data.api_key },
-        signal: AbortSignal.timeout(10000),
-      })
-    } catch (fetchError) {
-      console.error('[Ringover] Fetch error:', fetchError)
-      return { error: `Impossible de contacter l'API Ringover: ${(fetchError as Error).message}` }
-    }
-
-    console.log('[Ringover] Response status:', testResponse.status)
-
-    if (!testResponse.ok) {
-      const body = await testResponse.text()
-      console.error('[Ringover] API key validation failed:', testResponse.status, body)
-
-      if (testResponse.status === 401 || testResponse.status === 403) {
-        return { error: 'Cle API Ringover invalide ou droits insuffisants. Verifiez votre cle et ses droits dans le Dashboard Ringover > Developpeur.' }
-      }
-      return { error: `Erreur API Ringover (${testResponse.status}): ${body.slice(0, 200)}` }
-    }
-    console.log('[Ringover] API key validated successfully')
-
+    // Save the connection — validation will happen when loading numbers or syncing
     const { data: connection, error } = await supabase
       .from('ringover_connections')
       .upsert(
