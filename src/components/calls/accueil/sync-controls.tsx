@@ -260,7 +260,7 @@ export function SyncControls({ connection }: SyncControlsProps) {
             setPendingAction('sync')
             startTransition(async () => {
               const r = await syncRingoverCalls()
-              if (r.error) toast.error(r.error)
+              if (r.error) toast.error(r.error, { duration: 15000 })
               else toast.success(`${r.data?.synced || 0} appels synchronises`)
               setPendingAction(null)
               router.refresh()

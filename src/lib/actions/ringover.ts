@@ -162,19 +162,15 @@ export async function getRecentAstreinteCalls() {
       return { data: [] }
     }
 
-    // Fetch recent calls via POST /calls with filters
-    const response = await fetch(`${RINGOVER_API_BASE}/calls`, {
-      method: 'POST',
+    // Fetch recent calls via GET /calls with query parameters
+    const params = new URLSearchParams({
+      limit_count: '20',
+      limit_offset: '0',
+    })
+    const response = await fetch(`${RINGOVER_API_BASE}/calls?${params}`, {
       headers: {
-        Authorization: conn.api_key,
-        'Content-Type': 'application/json',
+        Authorization: conn.api_key.trim(),
       },
-      body: JSON.stringify({
-        limit_count: 20,
-        limit_offset: 0,
-        filter_by_direction: 'in',
-        filter_by_number: conn.astreinte_number,
-      }),
     })
 
     if (!response.ok) {
@@ -185,16 +181,24 @@ export async function getRecentAstreinteCalls() {
     const body = await response.json()
     const callList = body?.call_list || body?.calls || []
 
+    const astreinteNum = (conn.astreinte_number || '').replace(/[^0-9+]/g, '')
+
     const calls: RingoverCall[] = []
     if (Array.isArray(callList)) {
       for (const call of callList) {
+        // Client-side filter: only keep calls involving the astreinte number
+        const from = String(call.from_number || '').replace(/[^0-9+]/g, '')
+        const to = String(call.to_number || '').replace(/[^0-9+]/g, '')
+        if (astreinteNum && !from.includes(astreinteNum) && !to.includes(astreinteNum)) {
+          continue
+        }
         calls.push({
-          call_id: String(call.call_id || call.cdr_id || ''),
+          call_id: String(call.cdr_id || call.call_id || ''),
           direction: call.direction || 'in',
           from_number: call.from_number || call.caller_number || '',
           from_name: call.from_name || call.caller_name || call.contact_name || null,
           to_number: call.to_number || call.callee_number || conn.astreinte_number,
-          start_time: call.start_time || call.start_date || '',
+          start_time: call.start_date || call.start_time || '',
           duration: call.duration || 0,
           status: call.status || call.call_status || '',
         })

@@ -73,55 +73,115 @@ export async function syncRingoverCalls() {
 
     // Determine start date: from sync_cursor or 15 days ago
     const now = new Date()
-    let filterDateStart: string
+    let startDate: string
     if (conn.sync_cursor) {
-      filterDateStart = conn.sync_cursor
+      startDate = conn.sync_cursor
     } else {
       const fifteenDaysAgo = new Date(now)
       fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15)
-      filterDateStart = fifteenDaysAgo.toISOString()
+      startDate = fifteenDaysAgo.toISOString()
     }
-    const filterDateEnd = now.toISOString()
+    const endDate = now.toISOString()
+    const apiKey = conn.api_key.trim()
+
+    // ── Try multiple auth formats to find the working one ──
+    const authFormats = [
+      { label: 'raw', value: apiKey },
+      { label: 'Bearer', value: `Bearer ${apiKey}` },
+    ]
+    let workingAuth: string | null = null
+    let lastStatus = 0
+    let lastBody = ''
+
+    for (const fmt of authFormats) {
+      const testResp = await fetch(`${RINGOVER_API_BASE}/calls`, {
+        headers: { Authorization: fmt.value },
+      })
+      if (testResp.ok) {
+        workingAuth = fmt.value
+        const testData = await testResp.json()
+        const testCalls = testData?.call_list || testData?.calls || []
+        console.log(`[Ringover Sync] Auth OK with "${fmt.label}".`, Array.isArray(testCalls) ? testCalls.length : 0, 'calls')
+        if (Array.isArray(testCalls) && testCalls.length > 0) {
+          console.log('[Ringover Sync] Sample call:', JSON.stringify(testCalls[0]).slice(0, 600))
+        }
+        break
+      }
+      lastStatus = testResp.status
+      lastBody = await testResp.text().catch(() => '')
+      console.log(`[Ringover Sync] Auth "${fmt.label}" failed:`, testResp.status)
+      await sleep(600)
+    }
+
+    if (!workingAuth) {
+      return {
+        error: `Cle API Ringover rejetee (${lastStatus}). Verifiez que la cle est valide dans Ringover Dashboard > Developpeur > Cle API. ${lastBody.slice(0, 100)}`,
+      }
+    }
 
     let offset = 0
     let totalCount = 0
     let latestCallTime: string | null = null
 
     while (true) {
-      const response = await fetch(`${RINGOVER_API_BASE}/calls`, {
-        method: 'POST',
-        headers: {
-          Authorization: conn.api_key,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          limit_count: 500,
-          limit_offset: offset,
-          filter_date_start: filterDateStart,
-          filter_date_end: filterDateEnd,
-          filter_by_number: conn.accueil_number,
-        }),
+      // Ringover API v2 GET /calls — query parameters
+      const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate,
+        limit_count: '500',
+        limit_offset: String(offset),
+      })
+
+      const url = `${RINGOVER_API_BASE}/calls?${params}`
+      console.log('[Ringover Sync] Fetching offset', offset)
+
+      const response = await fetch(url, {
+        headers: { Authorization: workingAuth },
       })
 
       if (!response.ok) {
-        console.error('[Ringover Sync] API error:', response.status)
+        const errorText = await response.text().catch(() => '')
+        console.error('[Ringover Sync] API error:', response.status, errorText)
         return { error: `Erreur API Ringover (${response.status})` }
       }
 
       const body = await response.json()
       const callList = body?.call_list || body?.calls || []
 
-      if (!Array.isArray(callList) || callList.length === 0) break
+      if (!Array.isArray(callList) || callList.length === 0) {
+        // Log response structure on first empty page for debugging
+        if (offset === 0) {
+          console.log('[Ringover Sync] Empty response. Keys:', Object.keys(body))
+        }
+        break
+      }
+
+      // Log first call structure for debugging
+      if (offset === 0 && callList.length > 0) {
+        console.log('[Ringover Sync] First call keys:', Object.keys(callList[0]))
+      }
+
+      // Filter to only calls involving the accueil number (client-side filter)
+      const accueilNumber = conn.accueil_number.replace(/[^0-9+]/g, '')
+      const filteredCalls = callList.filter((call: Record<string, unknown>) => {
+        const from = String(call.from_number || '').replace(/[^0-9+]/g, '')
+        const to = String(call.to_number || '').replace(/[^0-9+]/g, '')
+        // If no number filtering needed (API key scoped to user), keep all
+        if (!accueilNumber) return true
+        return from.includes(accueilNumber) || to.includes(accueilNumber)
+          || from === accueilNumber || to === accueilNumber
+      })
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const records = callList.map((call: any) => {
-        const direction = call.direction === 'out' ? 'out' : 'in'
-        const status = String(call.status || call.call_status || 'UNKNOWN')
-        const startTime = call.start_time || call.start_date
+      const records = filteredCalls.map((call: any) => {
+        const direction = call.direction === 'out' || call.direction === 'OUT' ? 'out' : 'in'
+        const rawStatus = String(call.status || call.call_status || call.type || 'UNKNOWN')
+        const status = rawStatus.toUpperCase()
+        const callStartTime = call.start_date || call.start_time
 
         return {
           establishment_id: establishmentId,
-          ringover_call_id: String(call.call_id || call.cdr_id),
+          ringover_call_id: String(call.cdr_id || call.call_id || call.id),
           direction,
           status,
           caller_number: call.from_number || call.caller_number || null,
@@ -130,13 +190,13 @@ export async function syncRingoverCalls() {
           callee_name: call.to_name || call.callee_name || null,
           agent_id: call.agent_id ? String(call.agent_id) : null,
           agent_name: call.agent_name || null,
-          start_time: startTime,
-          end_time: call.end_time || call.end_date || null,
+          start_time: callStartTime,
+          end_time: call.end_date || call.end_time || null,
           duration: Number(call.duration) || 0,
           wait_time: Number(call.wait_time || call.waiting_duration) || 0,
-          has_voicemail: Boolean(call.has_voicemail),
+          has_voicemail: Boolean(call.has_voicemail || call.voicemail),
           voicemail_url: call.voicemail_url || null,
-          has_recording: Boolean(call.has_recording),
+          has_recording: Boolean(call.has_recording || call.recording),
           recording_url: call.recording_url || null,
           tags: call.tags || [],
           notes: call.notes || null,
@@ -147,22 +207,24 @@ export async function syncRingoverCalls() {
         }
       })
 
-      // Upsert batch
-      const { error: upsertError } = await supabase
-        .from('ringover_calls')
-        .upsert(records, { onConflict: 'establishment_id,ringover_call_id' })
+      // Upsert batch (skip if no records after filtering)
+      if (records.length > 0) {
+        const { error: upsertError } = await supabase
+          .from('ringover_calls')
+          .upsert(records, { onConflict: 'establishment_id,ringover_call_id' })
 
-      if (upsertError) {
-        console.error('[Ringover Sync] Upsert error:', upsertError.message)
-        return { error: `Erreur lors de l'enregistrement : ${upsertError.message}` }
-      }
+        if (upsertError) {
+          console.error('[Ringover Sync] Upsert error:', upsertError.message)
+          return { error: `Erreur lors de l'enregistrement : ${upsertError.message}` }
+        }
 
-      totalCount += callList.length
+        totalCount += records.length
 
-      // Track latest call time for cursor update
-      for (const record of records) {
-        if (record.start_time && (!latestCallTime || record.start_time > latestCallTime)) {
-          latestCallTime = record.start_time
+        // Track latest call time for cursor update
+        for (const record of records) {
+          if (record.start_time && (!latestCallTime || record.start_time > latestCallTime)) {
+            latestCallTime = record.start_time
+          }
         }
       }
 
