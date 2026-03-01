@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "bundle:remotion": "npx remotion bundle src/remotion/index.tsx --out-dir public/remotion-bundle"
+    "bundle:remotion": "remotion bundle src/remotion/index.tsx --out-dir public/remotion-bundle"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
