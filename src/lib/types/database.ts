@@ -442,3 +442,149 @@ export interface CallTranscript {
 export interface CallLogWithCategory extends CallLog {
   category: CallCategory | null
 }
+
+// ============================================
+// Pound Interventions
+// ============================================
+
+export interface PoundIntervention {
+  id: string
+  establishment_id: string
+  animal_id: string | null
+  caller_name: string
+  caller_phone: string | null
+  caller_email: string | null
+  location_street_number: string | null
+  location_street: string
+  location_city: string
+  intervention_date: string
+  intervened_by: string
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ============================================
+// Ringover Integration
+// ============================================
+
+export interface RingoverConnection {
+  id: string
+  establishment_id: string
+  api_key: string
+  astreinte_number: string | null
+  astreinte_label: string | null
+  accueil_number: string | null
+  accueil_label: string | null
+  last_sync_at: string | null
+  sync_cursor: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface RingoverCall {
+  call_id: string
+  direction: string
+  from_number: string
+  from_name: string | null
+  to_number: string
+  start_time: string
+  duration: number
+  status: string
+}
+
+export interface RingoverNumber {
+  number: string
+  label: string
+  type: string
+}
+
+// ============================================
+// Ringover Analytics
+// ============================================
+
+export interface RingoverCallRecord {
+  id: string
+  establishment_id: string
+  ringover_call_id: string
+  direction: 'in' | 'out'
+  status: string
+  caller_number: string | null
+  caller_name: string | null
+  callee_number: string | null
+  callee_name: string | null
+  agent_id: string | null
+  agent_name: string | null
+  start_time: string
+  end_time: string | null
+  duration: number
+  wait_time: number
+  has_voicemail: boolean
+  voicemail_url: string | null
+  has_recording: boolean
+  recording_url: string | null
+  tags: string[]
+  notes: string | null
+  callback_needed: boolean
+  callback_completed: boolean
+  callback_completed_at: string | null
+  callback_completed_by: string | null
+  callback_notes: string | null
+  raw_data: Record<string, unknown> | null
+  synced_at: string
+  created_at: string
+  updated_at: string
+}
+
+export interface RingoverDashboardStats {
+  totalCalls: number
+  answeredCalls: number
+  missedCalls: number
+  voicemailCalls: number
+  outboundCalls: number
+  answerRate: number
+  missedRate: number
+  avgDuration: number
+  avgWaitTime: number
+  totalDuration: number
+  callbacksPending: number
+}
+
+export interface RingoverHourlyData {
+  hour: number
+  total: number
+  answered: number
+  missed: number
+}
+
+export interface RingoverDailyData {
+  date: string
+  total: number
+  answered: number
+  missed: number
+  avgWaitTime: number
+}
+
+export interface RingoverCallbackItem {
+  id: string
+  caller_number: string
+  caller_name: string | null
+  start_time: string
+  status: string
+  has_voicemail: boolean
+  voicemail_url: string | null
+  duration: number
+  wait_time: number
+  callback_completed: boolean
+  callback_notes: string | null
+}
+
+export interface RingoverTopCaller {
+  caller_number: string
+  caller_name: string | null
+  total_calls: number
+  missed_calls: number
+  last_call_time: string
+}

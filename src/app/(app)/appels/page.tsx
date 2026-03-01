@@ -1,83 +1,96 @@
 import { redirect } from 'next/navigation'
-import { Phone } from 'lucide-react'
 import { getEstablishmentContext } from '@/lib/establishment/context'
-import { getAllCalls, getCallStats, getAgentSessions, getCallCategories, seedDefaultCategories } from '@/lib/actions/calls'
-import { CallStats } from '@/components/calls/call-stats'
-import { ActiveAgents } from '@/components/calls/active-agents'
-import { CallFilters } from '@/components/calls/call-filters'
-import { CategoryChart } from '@/components/calls/category-chart'
-import { CallList } from '@/components/calls/call-list'
-import type { CallStatus } from '@/lib/types/database'
+import { getRingoverConnection } from '@/lib/actions/ringover'
+import {
+  getRingoverAccueilStats,
+  getRingoverAccueilCalls,
+  getRingoverCallbacks,
+  getRingoverHourlyDistribution,
+  getRingoverDailyTrend,
+  getRingoverTopCallers,
+} from '@/lib/actions/ringover-sync'
+import { AccueilStats } from '@/components/calls/accueil/accueil-stats'
+import { PeriodFilter } from '@/components/calls/accueil/period-filter'
+import { SyncControls } from '@/components/calls/accueil/sync-controls'
+import { CallbackList } from '@/components/calls/accueil/callback-list'
+import { HourlyChart } from '@/components/calls/accueil/hourly-chart'
+import { DailyTrendChart } from '@/components/calls/accueil/daily-trend-chart'
+import { AccueilCallList } from '@/components/calls/accueil/accueil-call-list'
+import { TopCallers } from '@/components/calls/accueil/top-callers'
 
-export default async function AppelsPage({
+export default async function AppelsAccueilPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; category?: string }>
+  searchParams: Promise<{ period?: string }>
 }) {
   const params = await searchParams
   const ctx = await getEstablishmentContext()
   if (!ctx) redirect('/login')
 
-  // Seed default categories (no-op if already exist)
-  await seedDefaultCategories()
+  const period = (params.period as 'today' | '7d' | '30d' | 'all') || '7d'
 
-  // Build filters
-  const filters: { status?: CallStatus; category_id?: string } = {}
-  if (params.status) {
-    filters.status = params.status as CallStatus
+  // Get Ringover connection
+  const connResult = await getRingoverConnection()
+  const connection = connResult.data || null
+
+  // If no connection or no accueil number, show config panel only
+  if (!connection || !connection.accueil_number) {
+    return (
+      <div>
+        <SyncControls connection={connection} />
+      </div>
+    )
   }
-  if (params.category) {
-    filters.category_id = params.category
+
+  // Fetch all dashboard data in parallel
+  const [statsResult, callsResult, callbacksResult, hourlyResult, dailyResult, topCallersResult] =
+    await Promise.all([
+      getRingoverAccueilStats(period),
+      getRingoverAccueilCalls({ limit: 100 }),
+      getRingoverCallbacks(),
+      getRingoverHourlyDistribution(period === 'today' ? '7d' : period === 'all' ? '30d' : period),
+      getRingoverDailyTrend(period === 'today' ? 7 : period === '7d' ? 7 : 30),
+      getRingoverTopCallers(10),
+    ])
+
+  const stats = statsResult.data || {
+    totalCalls: 0, answeredCalls: 0, missedCalls: 0, voicemailCalls: 0,
+    outboundCalls: 0, answerRate: 0, missedRate: 0, avgDuration: 0,
+    avgWaitTime: 0, totalDuration: 0, callbacksPending: 0,
   }
-
-  // Fetch data in parallel
-  const [statsResult, callsResult, agentsResult, categoriesResult] = await Promise.all([
-    getCallStats(),
-    getAllCalls(filters),
-    getAgentSessions(),
-    getCallCategories(),
-  ])
-
-  const stats = statsResult.data || { total: 0, inProgress: 0, avgDuration: 0, callbackNeeded: 0 }
   const calls = callsResult.data || []
-  const agents = agentsResult.data || []
-  const categories = categoriesResult.data || []
+  const callbacks = callbacksResult.data || []
+  const hourly = hourlyResult.data || []
+  const daily = dailyResult.data || []
+  const topCallers = topCallersResult.data || []
 
   return (
-    <div className="animate-fade-up">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Phone className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Appels telephoniques</h1>
-            <p className="text-sm text-muted mt-1">
-              Agents IA du refuge
-            </p>
-          </div>
+    <div className="space-y-6">
+      {/* Header controls */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <PeriodFilter />
+        <SyncControls connection={connection} />
+      </div>
+
+      {/* KPI Stats */}
+      <AccueilStats stats={stats} />
+
+      {/* Callbacks - high priority */}
+      <CallbackList callbacks={callbacks} />
+
+      {/* Charts row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <HourlyChart data={hourly} />
+        <DailyTrendChart data={daily} />
+      </div>
+
+      {/* Bottom row: top callers + call history */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <TopCallers callers={topCallers} />
+        <div className="lg:col-span-2">
+          <AccueilCallList initialCalls={calls} establishmentId={ctx.establishment.id} />
         </div>
       </div>
-
-      {/* Stats */}
-      <div className="mb-6">
-        <CallStats stats={stats} />
-      </div>
-
-      {/* Active agents */}
-      <div className="mb-6">
-        <ActiveAgents initialAgents={agents} establishmentId={ctx.establishment.id} />
-      </div>
-
-      {/* Filters + Category chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <CallFilters categories={categories} />
-        <CategoryChart calls={calls} categories={categories} />
-      </div>
-
-      {/* Call list */}
-      <CallList initialCalls={calls} categories={categories} establishmentId={ctx.establishment.id} />
     </div>
   )
 }

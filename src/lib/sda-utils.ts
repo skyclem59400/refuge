@@ -296,3 +296,60 @@ export function formatOutingDuration(minutes: number): string {
   if (m === 0) return `${h}h`
   return `${h}h${m.toString().padStart(2, '0')}`
 }
+
+// ============================================
+// Ringover Analytics Helpers
+// ============================================
+
+export function getRingoverStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    ANSWERED: 'Repondu',
+    MISSED: 'Manque',
+    OUT: 'Sortant',
+    VOICEMAIL: 'Messagerie',
+    UNKNOWN: 'Inconnu',
+  }
+  return labels[status] || status
+}
+
+export function getRingoverStatusColor(status: string): string {
+  const colors: Record<string, string> = {
+    ANSWERED: 'text-green-500 bg-green-500/10',
+    MISSED: 'text-red-500 bg-red-500/10',
+    OUT: 'text-blue-500 bg-blue-500/10',
+    VOICEMAIL: 'text-purple-500 bg-purple-500/10',
+    UNKNOWN: 'text-muted bg-muted/10',
+  }
+  return colors[status] || 'text-muted bg-muted/10'
+}
+
+export function formatDurationHuman(seconds: number): string {
+  if (seconds === 0) return '0s'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+  if (h > 0) return `${h}h${m > 0 ? ` ${m}min` : ''}`
+  if (m > 0) return `${m}min${s > 0 ? ` ${s}s` : ''}`
+  return `${s}s`
+}
+
+export function formatPhoneFr(phone: string | null): string {
+  if (!phone) return 'Inconnu'
+  if (phone.startsWith('+33') && phone.length === 12) {
+    const local = '0' + phone.slice(3)
+    return local.replace(/(\d{2})(?=\d)/g, '$1 ')
+  }
+  return phone
+}
+
+export function getAnswerRateColor(rate: number): string {
+  if (rate >= 90) return 'text-success'
+  if (rate >= 75) return 'text-warning'
+  return 'text-error'
+}
+
+export function getWaitTimeColor(seconds: number): string {
+  if (seconds <= 15) return 'text-success'
+  if (seconds <= 30) return 'text-warning'
+  return 'text-error'
+}

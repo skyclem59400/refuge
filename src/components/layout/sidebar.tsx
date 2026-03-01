@@ -47,7 +47,7 @@ const shelterItems: NavItem[] = [
   { href: '/sorties', label: 'Sorties', Icon: Footprints, permission: 'canManageOutings' },
   { href: '/donations', label: 'Dons', Icon: Heart, permission: 'canManageDonations' },
   { href: '/publications', label: 'Publications', Icon: Share2, permission: 'canManagePosts' },
-  { href: '/appels', label: 'Appels IA', Icon: PhoneCall, permission: 'canManageEstablishment' },
+  { href: '/appels', label: 'Appels', Icon: PhoneCall, permission: 'canManageEstablishment' },
   { href: '/icad', label: 'I-CAD', Icon: Shield, permission: 'canManageMovements' },
   { href: '/documents', label: 'Documents', Icon: FileText, permission: 'canManageDocuments' },
   { href: '/clients', label: 'R\u00e9pertoire', Icon: Users, permission: 'canManageClients' },
