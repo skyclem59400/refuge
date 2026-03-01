@@ -11,6 +11,7 @@ interface MembersListProps {
   members: EstablishmentMember[]
   groups: PermissionGroup[]
   currentUserId: string
+  isOwner: boolean
 }
 
 function GroupDropdown({
@@ -85,7 +86,7 @@ function GroupDropdown({
   )
 }
 
-export function MembersList({ members, groups, currentUserId }: MembersListProps) {
+export function MembersList({ members, groups, currentUserId, isOwner }: MembersListProps) {
   const [list, setList] = useState(members)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -189,7 +190,7 @@ export function MembersList({ members, groups, currentUserId }: MembersListProps
                   onRemove={handleRemoveGroup}
                   disabled={isPending}
                 />
-                {!isAdmin && !isCurrentUser && (
+                {!isCurrentUser && (isOwner || !isAdmin) && (
                   <button
                     onClick={() => handleRemoveMember(member.id)}
                     disabled={isPending}
@@ -213,7 +214,7 @@ export function MembersList({ members, groups, currentUserId }: MembersListProps
                     }`}
                 >
                   {group.name}
-                  {!group.is_system && !isCurrentUser && (
+                  {!isCurrentUser && (isOwner || !group.is_system) && (
                     <button
                       onClick={() => handleRemoveGroup(member.id, group.id)}
                       disabled={isPending}

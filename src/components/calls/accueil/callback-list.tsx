@@ -4,7 +4,8 @@ import { useState, useTransition } from 'react'
 import { PhoneMissed, Voicemail, PhoneOutgoing, X, CheckCircle, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import { markRingoverCallback, dismissRingoverCallback } from '@/lib/actions/ringover-sync'
-import { formatPhoneFr, formatDurationHuman } from '@/lib/sda-utils'
+import { formatPhoneFr, formatDurationHuman, getSentimentLabel, getSentimentColor } from '@/lib/sda-utils'
+import { TranscribeButton } from '@/components/calls/accueil/transcribe-button'
 import type { RingoverCallbackItem } from '@/lib/types/database'
 
 interface CallbackListProps {
@@ -45,6 +46,16 @@ export function CallbackList({ callbacks: initial }: CallbackListProps) {
     })
   }
 
+  function handleTranscribed(id: string, data: { transcript: string; summary: string | null; sentiment: string | null }) {
+    setCallbacks((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? { ...c, ai_summary: data.summary, ai_sentiment: data.sentiment as RingoverCallbackItem['ai_sentiment'] }
+          : c
+      )
+    )
+  }
+
   if (callbacks.length === 0) {
     return (
       <div className="bg-success/5 border border-success/20 rounded-xl p-6 text-center">
@@ -83,9 +94,29 @@ export function CallbackList({ callbacks: initial }: CallbackListProps) {
                   {cb.wait_time > 0 && <span>Attente: {formatDurationHuman(cb.wait_time)}</span>}
                 </div>
                 {cb.voicemail_url && (
-                  <a href={cb.voicemail_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
-                    Ecouter le message vocal
-                  </a>
+                  <div className="mt-2 flex items-center gap-2">
+                    <audio controls preload="none" className="h-8 w-full max-w-xs">
+                      <source src={cb.voicemail_url} />
+                    </audio>
+                    <TranscribeButton
+                      callId={cb.id}
+                      hasAudio={true}
+                      alreadyTranscribed={!!cb.ai_summary}
+                      onTranscribed={(data) => handleTranscribed(cb.id, data)}
+                    />
+                  </div>
+                )}
+                {cb.ai_summary && (
+                  <div className="mt-2 p-2 rounded-lg bg-muted/5 border border-border">
+                    <div className="flex items-center gap-2 mb-1">
+                      {cb.ai_sentiment && (
+                        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${getSentimentColor(cb.ai_sentiment)}`}>
+                          {getSentimentLabel(cb.ai_sentiment)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-foreground/80">{cb.ai_summary}</p>
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-1 shrink-0">

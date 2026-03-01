@@ -67,8 +67,8 @@ export async function syncRingoverCalls() {
       .maybeSingle()
 
     if (connError) return { error: connError.message }
-    if (!conn || !conn.accueil_number) {
-      return { error: 'Aucune connexion Ringover active avec un numero d\'accueil configure.' }
+    if (!conn) {
+      return { error: 'Aucune connexion Ringover active.' }
     }
 
     // Determine start date: from sync_cursor or 15 days ago
@@ -109,7 +109,8 @@ export async function syncRingoverCalls() {
       }
       lastStatus = testResp.status
       lastBody = await testResp.text().catch(() => '')
-      console.log(`[Ringover Sync] Auth "${fmt.label}" failed:`, testResp.status)
+      console.log(`[Ringover Sync] Auth "${fmt.label}" failed:`, testResp.status, 'body:', lastBody.slice(0, 500))
+      console.log(`[Ringover Sync] Key used (first 8 chars):`, fmt.value.slice(0, 8) + '...')
       await sleep(600)
     }
 
@@ -162,22 +163,60 @@ export async function syncRingoverCalls() {
       }
 
       // Filter to only calls involving the accueil number (client-side filter)
-      const accueilNumber = conn.accueil_number.replace(/[^0-9+]/g, '')
-      const filteredCalls = callList.filter((call: Record<string, unknown>) => {
-        const from = String(call.from_number || '').replace(/[^0-9+]/g, '')
-        const to = String(call.to_number || '').replace(/[^0-9+]/g, '')
-        // If no number filtering needed (API key scoped to user), keep all
-        if (!accueilNumber) return true
-        return from.includes(accueilNumber) || to.includes(accueilNumber)
-          || from === accueilNumber || to === accueilNumber
-      })
+      // If no accueil_number configured, keep all calls from the account
+      // Normalize to last 9 digits for robust matching (France: 0X XX XX XX XX = 9 digits after prefix)
+      const accueilDigits = (conn.accueil_number || '').replace(/[^0-9]/g, '')
+      const accueilSuffix = accueilDigits.length >= 9 ? accueilDigits.slice(-9) : accueilDigits
+      const filteredCalls = accueilSuffix
+        ? callList.filter((call: Record<string, unknown>) => {
+            const fromDigits = String(call.from_number || '').replace(/[^0-9]/g, '')
+            const toDigits = String(call.to_number || '').replace(/[^0-9]/g, '')
+            return fromDigits.endsWith(accueilSuffix) || toDigits.endsWith(accueilSuffix)
+          })
+        : callList
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const records = filteredCalls.map((call: any) => {
         const direction = call.direction === 'out' || call.direction === 'OUT' ? 'out' : 'in'
-        const rawStatus = String(call.status || call.call_status || call.type || 'UNKNOWN')
-        const status = rawStatus.toUpperCase()
-        const callStartTime = call.start_date || call.start_time
+
+        // Derive status from Ringover v2 fields
+        // last_state: ANSWERED, MISSED, VOICEMAIL_ANSWERED, ABANDONED, etc.
+        // is_answered: boolean
+        let status = 'UNKNOWN'
+        const lastState = String(call.last_state || '').toUpperCase()
+        if (lastState.includes('VOICEMAIL')) {
+          status = 'VOICEMAIL'
+        } else if (lastState === 'MISSED' || lastState === 'ABANDONED' || (!call.is_answered && direction === 'in')) {
+          status = 'MISSED'
+        } else if (call.is_answered || lastState === 'ANSWERED') {
+          status = 'ANSWERED'
+        } else if (direction === 'out') {
+          status = 'OUT'
+        }
+        // Fallback to legacy fields
+        if (status === 'UNKNOWN' && call.status) {
+          status = String(call.status).toUpperCase()
+        }
+
+        const callStartTime = call.start_time || call.start_date
+        const voicemailData = call.voicemail
+        const recordData = call.record
+
+        // Extract URL from various shapes: string URL, object with .url/.link, nested .record_url
+        function extractUrl(data: unknown): string | null {
+          if (typeof data === 'string' && data.startsWith('http')) return data
+          if (typeof data === 'object' && data !== null) {
+            const obj = data as Record<string, unknown>
+            if (typeof obj.url === 'string') return obj.url
+            if (typeof obj.link === 'string') return obj.link
+            if (typeof obj.record_url === 'string') return obj.record_url
+          }
+          return null
+        }
+
+        const voicemailUrl = extractUrl(voicemailData) || call.voicemail_url || null
+        const recordingUrl = extractUrl(recordData)
+          || call.record_url || call.record_link || call.recording_url || null
 
         return {
           establishment_id: establishmentId,
@@ -191,15 +230,15 @@ export async function syncRingoverCalls() {
           agent_id: call.agent_id ? String(call.agent_id) : null,
           agent_name: call.agent_name || null,
           start_time: callStartTime,
-          end_time: call.end_date || call.end_time || null,
-          duration: Number(call.duration) || 0,
-          wait_time: Number(call.wait_time || call.waiting_duration) || 0,
-          has_voicemail: Boolean(call.has_voicemail || call.voicemail),
-          voicemail_url: call.voicemail_url || null,
-          has_recording: Boolean(call.has_recording || call.recording),
-          recording_url: call.recording_url || null,
+          end_time: call.end_time || call.end_date || null,
+          duration: Math.round(Number(call.total_duration || call.incall_duration || call.duration) || 0),
+          wait_time: Math.round(Number(call.queue_duration || call.wait_time || call.waiting_duration) || 0),
+          has_voicemail: Boolean(voicemailData || lastState.includes('VOICEMAIL')),
+          voicemail_url: voicemailUrl,
+          has_recording: Boolean(recordData),
+          recording_url: recordingUrl,
           tags: call.tags || [],
-          notes: call.notes || null,
+          notes: call.note || call.notes || null,
           callback_needed:
             direction === 'in' && (status === 'MISSED' || status === 'VOICEMAIL'),
           raw_data: call,
@@ -395,7 +434,7 @@ export async function getRingoverCallbacks() {
     const { data, error } = await supabase
       .from('ringover_calls')
       .select(
-        'id, caller_number, caller_name, start_time, status, has_voicemail, voicemail_url, duration, wait_time, callback_completed, callback_notes'
+        'id, caller_number, caller_name, start_time, status, has_voicemail, voicemail_url, duration, wait_time, callback_completed, callback_notes, ai_summary, ai_sentiment'
       )
       .eq('establishment_id', establishmentId)
       .eq('callback_needed', true)
@@ -658,16 +697,26 @@ export async function getRingoverTopCallers(limit: number = 10) {
 export async function saveAccueilNumber(data: {
   accueil_number: string
   accueil_label?: string
+  purge_calls?: boolean
 }) {
   try {
     const { establishmentId } = await requirePermission('manage_establishment')
     const supabase = createAdminClient()
+
+    // When changing number, purge old calls and reset cursor for full re-sync
+    if (data.purge_calls !== false) {
+      await supabase
+        .from('ringover_calls')
+        .delete()
+        .eq('establishment_id', establishmentId)
+    }
 
     const { error } = await supabase
       .from('ringover_connections')
       .update({
         accueil_number: data.accueil_number,
         accueil_label: data.accueil_label || null,
+        sync_cursor: null,
         updated_at: new Date().toISOString(),
       })
       .eq('establishment_id', establishmentId)
@@ -676,6 +725,148 @@ export async function saveAccueilNumber(data: {
 
     revalidatePath('/appels')
     return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 11. debugRecordingData — check what `record` field contains in raw_data
+// ---------------------------------------------------------------------------
+
+export async function debugRecordingData() {
+  try {
+    const { establishmentId } = await requireEstablishment()
+    const supabase = createAdminClient()
+
+    const { data: calls } = await supabase
+      .from('ringover_calls')
+      .select('id, ringover_call_id, has_recording, recording_url, raw_data')
+      .eq('establishment_id', establishmentId)
+      .eq('has_recording', true)
+      .order('start_time', { ascending: false })
+      .limit(5)
+
+    return {
+      data: (calls || []).map((c) => ({
+        id: c.id,
+        ringover_call_id: c.ringover_call_id,
+        has_recording: c.has_recording,
+        recording_url: c.recording_url,
+        raw_record_field: (c.raw_data as Record<string, unknown>)?.record,
+        raw_record_type: typeof (c.raw_data as Record<string, unknown>)?.record,
+        raw_record_url: (c.raw_data as Record<string, unknown>)?.record_url,
+        raw_record_link: (c.raw_data as Record<string, unknown>)?.record_link,
+        raw_recording_url: (c.raw_data as Record<string, unknown>)?.recording_url,
+      })),
+    }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 12. fetchAudioUrl — get recording/voicemail URL for a single call
+// First checks raw_data, then falls back to Ringover API detail endpoint.
+// ---------------------------------------------------------------------------
+
+export async function fetchRecordingUrl(callId: string) {
+  try {
+    const { establishmentId } = await requireEstablishment()
+    const supabase = createAdminClient()
+
+    const { data: call } = await supabase
+      .from('ringover_calls')
+      .select('id, ringover_call_id, has_recording, has_voicemail, raw_data')
+      .eq('id', callId)
+      .eq('establishment_id', establishmentId)
+      .single()
+
+    if (!call) return { error: 'Appel introuvable' }
+
+    const raw = (call.raw_data || {}) as Record<string, unknown>
+
+    // Helper: extract URL from string or object with .url/.link
+    function extractUrl(data: unknown): string | null {
+      if (typeof data === 'string' && data.startsWith('http')) return data
+      if (typeof data === 'object' && data !== null) {
+        const obj = data as Record<string, unknown>
+        if (typeof obj.url === 'string') return obj.url
+        if (typeof obj.link === 'string') return obj.link
+        if (typeof obj.record_url === 'string') return obj.record_url
+      }
+      return null
+    }
+
+    // Step 1: Try to extract from existing raw_data
+    const recordingFromRaw = extractUrl(raw.record)
+    const voicemailFromRaw = extractUrl(raw.voicemail)
+
+    if (recordingFromRaw || voicemailFromRaw) {
+      const updates: Record<string, string> = {}
+      if (recordingFromRaw) updates.recording_url = recordingFromRaw
+      if (voicemailFromRaw) updates.voicemail_url = voicemailFromRaw
+
+      await supabase
+        .from('ringover_calls')
+        .update(updates)
+        .eq('id', callId)
+
+      revalidatePath('/appels')
+      return { data: { recording_url: recordingFromRaw || voicemailFromRaw } }
+    }
+
+    // Step 2: Call Ringover API for fresh data
+    const { data: conn } = await supabase
+      .from('ringover_connections')
+      .select('api_key')
+      .eq('establishment_id', establishmentId)
+      .single()
+
+    if (!conn?.api_key) return { error: 'Connexion Ringover manquante' }
+
+    const auth = conn.api_key
+    const cdrId = call.ringover_call_id
+
+    const detailResp = await fetch(`${RINGOVER_API_BASE}/calls/${cdrId}`, {
+      headers: { Authorization: auth },
+    })
+
+    if (detailResp.ok) {
+      const detail = await detailResp.json()
+      const callDetail = detail?.call || detail
+
+      const recordingUrl = extractUrl(callDetail.record)
+        || callDetail.record_url || callDetail.record_link || callDetail.recording_url || null
+      const voicemailUrl = extractUrl(callDetail.voicemail)
+        || callDetail.voicemail_url || null
+
+      const audioUrl = recordingUrl || voicemailUrl
+      if (audioUrl) {
+        const updates: Record<string, string> = {}
+        if (recordingUrl) updates.recording_url = recordingUrl
+        if (voicemailUrl) updates.voicemail_url = voicemailUrl
+
+        await supabase
+          .from('ringover_calls')
+          .update(updates)
+          .eq('id', callId)
+
+        revalidatePath('/appels')
+        return { data: { recording_url: audioUrl } }
+      }
+
+      return {
+        data: {
+          recording_url: null,
+          detail_keys: Object.keys(callDetail),
+          record_field: callDetail.record,
+          voicemail_field: callDetail.voicemail,
+        },
+      }
+    }
+
+    return { error: `API Ringover ${detailResp.status}` }
   } catch (e) {
     return { error: (e as Error).message }
   }

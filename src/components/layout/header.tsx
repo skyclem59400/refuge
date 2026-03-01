@@ -172,12 +172,16 @@ export function Header({ userEmail, userAvatarUrl, permissions, currentEstablish
           >
             {userAvatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={userAvatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover" />
-            ) : (
-              <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-white">
-                {userEmail[0].toUpperCase()}
-              </div>
-            )}
+              <img
+                src={userAvatarUrl}
+                alt="Avatar"
+                className="w-7 h-7 rounded-full object-cover"
+                onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden') }}
+              />
+            ) : null}
+            <div className={`w-7 h-7 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-white ${userAvatarUrl ? 'hidden' : ''}`}>
+              {userEmail[0].toUpperCase()}
+            </div>
             <span className="hidden sm:block text-sm text-muted">{userEmail}</span>
           </button>
 

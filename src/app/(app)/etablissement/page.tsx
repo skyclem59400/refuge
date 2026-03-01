@@ -53,6 +53,7 @@ export default async function EtablissementPage() {
           members={members || []}
           groups={permissionGroups || []}
           currentUserId={user.id}
+          isOwner={ctx.permissions.isOwner}
         />
 
         <div className="pt-2 border-t border-border">

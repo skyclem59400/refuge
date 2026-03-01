@@ -1,6 +1,6 @@
 'use client'
 
-import { PhoneIncoming, PhoneMissed, PhoneOutgoing, Voicemail, Clock, Phone, TrendingDown, TrendingUp } from 'lucide-react'
+import { PhoneIncoming, PhoneMissed, Voicemail, Clock, PhoneOutgoing } from 'lucide-react'
 import { formatDurationHuman, getAnswerRateColor, getWaitTimeColor } from '@/lib/sda-utils'
 import type { RingoverDashboardStats } from '@/lib/types/database'
 
@@ -9,19 +9,53 @@ interface AccueilStatsProps {
 }
 
 export function AccueilStats({ stats }: AccueilStatsProps) {
+  const totalInbound = stats.answeredCalls + stats.missedCalls + stats.voicemailCalls
+
   const items = [
-    { label: 'Appels entrants', value: String(stats.answeredCalls + stats.missedCalls + stats.voicemailCalls), Icon: PhoneIncoming, color: 'text-primary', highlight: false },
-    { label: 'Taux de reponse', value: `${stats.answerRate}%`, Icon: stats.answerRate >= 75 ? TrendingUp : TrendingDown, color: getAnswerRateColor(stats.answerRate), highlight: stats.answerRate < 75 },
-    { label: 'Appels manques', value: String(stats.missedCalls), Icon: PhoneMissed, color: stats.missedCalls > 0 ? 'text-error' : 'text-success', highlight: stats.missedCalls > 5 },
-    { label: 'Messageries', value: String(stats.voicemailCalls), Icon: Voicemail, color: 'text-purple-500', highlight: false },
-    { label: 'Attente moyenne', value: formatDurationHuman(stats.avgWaitTime), Icon: Clock, color: getWaitTimeColor(stats.avgWaitTime), highlight: stats.avgWaitTime > 30 },
-    { label: 'Duree moyenne', value: formatDurationHuman(stats.avgDuration), Icon: Phone, color: 'text-muted', highlight: false },
-    { label: 'Appels sortants', value: String(stats.outboundCalls), Icon: PhoneOutgoing, color: 'text-blue-500', highlight: false },
-    { label: 'A rappeler', value: String(stats.callbacksPending), Icon: PhoneMissed, color: stats.callbacksPending > 0 ? 'text-warning' : 'text-success', highlight: stats.callbacksPending > 0 },
+    {
+      label: 'Entrants',
+      value: String(totalInbound),
+      sub: `${stats.outboundCalls} sortants`,
+      Icon: PhoneIncoming,
+      color: 'text-primary',
+      highlight: false,
+    },
+    {
+      label: 'Taux de reponse',
+      value: `${stats.answerRate}%`,
+      sub: `${stats.answeredCalls} repondus`,
+      Icon: PhoneOutgoing,
+      color: getAnswerRateColor(stats.answerRate),
+      highlight: stats.answerRate < 75,
+    },
+    {
+      label: 'Manques',
+      value: String(stats.missedCalls),
+      sub: `${stats.voicemailCalls} messageries`,
+      Icon: PhoneMissed,
+      color: stats.missedCalls > 0 ? 'text-error' : 'text-success',
+      highlight: stats.missedCalls > 5,
+    },
+    {
+      label: 'Attente moy.',
+      value: formatDurationHuman(stats.avgWaitTime),
+      sub: `Duree moy. ${formatDurationHuman(stats.avgDuration)}`,
+      Icon: Clock,
+      color: getWaitTimeColor(stats.avgWaitTime),
+      highlight: stats.avgWaitTime > 30,
+    },
+    {
+      label: 'A rappeler',
+      value: String(stats.callbacksPending),
+      sub: stats.callbacksPending > 0 ? 'en attente' : 'tout traite',
+      Icon: Voicemail,
+      color: stats.callbacksPending > 0 ? 'text-warning' : 'text-success',
+      highlight: stats.callbacksPending > 0,
+    },
   ]
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
       {items.map((item) => (
         <div
           key={item.label}
@@ -34,6 +68,7 @@ export function AccueilStats({ stats }: AccueilStatsProps) {
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">{item.label}</p>
           </div>
           <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
+          <p className="text-[11px] text-muted mt-1">{item.sub}</p>
         </div>
       ))}
     </div>

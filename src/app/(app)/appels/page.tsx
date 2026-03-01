@@ -4,7 +4,6 @@ import { getRingoverConnection } from '@/lib/actions/ringover'
 import {
   getRingoverAccueilStats,
   getRingoverAccueilCalls,
-  getRingoverCallbacks,
   getRingoverHourlyDistribution,
   getRingoverDailyTrend,
   getRingoverTopCallers,
@@ -12,7 +11,6 @@ import {
 import { AccueilStats } from '@/components/calls/accueil/accueil-stats'
 import { PeriodFilter } from '@/components/calls/accueil/period-filter'
 import { SyncControls } from '@/components/calls/accueil/sync-controls'
-import { CallbackList } from '@/components/calls/accueil/callback-list'
 import { HourlyChart } from '@/components/calls/accueil/hourly-chart'
 import { DailyTrendChart } from '@/components/calls/accueil/daily-trend-chart'
 import { AccueilCallList } from '@/components/calls/accueil/accueil-call-list'
@@ -33,8 +31,8 @@ export default async function AppelsAccueilPage({
   const connResult = await getRingoverConnection()
   const connection = connResult.data || null
 
-  // If no connection or no accueil number, show config panel only
-  if (!connection || !connection.accueil_number) {
+  // If no connection at all, show config panel only
+  if (!connection) {
     return (
       <div>
         <SyncControls connection={connection} />
@@ -43,11 +41,10 @@ export default async function AppelsAccueilPage({
   }
 
   // Fetch all dashboard data in parallel
-  const [statsResult, callsResult, callbacksResult, hourlyResult, dailyResult, topCallersResult] =
+  const [statsResult, callsResult, hourlyResult, dailyResult, topCallersResult] =
     await Promise.all([
       getRingoverAccueilStats(period),
-      getRingoverAccueilCalls({ limit: 100 }),
-      getRingoverCallbacks(),
+      getRingoverAccueilCalls({ limit: 200 }),
       getRingoverHourlyDistribution(period === 'today' ? '7d' : period === 'all' ? '30d' : period),
       getRingoverDailyTrend(period === 'today' ? 7 : period === '7d' ? 7 : 30),
       getRingoverTopCallers(10),
@@ -59,7 +56,6 @@ export default async function AppelsAccueilPage({
     avgWaitTime: 0, totalDuration: 0, callbacksPending: 0,
   }
   const calls = callsResult.data || []
-  const callbacks = callbacksResult.data || []
   const hourly = hourlyResult.data || []
   const daily = dailyResult.data || []
   const topCallers = topCallersResult.data || []
@@ -75,21 +71,31 @@ export default async function AppelsAccueilPage({
       {/* KPI Stats */}
       <AccueilStats stats={stats} />
 
-      {/* Callbacks - high priority */}
-      <CallbackList callbacks={callbacks} />
-
-      {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <HourlyChart data={hourly} />
-        <DailyTrendChart data={daily} />
+      {/* Charts + Top callers */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <HourlyChart data={hourly} />
+          <DailyTrendChart data={daily} />
+        </div>
+        <TopCallers callers={topCallers} />
       </div>
 
-      {/* Bottom row: top callers + call history */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <TopCallers callers={topCallers} />
-        <div className="lg:col-span-2">
-          <AccueilCallList initialCalls={calls} establishmentId={ctx.establishment.id} />
-        </div>
+      {/* Two call lists side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <AccueilCallList
+          initialCalls={calls}
+          establishmentId={ctx.establishment.id}
+          filter="no-audio"
+          title="Appels sans message"
+          icon="phone"
+        />
+        <AccueilCallList
+          initialCalls={calls}
+          establishmentId={ctx.establishment.id}
+          filter="with-audio"
+          title="Messages vocaux & enregistrements"
+          icon="headphones"
+        />
       </div>
     </div>
   )

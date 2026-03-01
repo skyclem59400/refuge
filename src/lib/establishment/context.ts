@@ -4,12 +4,13 @@ import type { Establishment, EstablishmentMember, EstablishmentContext, Permissi
 
 const COOKIE_NAME = 'current-establishment-id'
 
-function buildPermissions(groups: PermissionGroup[]): Permissions {
+function buildPermissions(groups: PermissionGroup[], membership: EstablishmentMember): Permissions {
   const has = (field: keyof PermissionGroup) =>
     groups.some(g => g[field] === true)
 
   return {
     isAdmin: groups.some(g => g.is_system && g.name === 'Administrateur'),
+    isOwner: !!(membership as EstablishmentMember & { is_owner?: boolean }).is_owner,
     canManageEstablishment: has('manage_establishment'),
     canManageDocuments: has('manage_documents'),
     canManageClients: has('manage_clients'),
@@ -138,6 +139,6 @@ export async function getEstablishmentContext(): Promise<EstablishmentContext | 
   return {
     establishment: establishment as Establishment,
     membership,
-    permissions: buildPermissions(groups),
+    permissions: buildPermissions(groups, membership),
   }
 }

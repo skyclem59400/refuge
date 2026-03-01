@@ -143,6 +143,86 @@ export async function getRingoverNumbers() {
 }
 
 // ---------------------------------------------------------------------------
+// getRingoverIVRNumbers — fetch IVR/team numbers from Ringover /teams
+// ---------------------------------------------------------------------------
+
+export async function getRingoverIVRNumbers() {
+  try {
+    const { establishmentId } = await requirePermission('manage_establishment')
+    const supabase = createAdminClient()
+
+    const { data: conn } = await supabase
+      .from('ringover_connections')
+      .select('api_key')
+      .eq('establishment_id', establishmentId)
+      .single()
+
+    if (!conn) return { error: 'Ringover non configure' }
+
+    const apiKey = conn.api_key.trim()
+
+    // Try /teams endpoint first (we know it works and returns IVR numbers)
+    const teamsResp = await fetch(`${RINGOVER_API_BASE}/teams`, {
+      headers: { Authorization: apiKey },
+    })
+
+    const numbers: RingoverNumber[] = []
+
+    if (teamsResp.ok) {
+      const teamsBody = await teamsResp.json()
+      const teamList = teamsBody?.team_list || teamsBody?.teams || []
+      if (Array.isArray(teamList)) {
+        for (const team of teamList) {
+          // Extract numbers from team
+          if (team.number) {
+            numbers.push({
+              number: String(team.number),
+              label: team.name || team.label || String(team.number),
+              type: team.type || 'IVR',
+            })
+          }
+          // Also check nested number_list
+          const innerNumbers = team.number_list || team.numbers || []
+          if (Array.isArray(innerNumbers)) {
+            for (const n of innerNumbers) {
+              numbers.push({
+                number: String(n.number || n.format_e164 || ''),
+                label: n.label || n.alias || String(n.number || ''),
+                type: n.type || team.type || 'team',
+              })
+            }
+          }
+        }
+      }
+    }
+
+    // Also try /numbers endpoint as fallback
+    if (numbers.length === 0) {
+      const numbersResp = await fetch(`${RINGOVER_API_BASE}/numbers`, {
+        headers: { Authorization: apiKey },
+      })
+      if (numbersResp.ok) {
+        const numbersBody = await numbersResp.json()
+        const numberList = numbersBody?.number_list || numbersBody?.numbers || []
+        if (Array.isArray(numberList)) {
+          for (const item of numberList) {
+            numbers.push({
+              number: item.number || item.format_e164 || '',
+              label: item.label || item.alias || item.number || '',
+              type: item.type || 'unknown',
+            })
+          }
+        }
+      }
+    }
+
+    return { data: numbers }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // getRecentAstreinteCalls — fetch recent incoming calls on astreinte line
 // ---------------------------------------------------------------------------
 

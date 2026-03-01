@@ -130,6 +130,7 @@ export interface Permissions {
   canViewPound: boolean
   canViewStatistics: boolean
   isAdmin: boolean
+  isOwner: boolean
 }
 
 export interface EstablishmentContext {
@@ -536,6 +537,14 @@ export interface RingoverCallRecord {
   synced_at: string
   created_at: string
   updated_at: string
+  // Transcription & AI
+  transcript: string | null
+  transcript_language: string | null
+  ai_summary: string | null
+  ai_sentiment: 'positive' | 'neutral' | 'negative' | null
+  ai_action_items: { text: string; completed: boolean }[] | null
+  transcribed_at: string | null
+  transcribed_by: string | null
 }
 
 export interface RingoverDashboardStats {
@@ -579,6 +588,9 @@ export interface RingoverCallbackItem {
   wait_time: number
   callback_completed: boolean
   callback_notes: string | null
+  // AI fields
+  ai_summary: string | null
+  ai_sentiment: 'positive' | 'neutral' | 'negative' | null
 }
 
 export interface RingoverTopCaller {
