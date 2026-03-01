@@ -6,10 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "bundle:remotion": "npx remotion bundle src/remotion/index.tsx --out-dir public/remotion-bundle"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@remotion/bundler": "^4.0.429",
+    "@remotion/player": "^4.0.429",
+    "@remotion/renderer": "^4.0.429",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
     "html2canvas": "^1.4.1",
@@ -20,6 +24,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0",
+    "remotion": "^4.0.429",
     "sonner": "^2.0.7"
   },
   "devDependencies": {

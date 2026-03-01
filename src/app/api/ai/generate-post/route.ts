@@ -109,7 +109,8 @@ Consignes :
 - Rappeler l'importance de l'identification
 - Utiliser des emojis avec parcimonie (2-3 max)
 - ${platformInstructions[platform]}
-- Ne pas mettre de hashtags en plein milieu du texte`
+- Ne pas mettre de hashtags en plein milieu du texte
+- IMPORTANT : texte brut uniquement, AUCUN formatage markdown (pas de **, pas de #, pas de _, pas de titres). Juste du texte lisible directement.`
     } else {
       prompt = `Tu es un redacteur pour la SDA Estormel, refuge animalier dans le Nord de la France.
 Redige un post ${platformLabel} pour promouvoir l'adoption d'un animal.
@@ -134,7 +135,8 @@ Consignes :
 - Inviter a contacter la SDA Estormel
 - Utiliser des emojis avec parcimonie (2-3 max)
 - ${platformInstructions[platform]}
-- Terminer par un appel a l'action`
+- Terminer par un appel a l'action
+- IMPORTANT : texte brut uniquement, AUCUN formatage markdown (pas de **, pas de #, pas de _, pas de titres). Juste du texte lisible directement.`
     }
 
     // Call Claude API
@@ -148,8 +150,17 @@ Consignes :
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const generatedText =
+    const rawText =
       message.content[0].type === 'text' ? message.content[0].text : ''
+
+    // Strip any markdown formatting
+    const generatedText = rawText
+      .replace(/^#{1,6}\s+/gm, '')   // Remove # headings
+      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
+      .replace(/__(.*?)__/g, '$1')     // Remove __bold__
+      .replace(/\*(.*?)\*/g, '$1')     // Remove *italic*
+      .replace(/_(.*?)_/g, '$1')       // Remove _italic_
+      .trim()
 
     return Response.json({ content: generatedText })
   } catch (error: unknown) {

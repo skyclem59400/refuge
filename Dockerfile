@@ -22,6 +22,7 @@ ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 RUN npm run build
+RUN npm run bundle:remotion
 
 # === Stage 3: Production ===
 FROM node:20-slim AS runner

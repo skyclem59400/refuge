@@ -53,6 +53,7 @@ export default async function NewPublicationPage() {
         animals={animals}
         establishmentName={ctx!.establishment.name}
         establishmentPhone={ctx!.establishment.phone}
+        establishmentLogoUrl={ctx!.establishment.logo_url}
         hasMetaConnection={hasMetaConnection}
       />
     </div>

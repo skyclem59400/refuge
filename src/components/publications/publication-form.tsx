@@ -5,17 +5,21 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Image as ImageIcon, Video, X, Sparkles, Clock, Save, Send, Loader2,
-  Facebook, Instagram,
+  Facebook, Instagram, Film, Search, Check,
 } from 'lucide-react'
 import { createPostEnhanced, updatePost, schedulePost } from '@/lib/actions/social-posts'
 import { uploadSocialMedia, deleteSocialMedia } from '@/lib/actions/social-media'
 import { getSocialPostTypeLabel } from '@/lib/sda-utils'
+import { VideoPreview } from './video-preview'
+import { VideoControls } from './video-controls'
+import type { VideoProps } from '@/remotion/types'
 import type { SocialPost, SocialPostType, SocialPlatform } from '@/lib/types/database'
 
 interface PublicationFormProps {
   animals: { id: string; name: string; species: string; status: string; photo_url: string | null }[]
   establishmentName: string
   establishmentPhone: string
+  establishmentLogoUrl?: string | null
   hasMetaConnection: boolean
   post?: SocialPost | null
 }
@@ -38,7 +42,7 @@ function getSpeciesEmoji(species: string): string {
   return species === 'cat' ? '🐱' : species === 'dog' ? '🐶' : '🐾'
 }
 
-export function PublicationForm({ animals, establishmentName, establishmentPhone, hasMetaConnection, post }: PublicationFormProps) {
+export function PublicationForm({ animals, establishmentName, establishmentPhone, establishmentLogoUrl, hasMetaConnection, post }: PublicationFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -63,11 +67,22 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
     post?.scheduled_at ? new Date(post.scheduled_at).toTimeString().slice(0, 5) : '09:00'
   )
 
+  // Animal search state
+  const [animalSearch, setAnimalSearch] = useState('')
+
   // AI generation state
   const [isGenerating, setIsGenerating] = useState(false)
 
   // Upload state
   const [isUploading, setIsUploading] = useState(false)
+
+  // Video generation state
+  const [showVideoPreview, setShowVideoPreview] = useState(false)
+  const [isRendering, setIsRendering] = useState(false)
+  const [videoText, setVideoText] = useState('')
+  const [musicUrl, setMusicUrl] = useState<string | null>(null)
+  const [musicTitle, setMusicTitle] = useState('')
+  const [isGeneratingVideoText, setIsGeneratingVideoText] = useState(false)
 
   async function handleAIGenerate() {
     if (!animalId) {
@@ -108,6 +123,61 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
       toast.error('Erreur reseau. Reessayez.')
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  async function generateVideoText(hint?: string) {
+    const videoContent = content || contentFacebook || contentInstagram || ''
+    if (!videoContent) return
+
+    setIsGeneratingVideoText(true)
+    try {
+      const selectedAnimal = animals.find(a => a.id === animalId)
+      const response = await fetch('/api/ai/generate-video-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postType,
+          animalName: selectedAnimal?.name,
+          animalSpecies: selectedAnimal?.species,
+          content: videoContent,
+          establishmentName,
+          hint,
+        }),
+      })
+
+      const data = await response.json()
+      if (response.ok && data.videoText) {
+        setVideoText(data.videoText)
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setIsGeneratingVideoText(false)
+    }
+  }
+
+  async function autoSelectMusic() {
+    try {
+      const response = await fetch(`/api/music/search?postType=${postType}`)
+      const data = await response.json()
+      if (response.ok && data.tracks?.length > 0) {
+        const track = data.tracks[0]
+        setMusicUrl(track.audioUrl)
+        setMusicTitle(`${track.title} - ${track.artist}`)
+      }
+    } catch {
+      // Silently fail
+    }
+  }
+
+  function handleToggleVideoPreview() {
+    const next = !showVideoPreview
+    setShowVideoPreview(next)
+    if (next) {
+      // Auto-generate text and music on first open
+      if (!videoText) generateVideoText()
+      if (!musicUrl) autoSelectMusic()
     }
   }
 
@@ -173,6 +243,50 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
       const url = videoUrl
       setVideoUrl(null)
       await deleteSocialMedia(url)
+    }
+  }
+
+  function getVideoProps(): VideoProps {
+    const selectedAnimal = animals.find(a => a.id === animalId)
+    // Use platform-specific content if available, fallback to general content
+    const videoContent = content || contentFacebook || contentInstagram || ''
+    return {
+      postType: postType,
+      animalName: selectedAnimal?.name,
+      animalSpecies: selectedAnimal?.species,
+      photoUrls: selectedAnimal?.photo_url ? [selectedAnimal.photo_url, ...photoUrls] : photoUrls,
+      content: videoContent,
+      establishmentName: establishmentName,
+      establishmentPhone: establishmentPhone,
+      logoUrl: establishmentLogoUrl || undefined,
+      videoText: videoText || undefined,
+      musicUrl: musicUrl || undefined,
+    }
+  }
+
+  async function handleRenderVideo() {
+    setIsRendering(true)
+    try {
+      const response = await fetch('/api/render-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(getVideoProps()),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        toast.error(data.error || 'Erreur lors du rendu video')
+        return
+      }
+
+      setVideoUrl(data.url)
+      setShowVideoPreview(false)
+      toast.success('Video generee avec succes !')
+    } catch {
+      toast.error('Erreur reseau. Reessayez.')
+    } finally {
+      setIsRendering(false)
     }
   }
 
@@ -331,25 +445,113 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
     <div className="space-y-6 max-w-3xl">
       {/* Animal selector */}
       <div className="bg-surface rounded-xl border border-border p-5 space-y-4">
-        <h3 className="font-semibold">Animal (optionnel)</h3>
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
-            Animal concerne
-          </label>
-          <select
-            value={animalId}
-            onChange={(e) => setAnimalId(e.target.value)}
-            disabled={isEdit}
-            className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
-          >
-            <option value="">Publication generale</option>
-            {animals.map((animal) => (
-              <option key={animal.id} value={animal.id}>
-                {getSpeciesEmoji(animal.species)} {animal.name}
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Animal (optionnel)</h3>
+          {animalId && !isEdit && (
+            <button
+              onClick={() => { setAnimalId(''); setAnimalSearch('') }}
+              className="text-xs text-muted hover:text-foreground transition-colors"
+            >
+              Retirer la selection
+            </button>
+          )}
         </div>
+
+        {/* Selected animal display */}
+        {animalId && (() => {
+          const selected = animals.find(a => a.id === animalId)
+          if (!selected) return null
+          return (
+            <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+              {selected.photo_url ? (
+                <img src={selected.photo_url} alt={selected.name} className="w-12 h-12 rounded-lg object-cover" />
+              ) : (
+                <div className="w-12 h-12 rounded-lg bg-surface-hover flex items-center justify-center text-lg">
+                  {getSpeciesEmoji(selected.species)}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">{selected.name}</p>
+                <p className="text-xs text-muted">{selected.species === 'dog' ? 'Chien' : selected.species === 'cat' ? 'Chat' : selected.species}</p>
+              </div>
+              <Check className="w-4 h-4 text-primary" />
+            </div>
+          )
+        })()}
+
+        {/* Search and list */}
+        {!isEdit && (
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+              <input
+                type="text"
+                value={animalSearch}
+                onChange={(e) => setAnimalSearch(e.target.value)}
+                placeholder="Rechercher un animal..."
+                className="w-full pl-9 pr-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {/* General publication option */}
+              {!animalSearch && (
+                <button
+                  onClick={() => setAnimalId('')}
+                  className={`w-full flex items-center gap-3 p-2 rounded-lg text-left transition-colors ${
+                    !animalId ? 'bg-primary/10 border border-primary/20' : 'hover:bg-surface-hover'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-lg bg-surface-hover flex items-center justify-center text-sm">
+                    📢
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Publication generale</p>
+                    <p className="text-xs text-muted">Sans animal associe</p>
+                  </div>
+                </button>
+              )}
+
+              {animals
+                .filter(a => {
+                  if (!animalSearch) return true
+                  const q = animalSearch.toLowerCase()
+                  return a.name.toLowerCase().includes(q) || a.species.toLowerCase().includes(q)
+                })
+                .map((animal) => (
+                  <button
+                    key={animal.id}
+                    onClick={() => { setAnimalId(animal.id); setAnimalSearch('') }}
+                    className={`w-full flex items-center gap-3 p-2 rounded-lg text-left transition-colors ${
+                      animalId === animal.id ? 'bg-primary/10 border border-primary/20' : 'hover:bg-surface-hover'
+                    }`}
+                  >
+                    {animal.photo_url ? (
+                      <img src={animal.photo_url} alt={animal.name} className="w-10 h-10 rounded-lg object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-surface-hover flex items-center justify-center text-sm">
+                        {getSpeciesEmoji(animal.species)}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{animal.name}</p>
+                      <p className="text-xs text-muted">
+                        {animal.species === 'dog' ? 'Chien' : animal.species === 'cat' ? 'Chat' : animal.species}
+                      </p>
+                    </div>
+                    {animalId === animal.id && <Check className="w-4 h-4 text-primary flex-shrink-0" />}
+                  </button>
+                ))}
+
+              {animalSearch && animals.filter(a => {
+                const q = animalSearch.toLowerCase()
+                return a.name.toLowerCase().includes(q) || a.species.toLowerCase().includes(q)
+              }).length === 0 && (
+                <p className="text-xs text-muted text-center py-3">Aucun animal trouve</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Post type */}
@@ -492,6 +694,18 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
             <Video className="w-3.5 h-3.5" />
             {videoUrl ? 'Video ajoutee' : 'Video'}
           </button>
+          <button
+            onClick={handleToggleVideoPreview}
+            disabled={!!videoUrl}
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-50
+              ${showVideoPreview
+                ? 'bg-primary/15 text-primary border border-primary/30'
+                : 'border border-border hover:bg-surface-hover'
+              }`}
+          >
+            <Film className="w-3.5 h-3.5" />
+            {showVideoPreview ? 'Masquer preview' : 'Generer une video'}
+          </button>
           <input
             ref={photoInputRef}
             type="file"
@@ -541,6 +755,30 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
               <X className="w-3 h-3" />
             </button>
           </div>
+        )}
+
+        {/* Remotion video preview */}
+        {showVideoPreview && !videoUrl && (
+          <>
+            <VideoPreview
+              videoProps={getVideoProps()}
+              onRender={handleRenderVideo}
+              isRendering={isRendering}
+            />
+            <VideoControls
+              videoText={videoText}
+              onVideoTextChange={setVideoText}
+              musicUrl={musicUrl}
+              musicTitle={musicTitle}
+              onMusicChange={(url, title) => {
+                setMusicUrl(url)
+                setMusicTitle(title)
+              }}
+              postType={postType}
+              isGeneratingText={isGeneratingVideoText}
+              onRegenerateText={generateVideoText}
+            />
+          </>
         )}
       </div>
 

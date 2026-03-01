@@ -90,6 +90,7 @@ export default async function EditPublicationPage({ params }: { params: Promise<
         animals={animals}
         establishmentName={ctx!.establishment.name}
         establishmentPhone={ctx!.establishment.phone}
+        establishmentLogoUrl={ctx!.establishment.logo_url}
         hasMetaConnection={hasMetaConnection}
         post={post}
       />
