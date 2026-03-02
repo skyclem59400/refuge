@@ -101,6 +101,8 @@ export async function createEstablishment(data: {
       manage_posts: true,
       manage_donations: true,
       manage_outings: true,
+      manage_outing_assignments: true,
+      manage_adoptions: true,
       view_pound: true,
       view_statistics: true,
     })
@@ -192,6 +194,8 @@ export async function createPermissionGroup(data: {
         manage_posts: data.manage_posts ?? false,
         manage_donations: data.manage_donations ?? false,
         manage_outings: data.manage_outings ?? false,
+        manage_outing_assignments: data.manage_outing_assignments ?? false,
+        manage_adoptions: data.manage_adoptions ?? false,
         view_pound: data.view_pound ?? false,
         view_statistics: data.view_statistics ?? false,
       })

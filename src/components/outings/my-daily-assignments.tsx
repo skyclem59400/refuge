@@ -3,28 +3,29 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Clock, PawPrint, Loader2, Search } from 'lucide-react'
+import { PawPrint, Clock, Loader2, Check, ListChecks, AlertTriangle } from 'lucide-react'
 import { createOuting } from '@/lib/actions/outings'
-import {
-  getOutingUrgencyLevel,
-  getOutingUrgencyColor,
-  getOutingUrgencyLabel,
-} from '@/lib/sda-utils'
 
-interface AnimalWithPriority {
+interface Assignment {
   id: string
-  name: string
-  species: string
-  photo_url: string | null
-  status: string
-  box_id: string | null
-  animal_photos: { id: string; url: string; is_primary: boolean }[]
-  last_outing_at: string | null
-  days_since_last_outing: number | null
+  animal_id: string
+  assigned_to: string
+  assigned_by: string
+  date: string
+  outing_id: string | null
+  notes: string | null
+  animals: {
+    id: string
+    name: string
+    species: string
+    photo_url: string | null
+    establishment_id: string
+    animal_photos: { id: string; url: string; is_primary: boolean }[]
+  }
 }
 
-interface OutingPriorityListProps {
-  animals: AnimalWithPriority[]
+interface MyDailyAssignmentsProps {
+  assignments: Assignment[]
   canManageOutings: boolean
 }
 
@@ -35,25 +36,25 @@ const QUICK_DURATIONS = [
   { label: '1h', value: 60 },
 ]
 
-function getAnimalPhoto(animal: AnimalWithPriority): string | null {
+function getAnimalPhoto(animal: Assignment['animals']): string | null {
   const primary = animal.animal_photos?.find((p) => p.is_primary)
   if (primary) return primary.url
   if (animal.animal_photos?.length > 0) return animal.animal_photos[0].url
   return animal.photo_url
 }
 
-export function OutingPriorityList({ animals, canManageOutings }: OutingPriorityListProps) {
+export function MyDailyAssignments({ assignments, canManageOutings }: MyDailyAssignmentsProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [activeAnimalId, setActiveAnimalId] = useState<string | null>(null)
+  const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
   const [rating, setRating] = useState<number | null>(null)
   const [ratingComment, setRatingComment] = useState('')
-  const [search, setSearch] = useState('')
 
-  const filtered = search.trim()
-    ? animals.filter((a) => a.name.toLowerCase().includes(search.trim().toLowerCase()))
-    : animals
+  if (assignments.length === 0) return null
+
+  const pending = assignments.filter((a) => a.outing_id === null)
+  const completed = assignments.filter((a) => a.outing_id !== null)
 
   function handleRecord(animalId: string, duration: number) {
     if (rating != null && rating <= 5 && !ratingComment.trim()) {
@@ -72,7 +73,7 @@ export function OutingPriorityList({ animals, canManageOutings }: OutingPriority
         toast.error(result.error)
       } else {
         toast.success('Sortie enregistree')
-        setActiveAnimalId(null)
+        setActiveAssignmentId(null)
         setNotes('')
         setRating(null)
         setRatingComment('')
@@ -81,49 +82,51 @@ export function OutingPriorityList({ animals, canManageOutings }: OutingPriority
     })
   }
 
+  function resetForm() {
+    setActiveAssignmentId(null)
+    setNotes('')
+    setRating(null)
+    setRatingComment('')
+  }
+
   return (
     <div className="mb-6">
-      <div className="flex items-center justify-between mb-4 gap-3">
-        <h2 className="text-lg font-semibold shrink-0">Priorite de sortie</h2>
-        <div className="relative max-w-xs w-full">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher un chien..."
-            className="w-full pl-8 pr-3 py-1.5 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
-          />
-        </div>
+      <div className="flex items-center gap-3 mb-4">
+        <ListChecks className="w-5 h-5 text-primary" />
+        <h2 className="text-lg font-semibold">Mes sorties du jour</h2>
+        <span className="text-sm text-muted">
+          {completed.length}/{assignments.length} effectuees
+        </span>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="bg-surface rounded-xl border border-border p-8 text-center">
-          <PawPrint className="w-10 h-10 text-muted mx-auto mb-3" />
-          <p className="text-muted text-sm">
-            {search.trim() ? 'Aucun chien trouve' : 'Aucun chien actif'}
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {filtered.map((animal) => {
-            const urgency = getOutingUrgencyLevel(animal.days_since_last_outing)
-            const urgencyColor = getOutingUrgencyColor(urgency)
-            const urgencyLabel = getOutingUrgencyLabel(animal.days_since_last_outing)
-            const photo = getAnimalPhoto(animal)
-            const isActive = activeAnimalId === animal.id
+      {/* Pending assignments */}
+      {pending.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-3">
+          {pending.map((assignment) => {
+            const photo = getAnimalPhoto(assignment.animals)
+            const isActive = activeAssignmentId === assignment.id
+            const today = new Date().toISOString().split('T')[0]
+            const isOverdue = assignment.date < today
 
             return (
               <div
-                key={animal.id}
-                className={`bg-surface rounded-xl border p-3 transition-all ${urgencyColor}`}
+                key={assignment.id}
+                className={`bg-surface rounded-xl border p-3 ${isOverdue ? 'border-warning/40' : 'border-border'}`}
               >
+                {isOverdue && (
+                  <div className="flex items-center gap-1.5 mb-2 text-warning">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span className="text-[11px] font-medium">
+                      En retard (depuis le {new Date(assignment.date + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })})
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center gap-3 mb-2">
                   {photo ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={photo}
-                      alt={animal.name}
+                      alt={assignment.animals.name}
                       className="w-10 h-10 rounded-full object-cover shrink-0"
                     />
                   ) : (
@@ -132,18 +135,19 @@ export function OutingPriorityList({ animals, canManageOutings }: OutingPriority
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm truncate">{animal.name}</p>
+                    <p className="font-semibold text-sm truncate">{assignment.animals.name}</p>
+                    {assignment.notes && (
+                      <p className="text-[11px] text-muted truncate">{assignment.notes}</p>
+                    )}
                   </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Clock className="w-3.5 h-3.5 shrink-0" />
-                  <span className="text-xs font-medium">{urgencyLabel}</span>
                 </div>
 
                 {canManageOutings && !isActive && (
                   <button
-                    onClick={() => setActiveAnimalId(animal.id)}
+                    onClick={() => {
+                      resetForm()
+                      setActiveAssignmentId(assignment.id)
+                    }}
                     className="w-full text-center px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                   >
                     Enregistrer une sortie
@@ -151,7 +155,7 @@ export function OutingPriorityList({ animals, canManageOutings }: OutingPriority
                 )}
 
                 {isActive && (
-                  <div className="space-y-2 pt-1 border-t border-current/10 mt-2">
+                  <div className="space-y-2 pt-1 border-t border-border mt-2">
                     {/* Rating selector */}
                     <div>
                       <p className="text-[11px] font-medium text-muted mb-1">Note de la sortie</p>
@@ -199,7 +203,7 @@ export function OutingPriorityList({ animals, canManageOutings }: OutingPriority
                       {QUICK_DURATIONS.map((d) => (
                         <button
                           key={d.value}
-                          onClick={() => handleRecord(animal.id, d.value)}
+                          onClick={() => handleRecord(assignment.animal_id, d.value)}
                           disabled={isPending || (rating != null && rating <= 5 && !ratingComment.trim())}
                           className="flex-1 px-1 py-1.5 rounded text-xs font-medium bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-50"
                         >
@@ -215,13 +219,53 @@ export function OutingPriorityList({ animals, canManageOutings }: OutingPriority
                       className="w-full px-2 py-1.5 bg-surface border border-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
                     />
                     <button
-                      onClick={() => { setActiveAnimalId(null); setNotes(''); setRating(null); setRatingComment('') }}
+                      onClick={resetForm}
                       className="w-full text-center text-xs text-muted hover:text-text transition-colors"
                     >
                       Annuler
                     </button>
                   </div>
                 )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Completed assignments */}
+      {completed.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {completed.map((assignment) => {
+            const photo = getAnimalPhoto(assignment.animals)
+
+            return (
+              <div
+                key={assignment.id}
+                className="bg-surface rounded-xl border border-border p-3 opacity-60"
+              >
+                <div className="flex items-center gap-3">
+                  {photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={photo}
+                      alt={assignment.animals.name}
+                      className="w-10 h-10 rounded-full object-cover shrink-0 grayscale"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-muted/20 flex items-center justify-center shrink-0">
+                      <PawPrint className="w-5 h-5 text-muted" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-sm truncate">{assignment.animals.name}</p>
+                    {assignment.notes && (
+                      <p className="text-[11px] text-muted truncate">{assignment.notes}</p>
+                    )}
+                  </div>
+                  <div className="shrink-0 w-6 h-6 rounded-full bg-success/20 flex items-center justify-center">
+                    <Check className="w-3.5 h-3.5 text-success" />
+                  </div>
+                </div>
               </div>
             )
           })}

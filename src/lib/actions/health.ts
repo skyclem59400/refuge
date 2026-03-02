@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
+import { logActivity } from '@/lib/actions/activity-log'
 import type { HealthRecordType } from '@/lib/types/database'
 
 // ============================================
@@ -138,6 +139,7 @@ export async function createHealthRecord(data: {
 
     revalidatePath('/health')
     revalidatePath(`/animals/${data.animal_id}`)
+    logActivity({ action: 'create', entityType: 'health_record', entityId: record.id, entityName: data.type, parentType: 'animal', parentId: data.animal_id })
     return { data: record }
   } catch (e) {
     return { error: (e as Error).message }
@@ -157,6 +159,13 @@ export async function updateHealthRecord(id: string, data: {
     await requirePermission('manage_health')
     const supabase = await createClient()
 
+    // Fetch the record to get animal_id for activity logging
+    const { data: record } = await supabase
+      .from('animal_health_records')
+      .select('animal_id')
+      .eq('id', id)
+      .single()
+
     const { error } = await supabase
       .from('animal_health_records')
       .update(data)
@@ -167,6 +176,7 @@ export async function updateHealthRecord(id: string, data: {
     }
 
     revalidatePath('/health')
+    logActivity({ action: 'update', entityType: 'health_record', entityId: id, parentType: 'animal', parentId: record?.animal_id })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -178,6 +188,13 @@ export async function deleteHealthRecord(id: string) {
     await requirePermission('manage_health')
     const supabase = await createClient()
 
+    // Fetch the record to get animal_id for activity logging
+    const { data: record } = await supabase
+      .from('animal_health_records')
+      .select('animal_id')
+      .eq('id', id)
+      .single()
+
     const { error } = await supabase
       .from('animal_health_records')
       .delete()
@@ -188,6 +205,7 @@ export async function deleteHealthRecord(id: string) {
     }
 
     revalidatePath('/health')
+    logActivity({ action: 'delete', entityType: 'health_record', entityId: id, parentType: 'animal', parentId: record?.animal_id })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }

@@ -5,7 +5,9 @@ import { getEstablishmentContext } from '@/lib/establishment/context'
 import { AnimalDetailTabs } from '@/components/animals/animal-detail-tabs'
 import { AnimalStatusBadge, SpeciesBadge } from '@/components/animals/animal-status-badge'
 import { getSexIcon, calculateAge, getOriginLabel } from '@/lib/sda-utils'
-import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, Box, SocialPost, IcadDeclaration } from '@/lib/types/database'
+import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, Box, SocialPost, IcadDeclaration, ActivityLog } from '@/lib/types/database'
+import { getActivityLogs } from '@/lib/actions/activity-log'
+import { getOutings } from '@/lib/actions/outings'
 import { ArrowLeft } from 'lucide-react'
 
 export default async function AnimalDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,6 +34,10 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
     admin.from('icad_declarations').select('*').eq('animal_id', id).order('created_at', { ascending: false }),
   ])
 
+  // Fetch outings for this animal
+  const outingsResult = await getOutings({ animalId: id, limit: 100 })
+  const outings = outingsResult.data || []
+
   if (!animal) notFound()
 
   const typedAnimal = animal as Animal
@@ -46,6 +52,7 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
   const allCreatedByIds = [
     ...typedMovements.map((m) => m.created_by),
     ...typedHealth.map((h) => h.created_by),
+    ...outings.map((o: { walked_by: string }) => o.walked_by),
   ].filter((id): id is string => !!id)
   const uniqueUserIds = [...new Set(allCreatedByIds)]
 
@@ -63,6 +70,41 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
   const canManageHealth = ctx!.permissions.canManageHealth
   const canManageMovements = ctx!.permissions.canManageMovements
   const canManagePosts = ctx!.permissions.canManagePosts
+  const isAdmin = ctx!.permissions.isAdmin
+
+  // Fetch activity logs for admin only
+  let activityLogs: ActivityLog[] = []
+  if (isAdmin) {
+    const logsResult = await getActivityLogs({
+      parentType: 'animal',
+      parentId: id,
+      limit: 50,
+    })
+    // Also fetch direct entity logs
+    const directLogsResult = await getActivityLogs({
+      entityType: 'animal',
+      entityId: id,
+      limit: 50,
+    })
+    const allLogs = [...(logsResult.data || []), ...(directLogsResult.data || [])]
+    // Deduplicate by id and sort by date
+    const logMap = new Map(allLogs.map(l => [l.id, l]))
+    activityLogs = Array.from(logMap.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+
+    // Add log user IDs to resolve names
+    const logUserIds = activityLogs.map(l => l.user_id).filter(uid => !userNames[uid])
+    if (logUserIds.length > 0) {
+      const uniqueLogUserIds = [...new Set(logUserIds)]
+      const { data: logUsersInfo } = await admin.rpc('get_users_info', { user_ids: uniqueLogUserIds })
+      if (logUsersInfo && Array.isArray(logUsersInfo)) {
+        for (const u of logUsersInfo) {
+          userNames[u.id] = u.full_name || u.email || u.id
+        }
+      }
+    }
+  }
 
   return (
     <div className="animate-fade-up">
@@ -96,6 +138,7 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
         photos={typedPhotos}
         movements={typedMovements}
         healthRecords={typedHealth}
+        outings={outings}
         socialPosts={typedPosts}
         icadDeclarations={typedIcad}
         boxes={typedBoxes}
@@ -106,6 +149,8 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
         canManageHealth={canManageHealth}
         canManageMovements={canManageMovements}
         canManagePosts={canManagePosts}
+        isAdmin={isAdmin}
+        activityLogs={activityLogs}
       />
     </div>
   )

@@ -54,7 +54,7 @@ export default async function AnimalsPage() {
         </div>
       </div>
 
-      <AnimalList animals={animalList} />
+      <AnimalList animals={animalList} canManageAdoptions={ctx!.permissions.canManageAdoptions} />
     </div>
   )
 }

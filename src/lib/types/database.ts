@@ -2,7 +2,7 @@ export type RoleType = 'admin' | 'salarie' | 'benevole'
 export type ContactCategory = 'client' | 'member' | 'volunteer' | 'board_member' | 'foster_family' | 'veterinarian'
 export type DocumentType = 'devis' | 'facture' | 'avoir'
 export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'converted' | 'validated'
-export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings'
+export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings' | 'manage_outing_assignments' | 'manage_adoptions'
 
 export interface LineItem {
   description: string
@@ -89,6 +89,8 @@ export interface PermissionGroup {
   manage_posts: boolean
   manage_donations: boolean
   manage_outings: boolean
+  manage_outing_assignments: boolean
+  manage_adoptions: boolean
   view_pound: boolean
   view_statistics: boolean
   created_at: string
@@ -134,6 +136,8 @@ export interface Permissions {
   canManagePosts: boolean
   canManageDonations: boolean
   canManageOutings: boolean
+  canManageOutingAssignments: boolean
+  canManageAdoptions: boolean
   canViewPound: boolean
   canViewStatistics: boolean
   isAdmin: boolean
@@ -224,6 +228,7 @@ export interface Animal {
   pound_entry_date: string | null
   shelter_entry_date: string | null
   exit_date: string | null
+  adoptable: boolean
   // Hunimalis sync fields
   hunimalis_id: number | null
   photo_url: string | null
@@ -262,6 +267,34 @@ export interface AnimalOuting {
   ended_at: string | null
   duration_minutes: number | null
   notes: string | null
+  rating: number | null
+  rating_comment: string | null
+  created_at: string
+}
+
+export interface OutingAssignment {
+  id: string
+  establishment_id: string
+  animal_id: string
+  assigned_to: string
+  assigned_by: string
+  date: string
+  outing_id: string | null
+  notes: string | null
+  created_at: string
+}
+
+export interface ActivityLog {
+  id: string
+  establishment_id: string
+  user_id: string
+  action: string
+  entity_type: string
+  entity_id: string | null
+  entity_name: string | null
+  parent_type: string | null
+  parent_id: string | null
+  details: Record<string, unknown>
   created_at: string
 }
 

@@ -303,10 +303,22 @@ export async function createOuting(data: {
   animal_id: string
   duration_minutes: number
   notes?: string | null
+  rating?: number | null
+  rating_comment?: string | null
 }) {
   try {
     const { userId } = await requirePermission('manage_outings')
     const supabase = await createClient()
+
+    // Validate rating
+    if (data.rating != null) {
+      if (data.rating < 1 || data.rating > 10 || !Number.isInteger(data.rating)) {
+        return { error: 'La note doit etre un entier entre 1 et 10' }
+      }
+      if (data.rating <= 5 && !data.rating_comment?.trim()) {
+        return { error: 'Un commentaire est obligatoire pour une note de 5 ou moins' }
+      }
+    }
 
     const now = new Date()
     const startedAt = new Date(now.getTime() - data.duration_minutes * 60 * 1000)
@@ -320,11 +332,24 @@ export async function createOuting(data: {
         ended_at: now.toISOString(),
         duration_minutes: data.duration_minutes,
         notes: data.notes ?? null,
+        rating: data.rating ?? null,
+        rating_comment: data.rating_comment?.trim() || null,
       })
       .select()
       .single()
 
     if (error) return { error: error.message }
+
+    // Auto-link: if there's an assignment for this animal+user today, mark completed
+    const todayDate = new Date().toISOString().split('T')[0]
+    const adminForLink = createAdminClient()
+    await adminForLink
+      .from('outing_assignments')
+      .update({ outing_id: outing.id })
+      .eq('animal_id', data.animal_id)
+      .eq('assigned_to', userId)
+      .eq('date', todayDate)
+      .is('outing_id', null)
 
     revalidatePath('/sorties')
     revalidatePath(`/animals/${data.animal_id}`)
@@ -336,33 +361,29 @@ export async function createOuting(data: {
 }
 
 // ---------------------------------------------------------------------------
-// deleteOuting — admin or creator of the outing
+// deleteOuting — admin only
 // ---------------------------------------------------------------------------
 
 export async function deleteOuting(id: string) {
   try {
-    const { userId, membership } = await requirePermission('manage_outings')
+    const { membership } = await requirePermission('manage_outings')
     const supabase = createAdminClient()
 
-    // Fetch outing to check ownership
+    // Only admins can delete outings
+    const isAdmin = membership.groups?.some(
+      (g: { is_system: boolean; name: string }) => g.is_system && g.name === 'Administrateur'
+    )
+    if (!isAdmin) {
+      return { error: 'Seul un administrateur peut supprimer une sortie. Contactez votre administrateur.' }
+    }
+
     const { data: outing, error: fetchError } = await supabase
       .from('animal_outings')
-      .select('walked_by')
+      .select('id')
       .eq('id', id)
       .single()
 
     if (fetchError || !outing) return { error: 'Sortie introuvable' }
-
-    const isCreator = outing.walked_by === userId
-
-    if (!isCreator) {
-      // Check if user has manage_outings permission (which implies admin-level access for outings)
-      try {
-        await requirePermission('manage_outings')
-      } catch {
-        return { error: 'Seul un administrateur ou le createur peut supprimer cette sortie' }
-      }
-    }
 
     const { error } = await supabase
       .from('animal_outings')
@@ -373,6 +394,166 @@ export async function deleteOuting(id: string) {
 
     revalidatePath('/sorties')
     return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// getAssignments — list assignments for a given date
+// ---------------------------------------------------------------------------
+
+export async function getAssignments(filters?: {
+  date?: string
+  assignedTo?: string
+}) {
+  try {
+    const { establishmentId } = await requireEstablishment()
+    const supabase = createAdminClient()
+
+    const targetDate = filters?.date || new Date().toISOString().split('T')[0]
+
+    // Fetch today's assignments + all past uncompleted assignments (outing_id IS NULL)
+    let query = supabase
+      .from('outing_assignments')
+      .select('*, animals!inner(id, name, species, photo_url, establishment_id, animal_photos(id, url, is_primary))')
+      .eq('establishment_id', establishmentId)
+      .or(`date.eq.${targetDate},and(date.lt.${targetDate},outing_id.is.null)`)
+
+    if (filters?.assignedTo) {
+      query = query.eq('assigned_to', filters.assignedTo)
+    }
+
+    const { data, error } = await query.order('date', { ascending: true }).order('created_at')
+
+    if (error) return { error: error.message }
+    return { data }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// createAssignment — manager assigns a dog to a person
+// ---------------------------------------------------------------------------
+
+export async function createAssignment(data: {
+  animal_id: string
+  assigned_to: string
+  date?: string
+  notes?: string | null
+}) {
+  try {
+    const { userId, establishmentId } = await requirePermission('manage_outing_assignments')
+    const supabase = createAdminClient()
+
+    const targetDate = data.date || new Date().toISOString().split('T')[0]
+
+    const { data: assignment, error } = await supabase
+      .from('outing_assignments')
+      .insert({
+        establishment_id: establishmentId,
+        animal_id: data.animal_id,
+        assigned_to: data.assigned_to,
+        assigned_by: userId,
+        date: targetDate,
+        notes: data.notes ?? null,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      if (error.code === '23505') {
+        return { error: 'Ce chien est deja assigne a cette personne pour ce jour' }
+      }
+      return { error: error.message }
+    }
+
+    revalidatePath('/sorties')
+    return { data: assignment }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// deleteAssignment — manager removes an assignment
+// ---------------------------------------------------------------------------
+
+export async function deleteAssignment(id: string) {
+  try {
+    await requirePermission('manage_outing_assignments')
+    const supabase = createAdminClient()
+
+    const { error } = await supabase
+      .from('outing_assignments')
+      .delete()
+      .eq('id', id)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/sorties')
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// getAssignmentStats — planned vs completed delta
+// ---------------------------------------------------------------------------
+
+export async function getAssignmentStats(filters?: {
+  dateFrom?: string
+  dateTo?: string
+}) {
+  try {
+    const { establishmentId } = await requireEstablishment()
+    const supabase = createAdminClient()
+
+    const now = new Date()
+    const dateFrom = filters?.dateFrom || new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13).toISOString().split('T')[0]
+    const dateTo = filters?.dateTo || now.toISOString().split('T')[0]
+
+    const { data: assignments, error } = await supabase
+      .from('outing_assignments')
+      .select('id, assigned_to, date, outing_id')
+      .eq('establishment_id', establishmentId)
+      .gte('date', dateFrom)
+      .lte('date', dateTo)
+
+    if (error) return { error: error.message }
+
+    const perPersonMap = new Map<string, { assigned: number; completed: number }>()
+    const perDayMap = new Map<string, { assigned: number; completed: number }>()
+
+    for (const a of assignments || []) {
+      const ps = perPersonMap.get(a.assigned_to) || { assigned: 0, completed: 0 }
+      ps.assigned++
+      if (a.outing_id) ps.completed++
+      perPersonMap.set(a.assigned_to, ps)
+
+      const ds = perDayMap.get(a.date) || { assigned: 0, completed: 0 }
+      ds.assigned++
+      if (a.outing_id) ds.completed++
+      perDayMap.set(a.date, ds)
+    }
+
+    return {
+      data: {
+        perPerson: Array.from(perPersonMap.entries()).map(([userId, s]) => ({
+          userId,
+          assigned: s.assigned,
+          completed: s.completed,
+          completionRate: s.assigned > 0 ? Math.round((s.completed / s.assigned) * 100) : 0,
+        })),
+        perDay: Array.from(perDayMap.entries())
+          .map(([date, s]) => ({ date, assigned: s.assigned, completed: s.completed }))
+          .sort((a, b) => b.date.localeCompare(a.date)),
+        totalAssigned: (assignments || []).length,
+        totalCompleted: (assignments || []).filter(a => a.outing_id).length,
+      },
+    }
   } catch (e) {
     return { error: (e as Error).message }
   }

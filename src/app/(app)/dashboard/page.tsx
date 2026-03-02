@@ -79,7 +79,7 @@ export default async function DashboardPage() {
   // ---------------------------------------------------------------
   // Shelter queries (only when relevant)
   // ---------------------------------------------------------------
-  let shelterStats = { poundCount: 0, shelterCount: 0, adoptionsThisMonth: 0, restitutionsThisMonth: 0 }
+  let shelterStats = { poundCount: 0, shelterCount: 0, fosterCount: 0, adoptionsThisMonth: 0, restitutionsThisMonth: 0 }
   let poundAnimals: AnimalWithPhotos[] = []
   let recentAnimals: AnimalWithPhotos[] = []
   let healthAlerts: { animal_name: string; animal_id: string; description: string; next_due_date: string }[] = []
@@ -92,6 +92,7 @@ export default async function DashboardPage() {
     const [
       { count: poundCount },
       { count: shelterCount },
+      { count: fosterCount },
       { count: adoptionsThisMonth },
       { count: restitutionsThisMonth },
       { data: rawPoundAnimals },
@@ -100,6 +101,7 @@ export default async function DashboardPage() {
     ] = await Promise.all([
       admin.from('animals').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId).eq('status', 'pound'),
       admin.from('animals').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId).eq('status', 'shelter'),
+      admin.from('animals').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId).eq('status', 'foster_family'),
       admin.from('animal_movements').select('*', { count: 'exact', head: true }).eq('type', 'adoption').gte('date', startOfMonth),
       admin.from('animal_movements').select('*', { count: 'exact', head: true }).eq('type', 'return_to_owner').gte('date', startOfMonth),
       admin.from('animals').select('*, animal_photos(id, url, is_primary)').eq('establishment_id', estabId).eq('status', 'pound').order('pound_entry_date', { ascending: true }),
@@ -110,6 +112,7 @@ export default async function DashboardPage() {
     shelterStats = {
       poundCount: poundCount || 0,
       shelterCount: shelterCount || 0,
+      fosterCount: fosterCount || 0,
       adoptionsThisMonth: adoptionsThisMonth || 0,
       restitutionsThisMonth: restitutionsThisMonth || 0,
     }

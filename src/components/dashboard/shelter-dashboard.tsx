@@ -7,6 +7,7 @@ import {
   Home,
   HeartPulse,
   AlertTriangle,
+  Users,
 } from 'lucide-react'
 import type { Animal, AnimalPhoto } from '@/lib/types/database'
 import { AnimalStatusBadge } from '@/components/animals/animal-status-badge'
@@ -19,6 +20,7 @@ interface ShelterDashboardProps {
   stats: {
     poundCount: number
     shelterCount: number
+    fosterCount: number
     adoptionsThisMonth: number
     restitutionsThisMonth: number
   }
@@ -44,6 +46,12 @@ const statConfig = [
     label: 'En refuge',
     Icon: PawPrint,
     colorClass: 'bg-info/10 text-info',
+  },
+  {
+    key: 'fosterCount' as const,
+    label: 'En famille d\'accueil',
+    Icon: Users,
+    colorClass: 'bg-primary/10 text-primary',
   },
   {
     key: 'adoptionsThisMonth' as const,
@@ -77,7 +85,7 @@ export function ShelterDashboard({
   return (
     <div className="space-y-6">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {statConfig.map((s) => (
           <div
             key={s.key}

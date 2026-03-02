@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
+import { logActivity } from '@/lib/actions/activity-log'
 import type {
   AnimalSpecies,
   AnimalSex,
@@ -212,6 +213,7 @@ export async function createAnimal(data: {
     revalidatePath('/animals')
     revalidatePath('/pound')
     revalidatePath('/dashboard')
+    logActivity({ action: 'create', entityType: 'animal', entityId: animal.id, entityName: data.name })
     return { data: animal }
   } catch (e) {
     return { error: (e as Error).message }
@@ -262,6 +264,34 @@ export async function updateAnimal(id: string, data: {
     revalidatePath(`/animals/${id}`)
     revalidatePath('/pound')
     revalidatePath('/dashboard')
+    logActivity({ action: 'update', entityType: 'animal', entityId: id, entityName: data.name || undefined })
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+export async function toggleAdoptable(animalId: string, adoptable: boolean) {
+  try {
+    const { establishmentId } = await requirePermission('manage_adoptions')
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('animals')
+      .update({ adoptable })
+      .eq('id', animalId)
+      .eq('establishment_id', establishmentId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/animals')
+    revalidatePath(`/animals/${animalId}`)
+    logActivity({
+      action: 'update',
+      entityType: 'animal',
+      entityId: animalId,
+      details: { field: 'adoptable', value: adoptable },
+    })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -289,6 +319,7 @@ export async function deleteAnimal(id: string) {
     revalidatePath('/animals')
     revalidatePath('/pound')
     revalidatePath('/dashboard')
+    logActivity({ action: 'delete', entityType: 'animal', entityId: id })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -381,6 +412,7 @@ export async function recordMovement(animalId: string, data: {
     revalidatePath(`/animals/${animalId}`)
     revalidatePath('/pound')
     revalidatePath('/dashboard')
+    logActivity({ action: 'create', entityType: 'movement', entityId: movement.id, parentType: 'animal', parentId: animalId })
     return { data: movement }
   } catch (e) {
     return { error: (e as Error).message }

@@ -17,6 +17,8 @@ interface OutingWithAnimal {
   ended_at: string | null
   duration_minutes: number | null
   notes: string | null
+  rating: number | null
+  rating_comment: string | null
   created_at: string
   animals: {
     id: string
@@ -48,7 +50,7 @@ export function OutingHistory({ outings, userNames, isAdmin, currentUserId }: Ou
   const [pendingId, setPendingId] = useState<string | null>(null)
 
   function canDelete(outing: OutingWithAnimal): boolean {
-    return isAdmin || outing.walked_by === currentUserId
+    return isAdmin
   }
 
   const showActionsColumn = outings.some(canDelete)
@@ -70,7 +72,7 @@ export function OutingHistory({ outings, userNames, isAdmin, currentUserId }: Ou
   }
 
   return (
-    <div>
+    <div className="mb-6">
       <h2 className="text-lg font-semibold mb-4">Historique des sorties</h2>
 
       {outings.length === 0 ? (
@@ -85,10 +87,11 @@ export function OutingHistory({ outings, userNames, isAdmin, currentUserId }: Ou
               <thead>
                 <tr className="border-b border-border text-left">
                   <th className="px-4 py-3 font-semibold text-muted">Animal</th>
+                  <th className="px-4 py-3 font-semibold text-muted">Note</th>
                   <th className="px-4 py-3 font-semibold text-muted">Promene par</th>
                   <th className="px-4 py-3 font-semibold text-muted">Duree</th>
                   <th className="px-4 py-3 font-semibold text-muted">Date</th>
-                  <th className="px-4 py-3 font-semibold text-muted">Notes</th>
+                  <th className="px-4 py-3 font-semibold text-muted">Commentaire</th>
                   {showActionsColumn && (
                     <th className="px-4 py-3 font-semibold text-muted text-right">Actions</th>
                   )}
@@ -121,6 +124,23 @@ export function OutingHistory({ outings, userNames, isAdmin, currentUserId }: Ou
                           </div>
                         </Link>
                       </td>
+                      <td className="px-4 py-3">
+                        {outing.rating != null ? (
+                          <span
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold
+                              ${outing.rating <= 3 ? 'bg-red-500/15 text-red-400'
+                                : outing.rating <= 5 ? 'bg-orange-500/15 text-orange-400'
+                                : outing.rating <= 7 ? 'bg-yellow-500/15 text-yellow-400'
+                                : 'bg-green-500/15 text-green-400'
+                              }`}
+                            title={outing.rating_comment || undefined}
+                          >
+                            {outing.rating}/10
+                          </span>
+                        ) : (
+                          <span className="text-muted text-xs">-</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-muted">
                         {userNames[outing.walked_by] || 'Inconnu'}
                       </td>
@@ -133,7 +153,7 @@ export function OutingHistory({ outings, userNames, isAdmin, currentUserId }: Ou
                         {formatDateShort(outing.started_at)}
                       </td>
                       <td className="px-4 py-3 text-muted text-xs max-w-[200px] truncate">
-                        {outing.notes || '-'}
+                        {outing.rating_comment || outing.notes || '-'}
                       </td>
                       {showActionsColumn && (
                         <td className="px-4 py-3 text-right">

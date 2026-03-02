@@ -18,6 +18,8 @@ const PERMISSION_LABELS: { key: Permission; label: string }[] = [
   { key: 'manage_movements', label: 'Mouvements' },
   { key: 'manage_boxes', label: 'Box' },
   { key: 'manage_outings', label: 'Sorties' },
+  { key: 'manage_outing_assignments', label: 'Assignations sorties' },
+  { key: 'manage_adoptions', label: 'Gestion adoptions' },
   { key: 'manage_documents', label: 'Documents' },
   { key: 'manage_clients', label: 'Repertoire' },
   { key: 'manage_donations', label: 'Dons' },
@@ -245,7 +247,7 @@ export function PermissionGroups({ groups: initialGroups }: PermissionGroupsProp
                   <ToggleSwitch
                     checked={group[key] as boolean}
                     onChange={() => handleTogglePermission(group.id, key, group[key] as boolean)}
-                    disabled={isPending || group.is_system}
+                    disabled={isPending}
                   />
                 </div>
               ))}

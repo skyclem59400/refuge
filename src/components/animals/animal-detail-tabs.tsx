@@ -18,7 +18,9 @@ import {
 } from '@/lib/sda-utils'
 import { PostGenerator } from '@/components/social/post-generator'
 import { IcadDeclarations } from '@/components/icad/icad-declarations'
-import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, Box, SocialPost, IcadDeclaration } from '@/lib/types/database'
+import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, Box, SocialPost, IcadDeclaration, ActivityLog } from '@/lib/types/database'
+import { ActivityTimeline } from '@/components/ui/activity-timeline'
+import { formatOutingDuration } from '@/lib/sda-utils'
 import {
   Fingerprint,
   MapPin,
@@ -41,15 +43,31 @@ import {
   Save,
   X,
   Loader2,
+  ClipboardList,
+  Footprints,
 } from 'lucide-react'
 
-type TabId = 'info' | 'photos' | 'health' | 'movements' | 'posts' | 'icad'
+type TabId = 'info' | 'photos' | 'health' | 'movements' | 'outings' | 'posts' | 'icad' | 'activity'
+
+interface AnimalOuting {
+  id: string
+  animal_id: string
+  walked_by: string
+  started_at: string
+  ended_at: string | null
+  duration_minutes: number | null
+  notes: string | null
+  rating: number | null
+  rating_comment: string | null
+  created_at: string
+}
 
 interface AnimalDetailTabsProps {
   animal: Animal
   photos: AnimalPhoto[]
   movements: AnimalMovement[]
   healthRecords: AnimalHealthRecord[]
+  outings?: AnimalOuting[]
   socialPosts: SocialPost[]
   icadDeclarations: IcadDeclaration[]
   boxes: Box[]
@@ -60,15 +78,19 @@ interface AnimalDetailTabsProps {
   canManageHealth: boolean
   canManageMovements: boolean
   canManagePosts: boolean
+  isAdmin?: boolean
+  activityLogs?: ActivityLog[]
 }
 
-const tabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'socialPosts' | 'icadDeclarations' }[] = [
+const baseTabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'outings' | 'socialPosts' | 'icadDeclarations' | 'activityLogs'; adminOnly?: boolean }[] = [
   { id: 'info', label: 'Infos', icon: Info },
   { id: 'photos', label: 'Photos', icon: Camera, countKey: 'photos' },
   { id: 'health', label: 'Sante', icon: HeartPulse, countKey: 'healthRecords' },
   { id: 'movements', label: 'Mouvements', icon: ArrowRightLeft, countKey: 'movements' },
+  { id: 'outings', label: 'Sorties', icon: Footprints, countKey: 'outings' },
   { id: 'posts', label: 'Publications', icon: Share2, countKey: 'socialPosts' },
   { id: 'icad', label: 'I-CAD', icon: Shield, countKey: 'icadDeclarations' },
+  { id: 'activity', label: 'Activite', icon: ClipboardList, countKey: 'activityLogs', adminOnly: true },
 ]
 
 export function AnimalDetailTabs({
@@ -85,11 +107,16 @@ export function AnimalDetailTabs({
   canManageAnimals,
   canManageHealth,
   canManageMovements,
+  outings = [],
   canManagePosts,
+  isAdmin = false,
+  activityLogs = [],
 }: AnimalDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('info')
   const [showHealthForm, setShowHealthForm] = useState(false)
   const [showMovementForm, setShowMovementForm] = useState(false)
+
+  const tabs = baseTabs.filter(t => !t.adminOnly || isAdmin)
 
   const primaryPhoto = photos.find((p) => p.is_primary) || photos[0] || null
   const displayPhotoUrl = primaryPhoto?.url || animal.photo_url || null
@@ -98,8 +125,10 @@ export function AnimalDetailTabs({
     photos: photos.length || (animal.photo_url ? 1 : 0),
     healthRecords: healthRecords.length,
     movements: movements.length,
+    outings: outings.length,
     socialPosts: socialPosts.length,
     icadDeclarations: icadDeclarations.length,
+    activityLogs: activityLogs.length,
   }
 
   const todayDate = new Date()
@@ -219,6 +248,10 @@ export function AnimalDetailTabs({
           />
         )}
 
+        {activeTab === 'outings' && (
+          <OutingsTab outings={outings} userNames={userNames} />
+        )}
+
         {activeTab === 'posts' && (
           <PostsTab
             animal={animal}
@@ -238,6 +271,10 @@ export function AnimalDetailTabs({
             declarations={icadDeclarations}
             canManage={canManageMovements}
           />
+        )}
+
+        {activeTab === 'activity' && isAdmin && (
+          <ActivityTimeline logs={activityLogs} userNames={userNames} />
         )}
       </div>
     </div>
@@ -910,6 +947,81 @@ function PostsTab({
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+/* ============================================================
+   Tab 6: Sorties
+   ============================================================ */
+
+function OutingsTab({
+  outings,
+  userNames,
+}: {
+  outings: AnimalOuting[]
+  userNames: Record<string, string>
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="bg-surface rounded-xl border border-border">
+        <div className="p-5 border-b border-border flex items-center gap-2">
+          <Footprints className="w-4 h-4 text-muted" />
+          <div>
+            <h3 className="font-semibold">Historique des sorties</h3>
+            <p className="text-xs text-muted mt-0.5">{outings.length} sortie(s)</p>
+          </div>
+        </div>
+
+        {outings.length === 0 ? (
+          <p className="p-5 text-sm text-muted text-center">Aucune sortie enregistree</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-surface-hover/50">
+                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Date</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Note</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Promene par</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Duree</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Commentaire</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {outings.map((outing) => (
+                  <tr key={outing.id} className="hover:bg-surface-hover/30 transition-colors">
+                    <td className="px-4 py-3 text-muted">{formatDateShort(outing.started_at)}</td>
+                    <td className="px-4 py-3">
+                      {outing.rating != null ? (
+                        <span
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold
+                            ${outing.rating <= 3 ? 'bg-red-500/15 text-red-400'
+                              : outing.rating <= 5 ? 'bg-orange-500/15 text-orange-400'
+                              : outing.rating <= 7 ? 'bg-yellow-500/15 text-yellow-400'
+                              : 'bg-green-500/15 text-green-400'
+                            }`}
+                          title={outing.rating_comment || undefined}
+                        >
+                          {outing.rating}/10
+                        </span>
+                      ) : (
+                        <span className="text-muted text-xs">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-muted">{userNames[outing.walked_by] || 'Inconnu'}</td>
+                    <td className="px-4 py-3">
+                      {outing.duration_minutes ? formatOutingDuration(outing.duration_minutes) : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-muted text-xs max-w-[200px] truncate">
+                      {outing.rating_comment || outing.notes || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
