@@ -366,12 +366,12 @@ export async function createOuting(data: {
 
 export async function deleteOuting(id: string) {
   try {
-    const { membership } = await requirePermission('manage_outings')
+    const { groups } = await requirePermission('manage_outings')
     const supabase = createAdminClient()
 
     // Only admins can delete outings
-    const isAdmin = membership.groups?.some(
-      (g: { is_system: boolean; name: string }) => g.is_system && g.name === 'Administrateur'
+    const isAdmin = (groups || []).some(
+      (g) => g.is_system && g.name === 'Administrateur'
     )
     if (!isAdmin) {
       return { error: 'Seul un administrateur peut supprimer une sortie. Contactez votre administrateur.' }

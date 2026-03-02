@@ -8,6 +8,7 @@ interface AuthContext {
   userId: string
   establishmentId: string
   membership: EstablishmentMember
+  groups?: PermissionGroup[]
 }
 
 async function resolveAuth(): Promise<AuthContext> {
@@ -83,5 +84,6 @@ export async function requirePermission(permission: Permission): Promise<AuthCon
     throw new Error('Permissions insuffisantes')
   }
 
+  ctx.groups = (groups as PermissionGroup[]) || []
   return ctx
 }
