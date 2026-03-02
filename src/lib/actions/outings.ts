@@ -177,19 +177,23 @@ export async function getOutingLeaderboard() {
     // All outings for dogs in this establishment
     const { data: allOutings, error } = await supabase
       .from('animal_outings')
-      .select('walked_by, animal_id, duration_minutes, started_at, animals!inner(id, name, species, photo_url, establishment_id, animal_photos(id, url, is_primary))')
+      .select('walked_by, animal_id, duration_minutes, started_at, is_tig, animals!inner(id, name, species, photo_url, establishment_id, animal_photos(id, url, is_primary))')
       .eq('animals.establishment_id', establishmentId)
       .eq('animals.species', 'dog')
       .order('started_at', { ascending: false })
 
     if (error) return { error: error.message }
     if (!allOutings || allOutings.length === 0) {
-      return { data: { perPerson: [], perAnimal: [], dailyTrend: [], weeklyTrend: [], monthlyTrend: [], totalDuration: 0, totalOutings: 0, avgDuration: 0 } }
+      return { data: { perPerson: [], perAnimal: [], dailyTrend: [], weeklyTrend: [], monthlyTrend: [], totalDuration: 0, totalOutings: 0, avgDuration: 0, tigTotal: 0 } }
     }
 
-    // --- Per person ---
+    // Separate regular outings from TIG outings for per-person stats
+    const regularOutings = allOutings.filter((o) => !o.is_tig)
+    const tigCount = allOutings.length - regularOutings.length
+
+    // --- Per person (exclude TIG — those don't count in individual leaderboard) ---
     const personMap = new Map<string, { count: number; totalMinutes: number }>()
-    for (const o of allOutings) {
+    for (const o of regularOutings) {
       const prev = personMap.get(o.walked_by) || { count: 0, totalMinutes: 0 }
       prev.count++
       prev.totalMinutes += o.duration_minutes || 0
@@ -288,7 +292,7 @@ export async function getOutingLeaderboard() {
     const avgDuration = totalOutings > 0 ? Math.round(totalDuration / totalOutings) : 0
 
     return {
-      data: { perPerson, perAnimal, dailyTrend, weeklyTrend, monthlyTrend, totalDuration, totalOutings, avgDuration },
+      data: { perPerson, perAnimal, dailyTrend, weeklyTrend, monthlyTrend, totalDuration, totalOutings, avgDuration, tigTotal: tigCount },
     }
   } catch (e) {
     return { error: (e as Error).message }
@@ -305,10 +309,22 @@ export async function createOuting(data: {
   notes?: string | null
   rating?: number | null
   rating_comment?: string | null
+  is_tig?: boolean
+  tig_walker_name?: string | null
 }) {
   try {
-    const { userId } = await requirePermission('manage_outings')
+    const { userId, groups } = await requirePermission('manage_outings')
     const supabase = await createClient()
+
+    // TIG outings require manage_outing_assignments OR admin
+    if (data.is_tig) {
+      const isAdminOrManager = (groups || []).some(
+        (g) => (g.is_system && g.name === 'Administrateur') || g.manage_outing_assignments
+      )
+      if (!isAdminOrManager) {
+        return { error: 'Seuls les managers et administrateurs peuvent enregistrer des sorties TIG' }
+      }
+    }
 
     // Validate rating
     if (data.rating != null) {
@@ -334,6 +350,8 @@ export async function createOuting(data: {
         notes: data.notes ?? null,
         rating: data.rating ?? null,
         rating_comment: data.rating_comment?.trim() || null,
+        is_tig: data.is_tig ?? false,
+        tig_walker_name: data.is_tig ? (data.tig_walker_name?.trim() || null) : null,
       })
       .select()
       .single()
@@ -341,15 +359,18 @@ export async function createOuting(data: {
     if (error) return { error: error.message }
 
     // Auto-link: if there's an assignment for this animal+user today, mark completed
-    const todayDate = new Date().toISOString().split('T')[0]
-    const adminForLink = createAdminClient()
-    await adminForLink
-      .from('outing_assignments')
-      .update({ outing_id: outing.id })
-      .eq('animal_id', data.animal_id)
-      .eq('assigned_to', userId)
-      .eq('date', todayDate)
-      .is('outing_id', null)
+    // (skip for TIG outings — TIG don't have assignments)
+    if (!data.is_tig) {
+      const todayDate = new Date().toISOString().split('T')[0]
+      const adminForLink = createAdminClient()
+      await adminForLink
+        .from('outing_assignments')
+        .update({ outing_id: outing.id })
+        .eq('animal_id', data.animal_id)
+        .eq('assigned_to', userId)
+        .eq('date', todayDate)
+        .is('outing_id', null)
+    }
 
     revalidatePath('/sorties')
     revalidatePath(`/animals/${data.animal_id}`)

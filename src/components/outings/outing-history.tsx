@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Trash2, Footprints, PawPrint } from 'lucide-react'
+import { Trash2, Footprints, PawPrint, HardHat } from 'lucide-react'
 import { deleteOuting } from '@/lib/actions/outings'
 import { formatOutingDuration, getSpeciesLabel } from '@/lib/sda-utils'
 import { formatDateShort } from '@/lib/utils'
@@ -19,6 +19,8 @@ interface OutingWithAnimal {
   notes: string | null
   rating: number | null
   rating_comment: string | null
+  is_tig?: boolean
+  tig_walker_name?: string | null
   created_at: string
   animals: {
     id: string
@@ -142,7 +144,17 @@ export function OutingHistory({ outings, userNames, isAdmin, currentUserId }: Ou
                         )}
                       </td>
                       <td className="px-4 py-3 text-muted">
-                        {userNames[outing.walked_by] || 'Inconnu'}
+                        {outing.is_tig ? (
+                          <span className="inline-flex items-center gap-1">
+                            <HardHat className="w-3.5 h-3.5 text-amber-500" />
+                            <span className="font-medium text-amber-500">TIG</span>
+                            {outing.tig_walker_name && (
+                              <span className="text-xs"> — {outing.tig_walker_name}</span>
+                            )}
+                          </span>
+                        ) : (
+                          userNames[outing.walked_by] || 'Inconnu'
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {outing.duration_minutes

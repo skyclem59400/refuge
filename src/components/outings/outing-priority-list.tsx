@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Clock, PawPrint, Loader2, Search } from 'lucide-react'
+import { Clock, PawPrint, Loader2, Search, HardHat } from 'lucide-react'
 import { createOuting } from '@/lib/actions/outings'
 import {
   getOutingUrgencyLevel,
@@ -26,6 +26,7 @@ interface AnimalWithPriority {
 interface OutingPriorityListProps {
   animals: AnimalWithPriority[]
   canManageOutings: boolean
+  canCreateTig?: boolean
 }
 
 const QUICK_DURATIONS = [
@@ -42,10 +43,12 @@ function getAnimalPhoto(animal: AnimalWithPriority): string | null {
   return animal.photo_url
 }
 
-export function OutingPriorityList({ animals, canManageOutings }: OutingPriorityListProps) {
+export function OutingPriorityList({ animals, canManageOutings, canCreateTig = false }: OutingPriorityListProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [activeAnimalId, setActiveAnimalId] = useState<string | null>(null)
+  const [isTigMode, setIsTigMode] = useState(false)
+  const [tigName, setTigName] = useState('')
   const [notes, setNotes] = useState('')
   const [rating, setRating] = useState<number | null>(null)
   const [ratingComment, setRatingComment] = useState('')
@@ -54,6 +57,15 @@ export function OutingPriorityList({ animals, canManageOutings }: OutingPriority
   const filtered = search.trim()
     ? animals.filter((a) => a.name.toLowerCase().includes(search.trim().toLowerCase()))
     : animals
+
+  function resetForm() {
+    setActiveAnimalId(null)
+    setIsTigMode(false)
+    setTigName('')
+    setNotes('')
+    setRating(null)
+    setRatingComment('')
+  }
 
   function handleRecord(animalId: string, duration: number) {
     if (rating != null && rating <= 5 && !ratingComment.trim()) {
@@ -67,15 +79,14 @@ export function OutingPriorityList({ animals, canManageOutings }: OutingPriority
         notes: notes.trim() || null,
         rating,
         rating_comment: ratingComment.trim() || null,
+        is_tig: isTigMode,
+        tig_walker_name: isTigMode ? (tigName.trim() || null) : null,
       })
       if (result.error) {
         toast.error(result.error)
       } else {
-        toast.success('Sortie enregistree')
-        setActiveAnimalId(null)
-        setNotes('')
-        setRating(null)
-        setRatingComment('')
+        toast.success(isTigMode ? 'Sortie TIG enregistree' : 'Sortie enregistree')
+        resetForm()
         router.refresh()
       }
     })
@@ -142,16 +153,45 @@ export function OutingPriorityList({ animals, canManageOutings }: OutingPriority
                 </div>
 
                 {canManageOutings && !isActive && (
-                  <button
-                    onClick={() => setActiveAnimalId(animal.id)}
-                    className="w-full text-center px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                  >
-                    Enregistrer une sortie
-                  </button>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => { setActiveAnimalId(animal.id); setIsTigMode(false) }}
+                      className="flex-1 text-center px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                    >
+                      Enregistrer une sortie
+                    </button>
+                    {canCreateTig && (
+                      <button
+                        onClick={() => { setActiveAnimalId(animal.id); setIsTigMode(true) }}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-colors"
+                        title="Sortie effectuee par un TIG"
+                      >
+                        <HardHat className="w-3.5 h-3.5" />
+                        TIG
+                      </button>
+                    )}
+                  </div>
                 )}
 
                 {isActive && (
                   <div className="space-y-2 pt-1 border-t border-current/10 mt-2">
+                    {/* TIG indicator + name field */}
+                    {isTigMode && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-amber-500">
+                          <HardHat className="w-3.5 h-3.5" />
+                          <span className="text-xs font-bold">Sortie TIG</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={tigName}
+                          onChange={(e) => setTigName(e.target.value)}
+                          placeholder="Nom du TIG (optionnel)"
+                          className="w-full px-2 py-1.5 bg-surface border border-amber-500/30 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                        />
+                      </div>
+                    )}
+
                     {/* Rating selector */}
                     <div>
                       <p className="text-[11px] font-medium text-muted mb-1">Note de la sortie</p>
@@ -215,7 +255,7 @@ export function OutingPriorityList({ animals, canManageOutings }: OutingPriority
                       className="w-full px-2 py-1.5 bg-surface border border-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
                     />
                     <button
-                      onClick={() => { setActiveAnimalId(null); setNotes(''); setRating(null); setRatingComment('') }}
+                      onClick={resetForm}
                       className="w-full text-center text-xs text-muted hover:text-text transition-colors"
                     >
                       Annuler

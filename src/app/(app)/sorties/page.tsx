@@ -230,7 +230,7 @@ export default async function SortiesPage({
           <OutingHistory outings={outings} userNames={userNames} isAdmin={isAdmin} currentUserId={currentUserId} />
 
           {/* 4. Priority list */}
-          <OutingPriorityList animals={sortedPriorityAnimals} canManageOutings={canManageOutings} />
+          <OutingPriorityList animals={sortedPriorityAnimals} canManageOutings={canManageOutings} canCreateTig={canManageAssignments || isAdmin} />
         </>
       )}
 
@@ -247,6 +247,7 @@ export default async function SortiesPage({
               totalDuration={leaderboardResult.data.totalDuration}
               totalOutings={leaderboardResult.data.totalOutings}
               avgDuration={leaderboardResult.data.avgDuration}
+              tigTotal={leaderboardResult.data.tigTotal}
               userNames={userNames}
             />
           )}

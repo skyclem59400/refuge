@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { PawPrint, Users, Clock, TrendingUp, Trophy, AlertTriangle } from 'lucide-react'
+import { PawPrint, Users, Clock, TrendingUp, Trophy, AlertTriangle, HardHat } from 'lucide-react'
 import { formatOutingDuration } from '@/lib/sda-utils'
 
 interface PersonStat {
@@ -35,6 +35,7 @@ interface OutingStatsProps {
   totalDuration: number
   totalOutings: number
   avgDuration: number
+  tigTotal?: number
   userNames: Record<string, string>
 }
 
@@ -62,6 +63,7 @@ export function OutingStats({
   totalDuration,
   totalOutings,
   avgDuration,
+  tigTotal = 0,
   userNames,
 }: OutingStatsProps) {
   const [granularity, setGranularity] = useState<Granularity>('week')
@@ -72,7 +74,7 @@ export function OutingStats({
   return (
     <div className="space-y-6">
       {/* Global KPIs */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className={`grid gap-4 ${tigTotal > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
         <div className="bg-surface rounded-xl border border-border p-4 text-center">
           <TrendingUp className="w-5 h-5 text-primary mx-auto mb-1" />
           <p className="text-2xl font-bold">{totalOutings}</p>
@@ -88,6 +90,13 @@ export function OutingStats({
           <p className="text-2xl font-bold">{formatOutingDuration(avgDuration)}</p>
           <p className="text-xs text-muted mt-1">Duree moyenne</p>
         </div>
+        {tigTotal > 0 && (
+          <div className="bg-surface rounded-xl border border-border p-4 text-center">
+            <HardHat className="w-5 h-5 text-amber-500 mx-auto mb-1" />
+            <p className="text-2xl font-bold">{tigTotal}</p>
+            <p className="text-xs text-muted mt-1">Sorties TIG</p>
+          </div>
+        )}
       </div>
 
       {/* Trend chart with granularity selector */}

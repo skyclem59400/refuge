@@ -45,6 +45,7 @@ import {
   Loader2,
   ClipboardList,
   Footprints,
+  HardHat,
 } from 'lucide-react'
 
 type TabId = 'info' | 'photos' | 'health' | 'movements' | 'outings' | 'posts' | 'icad' | 'activity'
@@ -59,6 +60,8 @@ interface AnimalOuting {
   notes: string | null
   rating: number | null
   rating_comment: string | null
+  is_tig?: boolean
+  tig_walker_name?: string | null
   created_at: string
 }
 
@@ -1008,7 +1011,19 @@ function OutingsTab({
                         <span className="text-muted text-xs">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-muted">{userNames[outing.walked_by] || 'Inconnu'}</td>
+                    <td className="px-4 py-3 text-muted">
+                      {outing.is_tig ? (
+                        <span className="inline-flex items-center gap-1">
+                          <HardHat className="w-3.5 h-3.5 text-amber-500" />
+                          <span className="font-medium text-amber-500">TIG</span>
+                          {outing.tig_walker_name && (
+                            <span className="text-xs"> — {outing.tig_walker_name}</span>
+                          )}
+                        </span>
+                      ) : (
+                        userNames[outing.walked_by] || 'Inconnu'
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       {outing.duration_minutes ? formatOutingDuration(outing.duration_minutes) : '-'}
                     </td>
