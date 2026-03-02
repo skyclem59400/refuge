@@ -12,6 +12,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@remotion/bundler": "^4.0.429",
+    "@remotion/cli": "^4.0.431",
     "@remotion/player": "^4.0.429",
     "@remotion/renderer": "^4.0.429",
     "@supabase/ssr": "^0.8.0",
