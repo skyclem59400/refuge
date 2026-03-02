@@ -51,14 +51,14 @@ export default async function DashboardPage() {
       admin.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'devis').eq('establishment_id', estabId).neq('status', 'converted'),
       admin.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'facture').eq('establishment_id', estabId),
       admin.from('documents').select('total').eq('type', 'facture').eq('status', 'paid').eq('establishment_id', estabId),
-      admin.from('documents').select('total').eq('type', 'facture').eq('status', 'sent').eq('establishment_id', estabId),
+      admin.from('documents').select('total').eq('type', 'facture').in('status', ['validated', 'sent']).eq('establishment_id', estabId),
       admin.from('clients').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId),
       admin.from('documents').select('*').eq('establishment_id', estabId).neq('status', 'converted').order('created_at', { ascending: false }).limit(5),
       admin.from('documents')
         .select('date, total, status')
         .eq('type', 'facture')
         .eq('establishment_id', estabId)
-        .in('status', ['paid', 'sent'])
+        .in('status', ['paid', 'sent', 'validated'])
         .order('date', { ascending: true }),
     ])
 
