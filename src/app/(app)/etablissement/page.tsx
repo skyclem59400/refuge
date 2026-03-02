@@ -7,6 +7,7 @@ import { PermissionGroups } from '@/components/establishment/permission-groups'
 import { MembersList } from '@/components/establishment/members-list'
 import { PendingUsersList } from '@/components/establishment/pending-users-list'
 import { InviteMemberSearch } from '@/components/establishment/invite-member-search'
+import { AddCollaborator } from '@/components/establishment/add-collaborator'
 
 export default async function EtablissementPage() {
   const ctx = await getEstablishmentContext()
@@ -71,6 +72,14 @@ export default async function EtablissementPage() {
         <div className="pt-2 border-t border-border">
           <h3 className="text-sm font-semibold mt-4 mb-3">Inviter un utilisateur</h3>
           <InviteMemberSearch users={invitableUsers || []} groups={permissionGroups || []} />
+        </div>
+
+        <div className="pt-2 border-t border-border">
+          <h3 className="text-sm font-semibold mt-4 mb-3">Ajouter un collaborateur (pseudo)</h3>
+          <p className="text-xs text-muted mb-3">
+            Creez un acces pour un salarie ou benevole. Ils se connecteront avec leur prenom, sans email.
+          </p>
+          <AddCollaborator groups={permissionGroups || []} />
         </div>
       </div>
     </div>

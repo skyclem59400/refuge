@@ -1,4 +1,51 @@
 import type { Donation, CompanyInfo } from '@/lib/types/database'
+import { SIGNATURE_BASE64 } from './cerfa-assets'
+
+function buildCachetSvg(company: CompanyInfo): string {
+  const name = (company.name || '').toUpperCase()
+  const legalName = (company.legal_name || '').toUpperCase()
+  const address = company.address || ''
+  const email = company.email || ''
+
+  const topText = legalName || name
+  const centerName = name
+  const bottomText = email || address
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+    <defs>
+      <path id="topArc" d="M 16,120 a 104,104 0 0,1 208,0" fill="none" />
+      <path id="bottomArc" d="M 224,120 a 104,104 0 0,1 -208,0" fill="none" />
+    </defs>
+
+    <!-- Double cercle -->
+    <circle cx="120" cy="120" r="112" fill="none" stroke="#1e3a6e" stroke-width="3" />
+    <circle cx="120" cy="120" r="102" fill="none" stroke="#1e3a6e" stroke-width="1.5" />
+
+    <!-- Etoiles decoratives -->
+    <text x="22" y="124" font-size="10" fill="#1e3a6e" text-anchor="middle">\u2605</text>
+    <text x="218" y="124" font-size="10" fill="#1e3a6e" text-anchor="middle">\u2605</text>
+
+    <!-- Texte arc haut : denomination legale -->
+    <text font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#1e3a6e" letter-spacing="1">
+      <textPath href="#topArc" startOffset="50%" text-anchor="middle">${topText}</textPath>
+    </text>
+
+    <!-- Texte arc bas : email -->
+    <text font-family="Helvetica, Arial, sans-serif" font-size="9" fill="#1e3a6e" letter-spacing="0.5">
+      <textPath href="#bottomArc" startOffset="50%" text-anchor="middle">${bottomText}</textPath>
+    </text>
+
+    <!-- Lignes separatrices -->
+    <line x1="48" y1="100" x2="192" y2="100" stroke="#1e3a6e" stroke-width="0.7" />
+    <line x1="48" y1="142" x2="192" y2="142" stroke="#1e3a6e" stroke-width="0.7" />
+
+    <!-- Centre : nom court -->
+    <text x="120" y="118" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="800" fill="#1e3a6e" text-anchor="middle">${centerName}</text>
+
+    <!-- Adresse -->
+    <text x="120" y="134" font-family="Helvetica, Arial, sans-serif" font-size="7" fill="#1e3a6e" opacity="0.8" text-anchor="middle">${address}</text>
+  </svg>`
+}
 
 function amountToWords(amount: number): string {
   const units = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf',
@@ -99,97 +146,99 @@ export function buildCerfaHtml(donation: Donation, companyInfo?: CompanyInfo, lo
   <meta charset="UTF-8">
   <title>Re&ccedil;u fiscal - ${donation.cerfa_number || 'CERFA'}</title>
   <style>
-    @page { size: A4; margin: 15mm; }
+    @page { size: A4; margin: 10mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
       color: #1e293b;
-      font-size: 12px;
-      line-height: 1.5;
+      font-size: 11px;
+      line-height: 1.4;
     }
 
     .page {
       border: 2px solid #1e40af;
-      padding: 28px;
-      min-height: calc(297mm - 30mm);
+      padding: 20px;
+      min-height: calc(297mm - 20mm);
+      max-height: calc(297mm - 20mm);
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
     /* Header */
     .header {
       text-align: center;
       border-bottom: 2px solid #1e40af;
-      padding-bottom: 16px;
-      margin-bottom: 20px;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
     }
     .header-title {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 700;
       color: #1e40af;
       text-transform: uppercase;
       letter-spacing: 2px;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
     .header-subtitle {
-      font-size: 11px;
+      font-size: 10px;
       color: #64748b;
     }
     .header-ref {
-      font-size: 10px;
+      font-size: 9px;
       color: #94a3b8;
-      margin-top: 4px;
+      margin-top: 2px;
     }
     .cerfa-number {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
       color: #1e40af;
-      margin-top: 6px;
+      margin-top: 4px;
     }
 
     /* Sections */
     .section {
       border: 1px solid #cbd5e1;
       border-radius: 6px;
-      padding: 16px;
-      margin-bottom: 16px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
     }
     .section-title {
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 1.5px;
       color: #1e40af;
-      margin-bottom: 10px;
-      padding-bottom: 6px;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
       border-bottom: 1px solid #e2e8f0;
     }
     .section-row {
       display: flex;
       justify-content: space-between;
-      gap: 20px;
+      gap: 16px;
     }
     .section-col {
       flex: 1;
     }
 
     .field {
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
     .field-label {
-      font-size: 9px;
+      font-size: 8px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: #94a3b8;
       font-weight: 600;
     }
     .field-value {
-      font-size: 12px;
+      font-size: 11px;
       color: #1e293b;
       font-weight: 500;
     }
     .field-value.name {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 600;
     }
 
@@ -198,39 +247,39 @@ export function buildCerfaHtml(donation: Donation, companyInfo?: CompanyInfo, lo
       background: #eff6ff;
       border: 2px solid #1e40af;
       border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 16px;
+      padding: 10px;
+      margin-bottom: 10px;
       text-align: center;
     }
     .amount-label {
-      font-size: 10px;
+      font-size: 9px;
       text-transform: uppercase;
       letter-spacing: 1px;
       color: #64748b;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
     .amount-value {
-      font-size: 28px;
+      font-size: 22px;
       font-weight: 700;
       color: #1e40af;
     }
     .amount-words {
-      font-size: 11px;
+      font-size: 10px;
       color: #475569;
       font-style: italic;
-      margin-top: 4px;
+      margin-top: 2px;
     }
 
     /* Checkboxes */
     .checkbox-group {
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
     .checkbox-item {
       display: flex;
       align-items: center;
       gap: 6px;
-      margin-bottom: 4px;
-      font-size: 11px;
+      margin-bottom: 2px;
+      font-size: 10px;
     }
     .checkbox {
       width: 12px;
@@ -254,19 +303,19 @@ export function buildCerfaHtml(donation: Donation, companyInfo?: CompanyInfo, lo
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 6px;
-      padding: 14px;
-      margin-bottom: 16px;
-      font-size: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      font-size: 9px;
       color: #475569;
-      line-height: 1.6;
+      line-height: 1.5;
     }
     .legal-title {
       font-weight: 700;
-      font-size: 9px;
+      font-size: 8px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: #1e40af;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
 
     /* Signature */
@@ -275,31 +324,44 @@ export function buildCerfaHtml(donation: Donation, companyInfo?: CompanyInfo, lo
       justify-content: space-between;
       align-items: flex-end;
       margin-top: auto;
-      padding-top: 20px;
+      padding-top: 10px;
     }
-    .signature-block {
+    .signature-left {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .cachet-wrapper {
+      width: 100px;
+      height: 100px;
+    }
+    .cachet-wrapper svg {
+      width: 100%;
+      height: 100%;
+    }
+    .signature-right {
       text-align: center;
     }
-    .signature-line {
-      width: 200px;
-      border-bottom: 1px solid #94a3b8;
-      margin-top: 50px;
-      margin-bottom: 4px;
+    .signature-img {
+      width: 150px;
+      height: auto;
     }
     .signature-label {
-      font-size: 9px;
+      font-size: 8px;
       color: #94a3b8;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      margin-top: 2px;
     }
 
     /* Footer */
     .footer {
-      margin-top: 16px;
-      padding-top: 10px;
+      margin-top: 8px;
+      padding-top: 6px;
       border-top: 1px solid #e2e8f0;
       text-align: center;
-      font-size: 9px;
+      font-size: 8px;
       color: #94a3b8;
     }
   </style>
@@ -405,7 +467,7 @@ export function buildCerfaHtml(donation: Donation, companyInfo?: CompanyInfo, lo
             <div class="field-label">Date du versement</div>
             <div class="field-value">${dateFormatted}</div>
           </div>
-          <div class="field" style="margin-top: 8px;">
+          <div class="field" style="margin-top: 4px;">
             <div class="field-label">Nature du don</div>
             <div class="checkbox-group">
               <div class="checkbox-item">
@@ -447,15 +509,16 @@ export function buildCerfaHtml(donation: Donation, companyInfo?: CompanyInfo, lo
 
     <!-- Signature section -->
     <div class="signature-section">
-      <div class="signature-block">
+      <div class="signature-left">
         <div class="field">
           <div class="field-label">Date d'&eacute;tablissement du re&ccedil;u</div>
           <div class="field-value">${generatedDate}</div>
         </div>
+        <div class="cachet-wrapper">${buildCachetSvg(company)}</div>
       </div>
-      <div class="signature-block">
-        <div class="signature-line"></div>
-        <div class="signature-label">Signature et cachet de l'organisme</div>
+      <div class="signature-right">
+        <img src="${SIGNATURE_BASE64}" class="signature-img" alt="Signature" />
+        <div class="signature-label">Signature du responsable</div>
       </div>
     </div>
 

@@ -1,3 +1,4 @@
+export type RoleType = 'admin' | 'salarie' | 'benevole'
 export type ContactCategory = 'client' | 'member' | 'volunteer' | 'board_member' | 'foster_family' | 'veterinarian'
 export type DocumentType = 'devis' | 'facture' | 'avoir'
 export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'converted' | 'validated'
@@ -105,6 +106,12 @@ export interface EstablishmentMember {
   id: string
   establishment_id: string
   user_id: string
+  is_owner?: boolean
+  // Pseudo auth fields
+  pseudo: string | null
+  role_type: RoleType
+  is_pseudo_user: boolean
+  password_set: boolean
   created_at: string
   updated_at: string
   // Enriched from auth.users via RPC

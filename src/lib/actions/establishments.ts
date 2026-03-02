@@ -3,7 +3,17 @@
 import { revalidatePath } from 'next/cache'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requirePermission, requireEstablishment } from '@/lib/establishment/permissions'
-import type { EstablishmentMember, UnassignedUser, PermissionGroup, Permission } from '@/lib/types/database'
+import type { EstablishmentMember, UnassignedUser, PermissionGroup, Permission, RoleType } from '@/lib/types/database'
+
+function stripAccents(str: string): string {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+function generatePseudoEmail(pseudo: string): string {
+  const clean = stripAccents(pseudo.trim().toLowerCase()).replace(/[^a-z0-9]/g, '-')
+  const random = Math.random().toString(36).substring(2, 8)
+  return `${clean}-${random}@refuge.internal`
+}
 
 // ============================================================
 // Establishment CRUD
@@ -383,12 +393,28 @@ export async function removeMember(memberId: string) {
       return { error: 'Vous ne pouvez pas vous retirer vous-meme' }
     }
 
+    const isPseudoUser = (member as EstablishmentMember).is_pseudo_user
+    const memberUserId = (member as EstablishmentMember).user_id
+
     const { error } = await admin
       .from('establishment_members')
       .delete()
       .eq('id', memberId)
 
     if (error) return { error: error.message }
+
+    // If pseudo user, delete the generated auth user if no other memberships
+    if (isPseudoUser) {
+      const { data: otherMemberships } = await admin
+        .from('establishment_members')
+        .select('id')
+        .eq('user_id', memberUserId)
+        .limit(1)
+
+      if (!otherMemberships || otherMemberships.length === 0) {
+        await admin.auth.admin.deleteUser(memberUserId)
+      }
+    }
 
     revalidatePath('/etablissement')
     return { success: true }
@@ -600,6 +626,119 @@ export async function addPendingUser(userId: string, groupIds: string[]) {
 
       if (groupError) return { error: groupError.message }
     }
+
+    revalidatePath('/etablissement')
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ============================================================
+// Pseudo-based member management
+// ============================================================
+
+export async function createPseudoMember(data: {
+  pseudo: string
+  roleType: 'salarie' | 'benevole'
+  groupIds: string[]
+}) {
+  try {
+    const { establishmentId } = await requirePermission('manage_establishment')
+    const admin = createAdminClient()
+
+    const pseudoLower = data.pseudo.trim().toLowerCase()
+
+    // Check for duplicate pseudo + role_type in this establishment
+    const { data: existing } = await admin
+      .from('establishment_members')
+      .select('id')
+      .eq('establishment_id', establishmentId)
+      .eq('pseudo', pseudoLower)
+      .eq('role_type', data.roleType)
+      .eq('is_pseudo_user', true)
+      .limit(1)
+      .single()
+
+    if (existing) {
+      return { error: `Un ${data.roleType === 'salarie' ? 'salarie' : 'benevole'} avec le pseudo "${data.pseudo}" existe deja` }
+    }
+
+    // Generate invisible email
+    const generatedEmail = generatePseudoEmail(data.pseudo)
+
+    // Create Supabase auth user (no password yet - user sets it on first login)
+    const { data: authUser, error: authError } = await admin.auth.admin.createUser({
+      email: generatedEmail,
+      email_confirm: true,
+      user_metadata: {
+        pseudo: pseudoLower,
+        role_type: data.roleType,
+        full_name: data.pseudo.trim(),
+      },
+    })
+
+    if (authError) {
+      console.error('Failed to create auth user:', authError)
+      return { error: 'Erreur lors de la creation du compte' }
+    }
+
+    // Create establishment_members row
+    const { data: member, error: memberError } = await admin
+      .from('establishment_members')
+      .insert({
+        establishment_id: establishmentId,
+        user_id: authUser.user.id,
+        pseudo: pseudoLower,
+        role_type: data.roleType,
+        is_pseudo_user: true,
+        password_set: false,
+      })
+      .select()
+      .single()
+
+    if (memberError) {
+      // Rollback: delete the auth user
+      await admin.auth.admin.deleteUser(authUser.user.id)
+      return { error: memberError.message }
+    }
+
+    // Assign to permission groups
+    if (data.groupIds.length > 0) {
+      const { error: groupError } = await admin
+        .from('member_groups')
+        .insert(data.groupIds.map(gid => ({ member_id: member.id, group_id: gid })))
+
+      if (groupError) {
+        console.error('Failed to assign groups:', groupError)
+      }
+    }
+
+    revalidatePath('/etablissement')
+    return { success: true, pseudo: pseudoLower }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+export async function resetPseudoPassword(memberId: string) {
+  try {
+    await requirePermission('manage_establishment')
+    const admin = createAdminClient()
+
+    const { data: member, error: memberError } = await admin
+      .from('establishment_members')
+      .select('id, user_id, is_pseudo_user')
+      .eq('id', memberId)
+      .single()
+
+    if (memberError || !member) return { error: 'Membre introuvable' }
+    if (!member.is_pseudo_user) return { error: 'Ce membre n\'utilise pas l\'authentification par pseudo' }
+
+    await admin
+      .from('establishment_members')
+      .update({ password_set: false })
+      .eq('id', memberId)
 
     revalidatePath('/etablissement')
     return { success: true }

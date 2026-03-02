@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useTransition } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { assignMemberToGroup, removeMemberFromGroup, removeMember } from '@/lib/actions/establishments'
+import { assignMemberToGroup, removeMemberFromGroup, removeMember, resetPseudoPassword } from '@/lib/actions/establishments'
 import { MemberAvatar } from '@/components/ui/member-avatar'
 import type { EstablishmentMember, PermissionGroup } from '@/lib/types/database'
 
@@ -153,6 +153,19 @@ export function MembersList({ members, groups, currentUserId, isOwner }: Members
     })
   }
 
+  function handleResetPassword(memberId: string, pseudo: string) {
+    if (!confirm(`Reinitialiser le mot de passe de "${pseudo}" ? L'utilisateur devra en creer un nouveau.`)) return
+    startTransition(async () => {
+      const result = await resetPseudoPassword(memberId)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Mot de passe reinitialise')
+        router.refresh()
+      }
+    })
+  }
+
   if (list.length === 0) {
     return (
       <p className="text-sm text-muted text-center py-6">Aucun membre</p>
@@ -170,19 +183,41 @@ export function MembersList({ members, groups, currentUserId, isOwner }: Members
             <div className="flex items-center gap-3">
               <MemberAvatar
                 src={member.avatar_url}
-                name={member.full_name || member.email || '?'}
+                name={member.full_name || member.pseudo || member.email || '?'}
                 size={32}
               />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium truncate">
-                  {member.full_name || member.email || member.user_id.slice(0, 8)}
+                  {member.full_name || member.pseudo || member.email || member.user_id.slice(0, 8)}
                   {isCurrentUser && <span className="text-muted text-xs ml-1">(vous)</span>}
+                  {member.is_pseudo_user && (
+                    <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-medium
+                      ${member.role_type === 'salarie'
+                        ? 'bg-blue-500/15 text-blue-400'
+                        : 'bg-green-500/15 text-green-400'
+                      }`}>
+                      {member.role_type === 'salarie' ? 'Salarie' : 'Benevole'}
+                    </span>
+                  )}
                 </p>
                 <p className="text-xs text-muted">
-                  {member.email && member.full_name && member.email}
+                  {member.is_pseudo_user
+                    ? (member.password_set ? 'Mot de passe defini' : 'En attente du mot de passe')
+                    : (member.email && member.full_name ? member.email : '')
+                  }
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                {member.is_pseudo_user && member.password_set && (
+                  <button
+                    onClick={() => handleResetPassword(member.id, member.pseudo || '')}
+                    disabled={isPending}
+                    className="px-2 py-1 rounded text-xs font-medium bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors disabled:opacity-50"
+                    title="Reinitialiser le mot de passe"
+                  >
+                    Reset mdp
+                  </button>
+                )}
                 <GroupDropdown
                   member={member}
                   allGroups={groups}
