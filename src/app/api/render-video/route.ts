@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const { renderMedia, selectComposition } = await import('@remotion/renderer')
 
     // Bundle the Remotion project (or use pre-bundled in production)
-    const bundlePath = path.join(process.cwd(), 'public', 'remotion-bundle')
+    const bundlePath = path.join(process.cwd(), 'remotion-bundle')
     const hasPrebundle = fs.existsSync(path.join(bundlePath, 'index.html'))
 
     let serveUrl: string
