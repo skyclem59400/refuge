@@ -1,5 +1,5 @@
 import React from 'react'
-import { Composition } from 'remotion'
+import { registerRoot, Composition } from 'remotion'
 import { AdoptionVideo } from './compositions/adoption-video'
 import { SearchOwnerVideo } from './compositions/search-owner-video'
 import { EventVideo } from './compositions/event-video'
@@ -48,3 +48,5 @@ export const COMPOSITION_MAP = {
   info: InfoVideo,
   other: OtherVideo,
 } as const
+
+registerRoot(RemotionRoot)
