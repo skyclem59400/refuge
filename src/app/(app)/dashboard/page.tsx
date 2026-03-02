@@ -82,7 +82,7 @@ export default async function DashboardPage() {
   // ---------------------------------------------------------------
   let shelterStats = { poundCount: 0, shelterCount: 0, fosterCount: 0, adoptionsThisMonth: 0, restitutionsThisMonth: 0 }
   let poundAnimals: AnimalWithPhotos[] = []
-  let recentAnimals: AnimalWithPhotos[] = []
+  let shelterAnimals: AnimalWithPhotos[] = []
   let healthAlerts: { animal_name: string; animal_id: string; description: string; next_due_date: string }[] = []
 
   if (showShelter) {
@@ -97,7 +97,7 @@ export default async function DashboardPage() {
       { count: adoptionsThisMonth },
       { count: restitutionsThisMonth },
       { data: rawPoundAnimals },
-      { data: rawRecentAnimals },
+      { data: rawShelterAnimals },
       { data: rawHealthAlerts },
     ] = await Promise.all([
       admin.from('animals').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId).eq('status', 'pound'),
@@ -106,7 +106,7 @@ export default async function DashboardPage() {
       admin.from('animal_movements').select('*', { count: 'exact', head: true }).eq('type', 'adoption').gte('date', startOfMonth),
       admin.from('animal_movements').select('*', { count: 'exact', head: true }).eq('type', 'return_to_owner').gte('date', startOfMonth),
       admin.from('animals').select('*, animal_photos(id, url, is_primary)').eq('establishment_id', estabId).eq('status', 'pound').order('pound_entry_date', { ascending: true }),
-      admin.from('animals').select('*, animal_photos(id, url, is_primary)').eq('establishment_id', estabId).order('created_at', { ascending: false }).limit(5),
+      admin.from('animals').select('*, animal_photos(id, url, is_primary)').eq('establishment_id', estabId).eq('status', 'shelter').order('shelter_entry_date', { ascending: false }),
       admin.from('animal_health_records').select('*, animals!inner(name, id)').eq('animals.establishment_id', estabId).not('next_due_date', 'is', null).lte('next_due_date', sevenDaysFromNow).order('next_due_date', { ascending: true }).limit(10),
     ])
 
@@ -118,7 +118,7 @@ export default async function DashboardPage() {
       restitutionsThisMonth: restitutionsThisMonth || 0,
     }
     poundAnimals = (rawPoundAnimals as AnimalWithPhotos[]) || []
-    recentAnimals = (rawRecentAnimals as AnimalWithPhotos[]) || []
+    shelterAnimals = (rawShelterAnimals as AnimalWithPhotos[]) || []
 
     // Map health alerts: the joined `animals` relation provides name + id
     healthAlerts = (rawHealthAlerts || []).map((r: Record<string, unknown>) => {
@@ -199,7 +199,7 @@ export default async function DashboardPage() {
           <ShelterDashboard
             stats={shelterStats}
             poundAnimals={poundAnimals}
-            recentAnimals={recentAnimals}
+            shelterAnimals={shelterAnimals}
             healthAlerts={healthAlerts}
             dailyAssignments={dailyAssignments}
           />
