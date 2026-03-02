@@ -8,6 +8,9 @@ import {
   HeartPulse,
   AlertTriangle,
   Users,
+  Footprints,
+  CheckCircle2,
+  Circle,
 } from 'lucide-react'
 import type { Animal, AnimalPhoto } from '@/lib/types/database'
 import { AnimalStatusBadge } from '@/components/animals/animal-status-badge'
@@ -15,6 +18,18 @@ import { calculateAge, calculateBusinessDays } from '@/lib/sda-utils'
 import { formatDate } from '@/lib/utils'
 
 type AnimalWithPhotos = Animal & { animal_photos: AnimalPhoto[] }
+
+interface DailyAssignment {
+  assignedTo: string
+  assignedToName: string
+  animals: {
+    id: string
+    name: string
+    species: string
+    photo_url: string | null
+    done: boolean
+  }[]
+}
 
 interface ShelterDashboardProps {
   stats: {
@@ -32,6 +47,7 @@ interface ShelterDashboardProps {
     description: string
     next_due_date: string
   }[]
+  dailyAssignments?: DailyAssignment[]
 }
 
 const statConfig = [
@@ -72,6 +88,7 @@ export function ShelterDashboard({
   poundAnimals,
   recentAnimals,
   healthAlerts,
+  dailyAssignments = [],
 }: ShelterDashboardProps) {
   // Calculate business days for pound animals to detect imminent deadlines
   const poundWithDays = poundAnimals.map((a) => ({
@@ -103,6 +120,61 @@ export function ShelterDashboard({
           </div>
         ))}
       </div>
+
+      {/* Daily outing assignments */}
+      {dailyAssignments.length > 0 && (
+        <div className="bg-surface rounded-xl border border-border">
+          <div className="flex items-center justify-between p-5 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Footprints className="w-4 h-4 text-primary" />
+              <h3 className="font-semibold">Sorties du jour</h3>
+            </div>
+            <Link href="/sorties" className="text-sm text-primary hover:text-primary-light transition-colors">
+              Voir tout
+            </Link>
+          </div>
+          <div className="divide-y divide-border">
+            {dailyAssignments.map((person) => {
+              const doneCount = person.animals.filter((a) => a.done).length
+              const totalCount = person.animals.length
+              return (
+                <div key={person.assignedTo} className="px-5 py-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">{person.assignedToName}</span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      doneCount === totalCount
+                        ? 'bg-success/10 text-success'
+                        : 'bg-muted/10 text-muted'
+                    }`}>
+                      {doneCount}/{totalCount}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {person.animals.map((animal) => (
+                      <Link
+                        key={animal.id}
+                        href={`/animals/${animal.id}`}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                          animal.done
+                            ? 'bg-success/10 text-success line-through decoration-success/40'
+                            : 'bg-surface-hover text-text hover:bg-primary/10 hover:text-primary'
+                        }`}
+                      >
+                        {animal.done ? (
+                          <CheckCircle2 className="w-3 h-3" />
+                        ) : (
+                          <Circle className="w-3 h-3" />
+                        )}
+                        {animal.name}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Two-column layout: alerts + recent entries */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -229,6 +301,9 @@ export function ShelterDashboard({
                         {calculateAge(animal.birth_date)}
                       </p>
                     </div>
+                    <span className="text-xs text-muted whitespace-nowrap ml-2">
+                      {formatDate(animal.created_at)}
+                    </span>
                   </Link>
                 )
               })

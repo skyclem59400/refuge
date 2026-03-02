@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
+import { getAssignments } from '@/lib/actions/outings'
 import { WelcomeBanner } from '@/components/dashboard/welcome-banner'
 import { StatsCards } from '@/components/dashboard/stats-cards'
 import { RevenueChart } from '@/components/dashboard/revenue-chart'
@@ -132,6 +133,54 @@ export default async function DashboardPage() {
   }
 
   // ---------------------------------------------------------------
+  // Today's outing assignments (shelter only)
+  // ---------------------------------------------------------------
+  let dailyAssignments: { assignedTo: string; assignedToName: string; animals: { id: string; name: string; species: string; photo_url: string | null; done: boolean }[] }[] = []
+
+  if (showShelter) {
+    const assignResult = await getAssignments()
+    const rawAssignments = assignResult.data || []
+
+    if (rawAssignments.length > 0) {
+      // Resolve user names for assigned_to
+      const assignUserIds = [...new Set(rawAssignments.map((a: { assigned_to: string }) => a.assigned_to))]
+      const assignUserNames: Record<string, string> = {}
+
+      if (assignUserIds.length > 0) {
+        const { data: usersInfo } = await admin.rpc('get_users_info', { user_ids: assignUserIds })
+        if (usersInfo && Array.isArray(usersInfo)) {
+          for (const u of usersInfo) {
+            assignUserNames[u.id] = u.full_name || u.email || u.id
+          }
+        }
+      }
+
+      // Group by assigned_to
+      const grouped = new Map<string, { id: string; name: string; species: string; photo_url: string | null; done: boolean }[]>()
+      for (const a of rawAssignments) {
+        const assignment = a as { assigned_to: string; outing_id: string | null; animals: { id: string; name: string; species: string; photo_url: string | null } }
+        const animal = Array.isArray(assignment.animals) ? assignment.animals[0] : assignment.animals
+        if (!grouped.has(assignment.assigned_to)) {
+          grouped.set(assignment.assigned_to, [])
+        }
+        grouped.get(assignment.assigned_to)!.push({
+          id: animal.id,
+          name: animal.name,
+          species: animal.species,
+          photo_url: animal.photo_url,
+          done: !!assignment.outing_id,
+        })
+      }
+
+      dailyAssignments = Array.from(grouped.entries()).map(([userId, animals]) => ({
+        assignedTo: userId,
+        assignedToName: assignUserNames[userId] || 'Inconnu',
+        animals,
+      }))
+    }
+  }
+
+  // ---------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------
   return (
@@ -152,6 +201,7 @@ export default async function DashboardPage() {
             poundAnimals={poundAnimals}
             recentAnimals={recentAnimals}
             healthAlerts={healthAlerts}
+            dailyAssignments={dailyAssignments}
           />
         </div>
       )}
