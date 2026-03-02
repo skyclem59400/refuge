@@ -179,8 +179,8 @@ export function AnimalDetailTabs({
       </div>
 
       {/* Tab bar */}
-      <div className="border-b border-border mb-6">
-        <nav className="flex gap-0 -mb-px">
+      <div className="border-b border-border mb-6 overflow-x-auto" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+        <nav className="flex gap-0 -mb-px w-max min-w-full">
           {tabs.map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
@@ -191,13 +191,13 @@ export function AnimalDetailTabs({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   isActive
                     ? 'border-primary text-primary font-semibold'
                     : 'border-transparent text-muted hover:text-text'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-4 h-4 shrink-0" />
                 <span>{tab.label}</span>
                 {count !== undefined && (
                   <span className={`text-xs ${isActive ? 'text-primary/70' : 'text-muted/70'}`}>

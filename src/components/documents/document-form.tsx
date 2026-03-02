@@ -223,45 +223,57 @@ export function DocumentForm({ document: doc, initialClient, establishmentId }: 
           {/* Line items */}
           <div className="space-y-2">
             {lineItems.map((item, index) => (
-              <div key={index} className="flex items-center gap-2 p-2 bg-surface-dark rounded-lg border border-border">
-                <input
-                  type="text"
-                  value={item.description}
-                  onChange={(e) => updateLineItem(index, 'description', e.target.value)}
-                  placeholder="Description"
-                  className="flex-1 min-w-0 px-3 py-2 bg-transparent border-none text-sm
-                    focus:outline-none placeholder:text-muted/50"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  value={item.quantity || ''}
-                  onChange={(e) => updateLineItem(index, 'quantity', e.target.value)}
-                  placeholder="Qte"
-                  className="w-16 px-2 py-2 bg-surface border border-border rounded text-sm text-center
-                    focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={item.unit_price || ''}
-                  onChange={(e) => updateLineItem(index, 'unit_price', e.target.value)}
-                  placeholder="Prix"
-                  className="w-20 px-2 py-2 bg-surface border border-border rounded text-sm text-right
-                    focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-                />
-                <span className="w-20 text-sm font-semibold text-right tabular-nums shrink-0">
-                  {formatCurrency(item.total)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeLineItem(index)}
-                  className="p-1.5 text-muted hover:text-danger transition-colors shrink-0"
-                  title="Supprimer"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
+              <div key={index} className="p-2 bg-surface-dark rounded-lg border border-border space-y-2 sm:space-y-0">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={item.description}
+                    onChange={(e) => updateLineItem(index, 'description', e.target.value)}
+                    placeholder="Description"
+                    className="flex-1 min-w-0 px-3 py-2 bg-transparent border-none text-sm
+                      focus:outline-none placeholder:text-muted/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeLineItem(index)}
+                    className="p-1.5 text-muted hover:text-danger transition-colors shrink-0 sm:hidden"
+                    title="Supprimer"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    value={item.quantity || ''}
+                    onChange={(e) => updateLineItem(index, 'quantity', e.target.value)}
+                    placeholder="Qte"
+                    className="w-16 px-2 py-2 bg-surface border border-border rounded text-sm text-center
+                      focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={item.unit_price || ''}
+                    onChange={(e) => updateLineItem(index, 'unit_price', e.target.value)}
+                    placeholder="Prix"
+                    className="w-20 px-2 py-2 bg-surface border border-border rounded text-sm text-right
+                      focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                  />
+                  <span className="flex-1 text-sm font-semibold text-right tabular-nums">
+                    {formatCurrency(item.total)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeLineItem(index)}
+                    className="p-1.5 text-muted hover:text-danger transition-colors shrink-0 hidden sm:block"
+                    title="Supprimer"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
               </div>
             ))}
             {lineItems.length === 0 && (
