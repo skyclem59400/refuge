@@ -503,13 +503,32 @@ export async function getEstablishmentMembers() {
 export async function getUnassignedUsers() {
   try {
     await requirePermission('manage_establishment')
-    const supabase = await createClient()
+    const admin = createAdminClient()
 
-    const { data, error } = await supabase.rpc('get_unassigned_users')
+    // Get all platform users
+    const { data: { users }, error: usersError } = await admin.auth.admin.listUsers()
+    if (usersError) return { error: usersError.message }
 
-    if (error) return { error: error.message }
+    // Get ALL establishment members (across all establishments)
+    const { data: allMembers } = await admin
+      .from('establishment_members')
+      .select('user_id')
 
-    return { data: (data as UnassignedUser[]) || [] }
+    const memberUserIds = new Set((allMembers || []).map((m: { user_id: string }) => m.user_id))
+
+    // Only return users who have NO establishment membership at all
+    // and who are NOT pseudo users (have a real email, not @refuge.internal)
+    const unassigned = users
+      .filter(u => !memberUserIds.has(u.id) && u.email && !u.email.endsWith('@refuge.internal'))
+      .map(u => ({
+        id: u.id,
+        email: u.email || '',
+        full_name: (u.user_metadata?.full_name || u.user_metadata?.name || null) as string | null,
+        avatar_url: (u.user_metadata?.avatar_url || null) as string | null,
+        created_at: u.created_at,
+      }))
+
+    return { data: unassigned }
   } catch (e) {
     return { error: (e as Error).message }
   }
