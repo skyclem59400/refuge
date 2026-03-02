@@ -104,9 +104,6 @@ export function EstablishmentSwitcher({ establishments, currentEstablishment, co
         <EstablishmentLogo establishment={currentEstablishment} />
         <div className="min-w-0 flex-1 text-left">
           <h1 className="font-bold text-sm text-primary-light truncate">{currentEstablishment.name}</h1>
-          <p className="text-[10px] text-muted truncate">
-            {currentEstablishment.description || 'Gestion & Facturation'}
-          </p>
         </div>
         <ChevronDownIcon className={`w-4 h-4 text-muted shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>

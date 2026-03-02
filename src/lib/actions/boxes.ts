@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
 import type { BoxSpecies, BoxStatus } from '@/lib/types/database'
+import { logActivity } from '@/lib/actions/activity-log'
 
 // ============================================
 // Read actions (use createAdminClient)
@@ -96,6 +97,7 @@ export async function createBox(data: {
     }
 
     revalidatePath('/boxes')
+    logActivity({ action: 'create', entityType: 'box', entityId: box.id, entityName: data.name, details: { espece: data.species_type, capacite: data.capacity } })
     return { data: box }
   } catch (e) {
     return { error: (e as Error).message }
@@ -123,6 +125,7 @@ export async function updateBox(id: string, data: {
     }
 
     revalidatePath('/boxes')
+    logActivity({ action: 'update', entityType: 'box', entityId: id, entityName: data.name, details: data })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -151,6 +154,8 @@ export async function deleteBox(id: string) {
       return { error: 'Impossible de supprimer ce box car des animaux y sont encore assignes' }
     }
 
+    const { data: boxInfo } = await admin.from('boxes').select('name').eq('id', id).single()
+
     const { error } = await supabase
       .from('boxes')
       .delete()
@@ -161,6 +166,7 @@ export async function deleteBox(id: string) {
       return { error: error.message }
     }
 
+    logActivity({ action: 'delete', entityType: 'box', entityId: id, entityName: boxInfo?.name })
     revalidatePath('/boxes')
     return { success: true }
   } catch (e) {

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
 import type { AnimalSpecies, AnimalSex, AnimalOrigin, MovementType, IcadStatus } from '@/lib/types/database'
+import { logActivity } from '@/lib/actions/activity-log'
 
 // ============================================
 // Read actions
@@ -204,6 +205,13 @@ export async function createIntervention(formData: FormData) {
     revalidatePath('/animals')
     revalidatePath('/dashboard')
 
+    logActivity({
+      action: 'create',
+      entityType: 'animal',
+      entityId: animal.id,
+      entityName: animal.name,
+      details: { intervention: true, appelant: callerName, commune: locationCity, espece: species, origine: originType },
+    })
     return { data: intervention }
   } catch (e) {
     return { error: (e as Error).message }
@@ -215,6 +223,13 @@ export async function deleteIntervention(id: string) {
     const { establishmentId } = await requirePermission('manage_movements')
     const supabase = await createClient()
 
+    const { data: interventionInfo } = await supabase
+      .from('pound_interventions')
+      .select('caller_name, location_city, animal_id, animals(name)')
+      .eq('id', id)
+      .eq('establishment_id', establishmentId)
+      .single()
+
     const { error } = await supabase
       .from('pound_interventions')
       .delete()
@@ -225,6 +240,13 @@ export async function deleteIntervention(id: string) {
       return { error: error.message }
     }
 
+    logActivity({
+      action: 'delete',
+      entityType: 'animal',
+      entityId: interventionInfo?.animal_id,
+      entityName: (interventionInfo?.animals as any)?.name,
+      details: { intervention: true, appelant: interventionInfo?.caller_name, commune: interventionInfo?.location_city },
+    })
     revalidatePath('/pound')
     revalidatePath('/pound/interventions')
     return { success: true }

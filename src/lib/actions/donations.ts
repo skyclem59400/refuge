@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
 import type { Donation, DonationPaymentMethod, DonationNature } from '@/lib/types/database'
+import { logActivity } from '@/lib/actions/activity-log'
 
 export async function getDonations(filters?: { year?: number }) {
   try {
@@ -93,6 +94,13 @@ export async function createDonation(data: {
 
     revalidatePath('/donations')
     revalidatePath('/dashboard')
+    logActivity({
+      action: 'create',
+      entityType: 'donation',
+      entityId: donation.id,
+      entityName: `Don ${cerfaNumber || ''} - ${data.donor_name}`,
+      details: { montant: data.amount, donateur: data.donor_name, methode: data.payment_method, nature: data.nature },
+    })
     return { data: donation as Donation }
   } catch (e) {
     return { error: (e as Error).message }
@@ -128,6 +136,13 @@ export async function updateDonation(id: string, data: {
 
     revalidatePath('/donations')
     revalidatePath('/dashboard')
+    logActivity({
+      action: 'update',
+      entityType: 'donation',
+      entityId: id,
+      entityName: data.donor_name,
+      details: { montant: data.amount, donateur: data.donor_name },
+    })
     return { data: donation as Donation }
   } catch (e) {
     return { error: (e as Error).message }
@@ -139,6 +154,8 @@ export async function deleteDonation(id: string) {
     const { establishmentId } = await requirePermission('manage_donations')
     const supabase = await createClient()
 
+    const { data: donInfo } = await supabase.from('donations').select('donor_name, amount, cerfa_number').eq('id', id).eq('establishment_id', establishmentId).single()
+
     const { error } = await supabase
       .from('donations')
       .delete()
@@ -147,6 +164,13 @@ export async function deleteDonation(id: string) {
 
     if (error) return { error: error.message }
 
+    logActivity({
+      action: 'delete',
+      entityType: 'donation',
+      entityId: id,
+      entityName: donInfo ? `Don ${donInfo.cerfa_number || ''} - ${donInfo.donor_name}` : undefined,
+      details: donInfo ? { montant: donInfo.amount, donateur: donInfo.donor_name } : undefined,
+    })
     revalidatePath('/donations')
     revalidatePath('/dashboard')
     return { success: true }

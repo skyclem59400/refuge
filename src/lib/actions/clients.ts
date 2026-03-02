@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/establishment/permissions'
 import type { ContactCategory } from '@/lib/types/database'
+import { logActivity } from '@/lib/actions/activity-log'
 
 export async function createClientAction(data: {
   name: string
@@ -30,6 +31,7 @@ export async function createClientAction(data: {
 
     revalidatePath('/clients')
     revalidatePath('/dashboard')
+    logActivity({ action: 'create', entityType: 'client', entityId: client.id, entityName: data.name })
     return { data: client }
   } catch (e) {
     return { error: (e as Error).message }
@@ -61,6 +63,7 @@ export async function updateClientAction(id: string, data: {
 
     revalidatePath('/clients')
     revalidatePath(`/clients/${id}`)
+    logActivity({ action: 'update', entityType: 'client', entityId: id, entityName: data.name })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -71,6 +74,9 @@ export async function deleteClientAction(id: string) {
   try {
     const { establishmentId } = await requirePermission('manage_clients')
     const supabase = await createClient()
+
+    const { data: clientInfo } = await supabase.from('clients').select('name').eq('id', id).eq('establishment_id', establishmentId).single()
+
     const { error } = await supabase
       .from('clients')
       .delete()
@@ -84,6 +90,7 @@ export async function deleteClientAction(id: string) {
       return { error: error.message }
     }
 
+    logActivity({ action: 'delete', entityType: 'client', entityId: id, entityName: clientInfo?.name })
     revalidatePath('/clients')
     revalidatePath('/dashboard')
     return { success: true }

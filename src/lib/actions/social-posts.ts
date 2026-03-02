@@ -9,6 +9,7 @@ import type {
   SocialPostStatus,
   MetaConnection,
 } from '@/lib/types/database'
+import { logActivity } from '@/lib/actions/activity-log'
 
 // ============================================
 // Read actions (use createAdminClient)
@@ -79,6 +80,7 @@ export async function createPost(data: {
 
     revalidatePath(`/animals/${data.animal_id}`)
     revalidatePath('/publications')
+    logActivity({ action: 'create', entityType: 'post', entityId: post.id, details: { type: data.type, plateforme: data.platform } })
     return { data: post }
   } catch (e) {
     return { error: (e as Error).message }
@@ -107,6 +109,7 @@ export async function updatePost(id: string, data: {
     }
 
     revalidatePath(`/animals/${post.animals.id}`)
+    logActivity({ action: 'update', entityType: 'post', entityId: id })
     return { data: post }
   } catch (e) {
     return { error: (e as Error).message }
@@ -139,6 +142,7 @@ export async function deletePost(id: string) {
     }
 
     revalidatePath(`/animals/${post.animal_id}`)
+    logActivity({ action: 'delete', entityType: 'post', entityId: id })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -165,6 +169,7 @@ export async function publishPost(id: string) {
     }
 
     revalidatePath(`/animals/${post.animals.id}`)
+    logActivity({ action: 'update', entityType: 'post', entityId: id, details: { statut: 'published' } })
     return { data: post }
   } catch (e) {
     return { error: (e as Error).message }
@@ -286,6 +291,7 @@ export async function createPostEnhanced(data: {
 
     revalidatePath('/publications')
     if (data.animal_id) revalidatePath(`/animals/${data.animal_id}`)
+    logActivity({ action: 'create', entityType: 'post', entityId: post.id, details: { type: data.type, plateforme: data.platform } })
     return { data: post }
   } catch (e) {
     return { error: (e as Error).message }
@@ -437,6 +443,7 @@ export async function publishPostNow(id: string) {
       if (updateError) return { error: updateError.message }
 
       revalidatePath('/publications')
+      logActivity({ action: 'update', entityType: 'post', entityId: id, details: { statut: 'published', plateforme: post.platform } })
       return { success: true }
     } catch (publishError) {
       const errorMsg = publishError instanceof Error ? publishError.message : String(publishError)

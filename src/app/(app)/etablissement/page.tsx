@@ -2,12 +2,14 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { getEstablishmentMembers, getUnassignedUsers, getInvitableUsers, getPermissionGroups } from '@/lib/actions/establishments'
+import { getActivityLogs } from '@/lib/actions/activity-log'
 import { EstablishmentForm } from '@/components/establishment/establishment-form'
 import { PermissionGroups } from '@/components/establishment/permission-groups'
 import { MembersList } from '@/components/establishment/members-list'
 import { PendingUsersList } from '@/components/establishment/pending-users-list'
 import { InviteMemberSearch } from '@/components/establishment/invite-member-search'
 import { AddCollaborator } from '@/components/establishment/add-collaborator'
+import { ActivityLogList } from '@/components/establishment/activity-log-list'
 
 export default async function EtablissementPage() {
   const ctx = await getEstablishmentContext()
@@ -19,17 +21,30 @@ export default async function EtablissementPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const isAdmin = ctx.permissions.isAdmin
+
   const [
     { data: members },
     { data: pendingUsers },
     { data: invitableUsers },
     { data: permissionGroups },
+    activityResult,
   ] = await Promise.all([
     getEstablishmentMembers(),
     getUnassignedUsers(),
     getInvitableUsers(),
     getPermissionGroups(),
+    isAdmin ? getActivityLogs({ limit: 500 }) : Promise.resolve({ data: [] }),
   ])
+
+  // Build user names map from all members (for activity log filter)
+  const activityLogs = activityResult.data || []
+  const allUserNames: Record<string, string> = {}
+  if (members) {
+    for (const m of members) {
+      allUserNames[m.user_id] = m.full_name || m.pseudo || m.email || m.user_id
+    }
+  }
 
   return (
     <div className="animate-fade-up space-y-8">
@@ -82,6 +97,11 @@ export default async function EtablissementPage() {
           <AddCollaborator groups={permissionGroups || []} />
         </div>
       </div>
+
+      {/* Activity log — admin only */}
+      {isAdmin && (
+        <ActivityLogList logs={activityLogs} userNames={allUserNames} />
+      )}
     </div>
   )
 }

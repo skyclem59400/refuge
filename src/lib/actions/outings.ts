@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
+import { logActivity } from '@/lib/actions/activity-log'
 
 // ---------------------------------------------------------------------------
 // getOutings — list outings for the establishment
@@ -375,6 +376,20 @@ export async function createOuting(data: {
     revalidatePath('/sorties')
     revalidatePath(`/animals/${data.animal_id}`)
     revalidatePath('/dashboard')
+
+    // Fetch animal name for the log
+    const admin = createAdminClient()
+    const { data: animalInfo } = await admin.from('animals').select('name').eq('id', data.animal_id).single()
+    logActivity({
+      action: 'create',
+      entityType: 'outing',
+      entityId: outing.id,
+      entityName: animalInfo?.name || undefined,
+      parentType: 'animal',
+      parentId: data.animal_id,
+      details: { duree: `${data.duration_minutes} min`, note: data.rating ?? undefined, tig: data.is_tig ?? false },
+    })
+
     return { data: outing }
   } catch (e) {
     return { error: (e as Error).message }
@@ -400,7 +415,7 @@ export async function deleteOuting(id: string) {
 
     const { data: outing, error: fetchError } = await supabase
       .from('animal_outings')
-      .select('id')
+      .select('id, animal_id, duration_minutes, animals(name)')
       .eq('id', id)
       .single()
 
@@ -412,6 +427,15 @@ export async function deleteOuting(id: string) {
       .eq('id', id)
 
     if (error) return { error: error.message }
+
+    logActivity({
+      action: 'delete',
+      entityType: 'outing',
+      entityId: id,
+      entityName: (outing.animals as any)?.name || undefined,
+      parentType: 'animal',
+      parentId: outing.animal_id,
+    })
 
     revalidatePath('/sorties')
     return { success: true }
@@ -491,6 +515,17 @@ export async function createAssignment(data: {
     }
 
     revalidatePath('/sorties')
+
+    const { data: animalInfo } = await supabase.from('animals').select('name').eq('id', data.animal_id).single()
+    logActivity({
+      action: 'assign',
+      entityType: 'outing_assignment',
+      entityId: assignment.id,
+      entityName: animalInfo?.name || undefined,
+      parentType: 'animal',
+      parentId: data.animal_id,
+    })
+
     return { data: assignment }
   } catch (e) {
     return { error: (e as Error).message }
@@ -506,12 +541,27 @@ export async function deleteAssignment(id: string) {
     await requirePermission('manage_outing_assignments')
     const supabase = createAdminClient()
 
+    const { data: assignment } = await supabase
+      .from('outing_assignments')
+      .select('animal_id, animals(name)')
+      .eq('id', id)
+      .single()
+
     const { error } = await supabase
       .from('outing_assignments')
       .delete()
       .eq('id', id)
 
     if (error) return { error: error.message }
+
+    logActivity({
+      action: 'delete',
+      entityType: 'outing_assignment',
+      entityId: id,
+      entityName: (assignment?.animals as any)?.name || undefined,
+      parentType: 'animal',
+      parentId: assignment?.animal_id,
+    })
 
     revalidatePath('/sorties')
     return { success: true }

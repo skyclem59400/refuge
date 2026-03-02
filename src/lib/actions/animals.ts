@@ -298,6 +298,33 @@ export async function toggleAdoptable(animalId: string, adoptable: boolean) {
   }
 }
 
+export async function toggleReserved(animalId: string, reserved: boolean) {
+  try {
+    const { establishmentId } = await requirePermission('manage_adoptions')
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('animals')
+      .update({ reserved })
+      .eq('id', animalId)
+      .eq('establishment_id', establishmentId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/animals')
+    revalidatePath(`/animals/${animalId}`)
+    logActivity({
+      action: 'update',
+      entityType: 'animal',
+      entityId: animalId,
+      details: { field: 'reserved', value: reserved },
+    })
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
 export async function deleteAnimal(id: string) {
   try {
     const { establishmentId } = await requirePermission('manage_animals')

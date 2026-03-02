@@ -229,6 +229,7 @@ export interface Animal {
   shelter_entry_date: string | null
   exit_date: string | null
   adoptable: boolean
+  reserved: boolean
   // Hunimalis sync fields
   hunimalis_id: number | null
   photo_url: string | null

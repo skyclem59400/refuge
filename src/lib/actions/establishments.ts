@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requirePermission, requireEstablishment } from '@/lib/establishment/permissions'
+import { logActivity } from '@/lib/actions/activity-log'
 import type { EstablishmentMember, UnassignedUser, PermissionGroup, Permission, RoleType } from '@/lib/types/database'
 
 function stripAccents(str: string): string {
@@ -44,6 +45,7 @@ export async function updateEstablishment(data: {
 
     revalidatePath('/etablissement')
     revalidatePath('/dashboard')
+    logActivity({ action: 'update', entityType: 'establishment', details: { nom: data.name } })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -205,6 +207,7 @@ export async function createPermissionGroup(data: {
     if (error) return { error: error.message }
 
     revalidatePath('/etablissement')
+    logActivity({ action: 'create', entityType: 'permission_group', entityId: group.id, entityName: data.name })
     return { data: group as PermissionGroup }
   } catch (e) {
     return { error: (e as Error).message }
@@ -238,6 +241,7 @@ export async function updatePermissionGroup(groupId: string, data: Partial<{
     if (error) return { error: error.message }
 
     revalidatePath('/etablissement')
+    logActivity({ action: 'update', entityType: 'permission_group', entityId: groupId, entityName: data.name })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -252,7 +256,7 @@ export async function deletePermissionGroup(groupId: string) {
     // Block deleting system groups
     const { data: existing } = await admin
       .from('permission_groups')
-      .select('is_system')
+      .select('is_system, name')
       .eq('id', groupId)
       .single()
 
@@ -267,6 +271,7 @@ export async function deletePermissionGroup(groupId: string) {
 
     if (error) return { error: error.message }
 
+    logActivity({ action: 'delete', entityType: 'permission_group', entityId: groupId, entityName: existing?.name })
     revalidatePath('/etablissement')
     return { success: true }
   } catch (e) {
@@ -293,6 +298,7 @@ export async function assignMemberToGroup(memberId: string, groupId: string) {
     }
 
     revalidatePath('/etablissement')
+    logActivity({ action: 'assign', entityType: 'member', entityId: memberId, details: { groupe_id: groupId } })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -313,6 +319,7 @@ export async function removeMemberFromGroup(memberId: string, groupId: string) {
     if (error) return { error: error.message }
 
     revalidatePath('/etablissement')
+    logActivity({ action: 'update', entityType: 'member', entityId: memberId, details: { retire_du_groupe: groupId } })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -371,6 +378,7 @@ export async function addMember(email: string, groupIds: string[]) {
     }
 
     revalidatePath('/etablissement')
+    logActivity({ action: 'create', entityType: 'member', entityId: member.id, entityName: email })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -421,6 +429,12 @@ export async function removeMember(memberId: string) {
     }
 
     revalidatePath('/etablissement')
+    logActivity({
+      action: 'delete',
+      entityType: 'member',
+      entityId: memberId,
+      entityName: (member as any).full_name || (member as any).pseudo || (member as any).email || undefined,
+    })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -606,6 +620,7 @@ export async function addMemberById(userId: string, groupIds: string[]) {
     }
 
     revalidatePath('/etablissement')
+    logActivity({ action: 'create', entityType: 'member', entityId: member.id })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -651,6 +666,7 @@ export async function addPendingUser(userId: string, groupIds: string[]) {
     }
 
     revalidatePath('/etablissement')
+    logActivity({ action: 'create', entityType: 'member', entityId: member.id })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -738,6 +754,7 @@ export async function createPseudoMember(data: {
     }
 
     revalidatePath('/etablissement')
+    logActivity({ action: 'create', entityType: 'member', entityId: member.id, entityName: data.pseudo })
     return { success: true, pseudo: pseudoLower }
   } catch (e) {
     return { error: (e as Error).message }
@@ -764,6 +781,7 @@ export async function resetPseudoPassword(memberId: string) {
       .eq('id', memberId)
 
     revalidatePath('/etablissement')
+    logActivity({ action: 'update', entityType: 'member', entityId: memberId, details: { action: 'reset_password' } })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }

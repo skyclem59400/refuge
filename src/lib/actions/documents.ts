@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
 import type { Document, DocumentType, DocumentStatus, LineItem } from '@/lib/types/database'
+import { logActivity } from '@/lib/actions/activity-log'
 
 export async function getDocument(id: string) {
   try {
@@ -82,6 +83,13 @@ export async function createDocument(data: {
 
     revalidatePath('/documents')
     revalidatePath('/dashboard')
+    logActivity({
+      action: 'create',
+      entityType: 'document',
+      entityId: doc.id,
+      entityName: `${data.type === 'facture' ? 'Facture' : data.type === 'devis' ? 'Devis' : 'Avoir'} ${numero}`,
+      details: { type: data.type, numero, client: data.client_name, total: data.total },
+    })
     return { data: doc }
   } catch (e) {
     return { error: (e as Error).message }
@@ -146,6 +154,13 @@ export async function updateDocument(id: string, data: {
 
     revalidatePath('/documents')
     revalidatePath('/dashboard')
+    logActivity({
+      action: 'update',
+      entityType: 'document',
+      entityId: id,
+      entityName: doc.numero ? `${existing.type === 'facture' ? 'Facture' : existing.type === 'devis' ? 'Devis' : 'Avoir'} ${doc.numero}` : undefined,
+      details: { client: data.client_name, total: data.total },
+    })
     return { data: doc }
   } catch (e) {
     return { error: (e as Error).message }
@@ -167,6 +182,13 @@ export async function deleteDocument(id: string) {
       .update({ converted_from_id: null })
       .eq('converted_from_id', id)
 
+    const { data: docInfo } = await supabase
+      .from('documents')
+      .select('type, numero, client_name, total')
+      .eq('id', id)
+      .eq('establishment_id', establishmentId)
+      .single()
+
     const { error } = await supabase
       .from('documents')
       .delete()
@@ -177,6 +199,13 @@ export async function deleteDocument(id: string) {
       return { error: error.message }
     }
 
+    logActivity({
+      action: 'delete',
+      entityType: 'document',
+      entityId: id,
+      entityName: docInfo ? `${docInfo.type === 'facture' ? 'Facture' : docInfo.type === 'devis' ? 'Devis' : 'Avoir'} ${docInfo.numero}` : undefined,
+      details: docInfo ? { type: docInfo.type, client: docInfo.client_name, total: docInfo.total } : undefined,
+    })
     revalidatePath('/documents')
     revalidatePath('/dashboard')
     return { success: true }
@@ -255,6 +284,13 @@ export async function convertDevisToFacture(devisId: string) {
 
     revalidatePath('/documents')
     revalidatePath('/dashboard')
+    logActivity({
+      action: 'create',
+      entityType: 'document',
+      entityId: facture.id,
+      entityName: `Facture ${numero}`,
+      details: { type: 'facture', numero, converti_depuis: `Devis ${devis.numero}`, client: devis.client_name, total: devis.total },
+    })
     return { data: facture }
   } catch (e) {
     return { error: (e as Error).message }
@@ -329,6 +365,13 @@ export async function cancelFactureWithAvoir(factureId: string) {
 
     revalidatePath('/documents')
     revalidatePath('/dashboard')
+    logActivity({
+      action: 'create',
+      entityType: 'document',
+      entityId: avoir.id,
+      entityName: `Avoir ${numero}`,
+      details: { type: 'avoir', numero, annule_facture: `Facture ${facture.numero}`, client: facture.client_name, total: facture.total },
+    })
     return { data: avoir }
   } catch (e) {
     return { error: (e as Error).message }
@@ -342,7 +385,7 @@ export async function updateDocumentStatus(id: string, status: DocumentStatus) {
 
     const { data: doc, error: fetchError } = await supabase
       .from('documents')
-      .select('type, status, cancelled_by_id')
+      .select('type, status, cancelled_by_id, numero')
       .eq('id', id)
       .eq('establishment_id', establishmentId)
       .single()
@@ -368,6 +411,13 @@ export async function updateDocumentStatus(id: string, status: DocumentStatus) {
 
     revalidatePath('/documents')
     revalidatePath('/dashboard')
+    logActivity({
+      action: 'update',
+      entityType: 'document',
+      entityId: id,
+      entityName: doc.numero ? `${doc.type === 'facture' ? 'Facture' : doc.type === 'devis' ? 'Devis' : 'Avoir'} ${doc.numero}` : undefined,
+      details: { statut: status },
+    })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }

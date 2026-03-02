@@ -5,10 +5,10 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Heart } from 'lucide-react'
+import { Heart, Bookmark } from 'lucide-react'
 import { AnimalStatusBadge, SpeciesBadge } from './animal-status-badge'
 import { getSexIcon, calculateAge, getStatusLabel } from '@/lib/sda-utils'
-import { toggleAdoptable } from '@/lib/actions/animals'
+import { toggleAdoptable, toggleReserved } from '@/lib/actions/animals'
 import type { Animal, AnimalPhoto, AnimalStatus } from '@/lib/types/database'
 
 type AnimalWithPhotos = Animal & { animal_photos: AnimalPhoto[] }
@@ -28,10 +28,13 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
   const [speciesFilter, setSpeciesFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [adoptableFilter, setAdoptableFilter] = useState<string>('all')
+  const [reservedFilter, setReservedFilter] = useState<string>('all')
   const [isPending, startTransition] = useTransition()
   const [pendingAnimalId, setPendingAnimalId] = useState<string | null>(null)
-  // Optimistic state for adoptable toggles
+  const [pendingField, setPendingField] = useState<'adoptable' | 'reserved' | null>(null)
+  // Optimistic state
   const [optimisticAdoptable, setOptimisticAdoptable] = useState<Record<string, boolean>>({})
+  const [optimisticReserved, setOptimisticReserved] = useState<Record<string, boolean>>({})
 
   const filtered = useMemo(() => {
     let result = animals
@@ -63,16 +66,21 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
       result = result.filter((a) => a.id in optimisticAdoptable ? !optimisticAdoptable[a.id] : !a.adoptable)
     }
 
+    // Reserved filter
+    if (reservedFilter === 'yes') {
+      result = result.filter((a) => a.id in optimisticReserved ? optimisticReserved[a.id] : a.reserved)
+    } else if (reservedFilter === 'no') {
+      result = result.filter((a) => a.id in optimisticReserved ? !optimisticReserved[a.id] : !a.reserved)
+    }
+
     return result
-  }, [animals, search, speciesFilter, statusFilter, adoptableFilter, optimisticAdoptable])
+  }, [animals, search, speciesFilter, statusFilter, adoptableFilter, reservedFilter, optimisticAdoptable, optimisticReserved])
 
   function getPrimaryPhoto(animal: AnimalWithPhotos): string | null {
-    // Check local photos first
     if (animal.animal_photos && animal.animal_photos.length > 0) {
       const primary = animal.animal_photos.find((p) => p.is_primary)
       return primary ? primary.url : animal.animal_photos[0].url
     }
-    // Fallback to Hunimalis photo_url
     if (animal.photo_url) return animal.photo_url
     return null
   }
@@ -86,6 +94,7 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
     e.stopPropagation()
     const newValue = !currentValue
     setPendingAnimalId(animalId)
+    setPendingField('adoptable')
     setOptimisticAdoptable(prev => ({ ...prev, [animalId]: newValue }))
     startTransition(async () => {
       const result = await toggleAdoptable(animalId, newValue)
@@ -94,6 +103,26 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
         setOptimisticAdoptable(prev => ({ ...prev, [animalId]: currentValue }))
       }
       setPendingAnimalId(null)
+      setPendingField(null)
+      router.refresh()
+    })
+  }
+
+  function handleToggleReserved(e: React.MouseEvent, animalId: string, currentValue: boolean) {
+    e.preventDefault()
+    e.stopPropagation()
+    const newValue = !currentValue
+    setPendingAnimalId(animalId)
+    setPendingField('reserved')
+    setOptimisticReserved(prev => ({ ...prev, [animalId]: newValue }))
+    startTransition(async () => {
+      const result = await toggleReserved(animalId, newValue)
+      if (result.error) {
+        toast.error(result.error)
+        setOptimisticReserved(prev => ({ ...prev, [animalId]: currentValue }))
+      }
+      setPendingAnimalId(null)
+      setPendingField(null)
       router.refresh()
     })
   }
@@ -103,12 +132,19 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
     return animal.adoptable
   }
 
+  function isReserved(animal: AnimalWithPhotos): boolean {
+    if (animal.id in optimisticReserved) return optimisticReserved[animal.id]
+    return animal.reserved
+  }
+
+  const hasActiveFilters = statusFilter !== 'all' || speciesFilter !== 'all' || adoptableFilter !== 'all' || reservedFilter !== 'all' || search.length >= 2
+
   return (
     <div>
       {/* Count */}
       <p className="text-sm text-muted mb-4">
-        {filtered.length} animal{filtered.length !== 1 ? 'x' : ''} {statusFilter !== 'all' || speciesFilter !== 'all' || adoptableFilter !== 'all' || search.length >= 2 ? 'trouvé' : 'enregistré'}{filtered.length !== 1 ? 's' : ''}
-        {(statusFilter !== 'all' || speciesFilter !== 'all' || adoptableFilter !== 'all' || search.length >= 2) && ` sur ${animals.length}`}
+        {filtered.length} animal{filtered.length !== 1 ? 'x' : ''} {hasActiveFilters ? 'trouvé' : 'enregistré'}{filtered.length !== 1 ? 's' : ''}
+        {hasActiveFilters && ` sur ${animals.length}`}
       </p>
 
       {/* Filters */}
@@ -153,6 +189,16 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
           <option value="yes">A l&apos;adoption</option>
           <option value="no">Non adoptable</option>
         </select>
+        <select
+          value={reservedFilter}
+          onChange={(e) => setReservedFilter(e.target.value)}
+          className="px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
+            focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+        >
+          <option value="all">Reservation : tous</option>
+          <option value="yes">Reserve</option>
+          <option value="no">Non reserve</option>
+        </select>
       </div>
 
       {/* Grid */}
@@ -166,6 +212,7 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
           {filtered.map((animal) => {
             const photoUrl = getPrimaryPhoto(animal)
             const adoptable = isAdoptable(animal)
+            const reserved = isReserved(animal)
             return (
               <Link
                 key={animal.id}
@@ -191,15 +238,21 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
                   <div className="absolute top-2 right-2">
                     <AnimalStatusBadge status={animal.status} overlay />
                   </div>
-                  {/* Adoptable badge overlay */}
-                  {adoptable && (
-                    <div className="absolute top-2 left-2">
+                  {/* Badges overlay top-left */}
+                  <div className="absolute top-2 left-2 flex flex-col gap-1">
+                    {adoptable && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-success/90 text-white backdrop-blur-sm">
                         <Heart className="w-3 h-3 fill-current" />
                         A l&apos;adoption
                       </span>
-                    </div>
-                  )}
+                    )}
+                    {reserved && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/90 text-white backdrop-blur-sm">
+                        <Bookmark className="w-3 h-3 fill-current" />
+                        Reserve
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Info */}
@@ -216,25 +269,38 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted">
                     <span>{calculateAge(animal.birth_date)}</span>
-                    {canManageAdoptions ? (
-                      <button
-                        type="button"
-                        onClick={(e) => handleToggleAdoptable(e, animal.id, adoptable)}
-                        disabled={isPending && pendingAnimalId === animal.id}
-                        className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors
-                          ${adoptable
-                            ? 'bg-success/15 text-success hover:bg-success/25'
-                            : 'bg-border/50 text-muted hover:bg-border hover:text-text'
-                          }
-                          disabled:opacity-50`}
-                      >
-                        <Heart className={`w-3 h-3 ${adoptable ? 'fill-current' : ''}`} />
-                        {adoptable ? 'Adoptable' : 'Non adoptable'}
-                      </button>
-                    ) : (
-                      animal.chip_number && (
-                        <span className="font-mono truncate ml-2">{animal.chip_number}</span>
-                      )
+                    {canManageAdoptions && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleReserved(e, animal.id, reserved)}
+                          disabled={isPending && pendingAnimalId === animal.id && pendingField === 'reserved'}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors
+                            ${reserved
+                              ? 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25'
+                              : 'bg-border/50 text-muted hover:bg-border hover:text-text'
+                            }
+                            disabled:opacity-50`}
+                        >
+                          <Bookmark className={`w-3 h-3 ${reserved ? 'fill-current' : ''}`} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleAdoptable(e, animal.id, adoptable)}
+                          disabled={isPending && pendingAnimalId === animal.id && pendingField === 'adoptable'}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors
+                            ${adoptable
+                              ? 'bg-success/15 text-success hover:bg-success/25'
+                              : 'bg-border/50 text-muted hover:bg-border hover:text-text'
+                            }
+                            disabled:opacity-50`}
+                        >
+                          <Heart className={`w-3 h-3 ${adoptable ? 'fill-current' : ''}`} />
+                        </button>
+                      </div>
+                    )}
+                    {!canManageAdoptions && animal.chip_number && (
+                      <span className="font-mono truncate ml-2">{animal.chip_number}</span>
                     )}
                   </div>
                 </div>
