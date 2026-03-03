@@ -325,6 +325,33 @@ export async function toggleReserved(animalId: string, reserved: boolean) {
   }
 }
 
+export async function toggleRetirementBasket(animalId: string, retirementBasket: boolean) {
+  try {
+    const { establishmentId } = await requirePermission('manage_adoptions')
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('animals')
+      .update({ retirement_basket: retirementBasket })
+      .eq('id', animalId)
+      .eq('establishment_id', establishmentId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/animals')
+    revalidatePath(`/animals/${animalId}`)
+    logActivity({
+      action: 'update',
+      entityType: 'animal',
+      entityId: animalId,
+      details: { field: 'retirement_basket', value: retirementBasket },
+    })
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
 export async function deleteAnimal(id: string) {
   try {
     const { establishmentId } = await requirePermission('manage_animals')

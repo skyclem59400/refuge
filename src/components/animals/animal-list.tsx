@@ -5,10 +5,10 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Heart, Bookmark } from 'lucide-react'
+import { Heart, Bookmark, Home } from 'lucide-react'
 import { AnimalStatusBadge, SpeciesBadge } from './animal-status-badge'
 import { getSexIcon, calculateAge, getStatusLabel } from '@/lib/sda-utils'
-import { toggleAdoptable, toggleReserved } from '@/lib/actions/animals'
+import { toggleAdoptable, toggleReserved, toggleRetirementBasket } from '@/lib/actions/animals'
 import type { Animal, AnimalPhoto, AnimalStatus } from '@/lib/types/database'
 
 type AnimalWithPhotos = Animal & { animal_photos: AnimalPhoto[] }
@@ -29,12 +29,14 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [adoptableFilter, setAdoptableFilter] = useState<string>('all')
   const [reservedFilter, setReservedFilter] = useState<string>('all')
+  const [retirementBasketFilter, setRetirementBasketFilter] = useState<string>('all')
   const [isPending, startTransition] = useTransition()
   const [pendingAnimalId, setPendingAnimalId] = useState<string | null>(null)
-  const [pendingField, setPendingField] = useState<'adoptable' | 'reserved' | null>(null)
+  const [pendingField, setPendingField] = useState<'adoptable' | 'reserved' | 'retirement_basket' | null>(null)
   // Optimistic state
   const [optimisticAdoptable, setOptimisticAdoptable] = useState<Record<string, boolean>>({})
   const [optimisticReserved, setOptimisticReserved] = useState<Record<string, boolean>>({})
+  const [optimisticRetirementBasket, setOptimisticRetirementBasket] = useState<Record<string, boolean>>({})
 
   const filtered = useMemo(() => {
     let result = animals
@@ -73,8 +75,15 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
       result = result.filter((a) => a.id in optimisticReserved ? !optimisticReserved[a.id] : !a.reserved)
     }
 
+    // Retirement basket filter
+    if (retirementBasketFilter === 'yes') {
+      result = result.filter((a) => a.id in optimisticRetirementBasket ? optimisticRetirementBasket[a.id] : a.retirement_basket)
+    } else if (retirementBasketFilter === 'no') {
+      result = result.filter((a) => a.id in optimisticRetirementBasket ? !optimisticRetirementBasket[a.id] : !a.retirement_basket)
+    }
+
     return result
-  }, [animals, search, speciesFilter, statusFilter, adoptableFilter, reservedFilter, optimisticAdoptable, optimisticReserved])
+  }, [animals, search, speciesFilter, statusFilter, adoptableFilter, reservedFilter, retirementBasketFilter, optimisticAdoptable, optimisticReserved, optimisticRetirementBasket])
 
   function getPrimaryPhoto(animal: AnimalWithPhotos): string | null {
     if (animal.animal_photos && animal.animal_photos.length > 0) {
@@ -127,6 +136,25 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
     })
   }
 
+  function handleToggleRetirementBasket(e: React.MouseEvent, animalId: string, currentValue: boolean) {
+    e.preventDefault()
+    e.stopPropagation()
+    const newValue = !currentValue
+    setPendingAnimalId(animalId)
+    setPendingField('retirement_basket')
+    setOptimisticRetirementBasket(prev => ({ ...prev, [animalId]: newValue }))
+    startTransition(async () => {
+      const result = await toggleRetirementBasket(animalId, newValue)
+      if (result.error) {
+        toast.error(result.error)
+        setOptimisticRetirementBasket(prev => ({ ...prev, [animalId]: currentValue }))
+      }
+      setPendingAnimalId(null)
+      setPendingField(null)
+      router.refresh()
+    })
+  }
+
   function isAdoptable(animal: AnimalWithPhotos): boolean {
     if (animal.id in optimisticAdoptable) return optimisticAdoptable[animal.id]
     return animal.adoptable
@@ -137,7 +165,12 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
     return animal.reserved
   }
 
-  const hasActiveFilters = statusFilter !== 'all' || speciesFilter !== 'all' || adoptableFilter !== 'all' || reservedFilter !== 'all' || search.length >= 2
+  function isRetirementBasket(animal: AnimalWithPhotos): boolean {
+    if (animal.id in optimisticRetirementBasket) return optimisticRetirementBasket[animal.id]
+    return animal.retirement_basket
+  }
+
+  const hasActiveFilters = statusFilter !== 'all' || speciesFilter !== 'all' || adoptableFilter !== 'all' || reservedFilter !== 'all' || retirementBasketFilter !== 'all' || search.length >= 2
 
   return (
     <div>
@@ -199,6 +232,16 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
           <option value="yes">Reserve</option>
           <option value="no">Non reserve</option>
         </select>
+        <select
+          value={retirementBasketFilter}
+          onChange={(e) => setRetirementBasketFilter(e.target.value)}
+          className="px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
+            focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+        >
+          <option value="all">Panier retraite : tous</option>
+          <option value="yes">Panier retraite</option>
+          <option value="no">Pas en panier retraite</option>
+        </select>
       </div>
 
       {/* Grid */}
@@ -213,6 +256,7 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
             const photoUrl = getPrimaryPhoto(animal)
             const adoptable = isAdoptable(animal)
             const reserved = isReserved(animal)
+            const retirementBasket = isRetirementBasket(animal)
             return (
               <Link
                 key={animal.id}
@@ -252,6 +296,12 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
                         Reserve
                       </span>
                     )}
+                    {retirementBasket && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/90 text-white backdrop-blur-sm">
+                        <Home className="w-3 h-3 fill-current" />
+                        Panier retraite
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -283,6 +333,19 @@ export function AnimalList({ animals, canManageAdoptions = false }: AnimalListPr
                             disabled:opacity-50`}
                         >
                           <Bookmark className={`w-3 h-3 ${reserved ? 'fill-current' : ''}`} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleRetirementBasket(e, animal.id, retirementBasket)}
+                          disabled={isPending && pendingAnimalId === animal.id && pendingField === 'retirement_basket'}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors
+                            ${retirementBasket
+                              ? 'bg-purple-500/15 text-purple-500 hover:bg-purple-500/25'
+                              : 'bg-border/50 text-muted hover:bg-border hover:text-text'
+                            }
+                            disabled:opacity-50`}
+                        >
+                          <Home className={`w-3 h-3 ${retirementBasket ? 'fill-current' : ''}`} />
                         </button>
                         <button
                           type="button"
