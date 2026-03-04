@@ -175,12 +175,13 @@ export async function getOutingLeaderboard() {
     const { establishmentId } = await requireEstablishment()
     const supabase = createAdminClient()
 
-    // All outings for dogs in this establishment
+    // All outings for dogs in this establishment (only currently active animals)
     const { data: allOutings, error } = await supabase
       .from('animal_outings')
-      .select('walked_by, animal_id, duration_minutes, started_at, is_tig, animals!inner(id, name, species, photo_url, establishment_id, animal_photos(id, url, is_primary))')
+      .select('walked_by, animal_id, duration_minutes, started_at, is_tig, animals!inner(id, name, species, photo_url, establishment_id, animal_photos(id, url, is_primary), status)')
       .eq('animals.establishment_id', establishmentId)
       .eq('animals.species', 'dog')
+      .in('animals.status', ['pound', 'shelter', 'foster_family', 'boarding'])
       .order('started_at', { ascending: false })
 
     if (error) return { error: error.message }
@@ -327,14 +328,15 @@ export async function createOuting(data: {
       }
     }
 
-    // Validate rating
-    if (data.rating != null) {
-      if (data.rating < 1 || data.rating > 10 || !Number.isInteger(data.rating)) {
-        return { error: 'La note doit etre un entier entre 1 et 10' }
-      }
-      if (data.rating <= 5 && !data.rating_comment?.trim()) {
-        return { error: 'Un commentaire est obligatoire pour une note de 5 ou moins' }
-      }
+    // Validate rating and comment (both required)
+    if (data.rating == null) {
+      return { error: 'Une notation de 1 a 10 est obligatoire' }
+    }
+    if (data.rating < 1 || data.rating > 10 || !Number.isInteger(data.rating)) {
+      return { error: 'La note doit etre un entier entre 1 et 10' }
+    }
+    if (!data.rating_comment?.trim()) {
+      return { error: 'Un commentaire est obligatoire pour toute sortie' }
     }
 
     const now = new Date()

@@ -82,10 +82,13 @@ export default async function SortiesPage({
     : 0
 
   // Resolve user names (needed for both views)
-  const userIdsFromOutings = outings.map((o: { walked_by: string }) => o.walked_by)
-  const userIdsFromLeaderboard = leaderboardResult.data?.perPerson?.map((p: { userId: string }) => p.userId) || []
-  const userIdsFromAssignments = allAssignments.flatMap((a: { assigned_to: string; assigned_by: string }) => [a.assigned_to, a.assigned_by])
-  const userIdsFromMembers = members.map((m: { user_id: string }) => m.user_id)
+  // Helper to validate UUID format
+  const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+
+  const userIdsFromOutings = outings.map((o: { walked_by: string }) => o.walked_by).filter(isValidUUID)
+  const userIdsFromLeaderboard = (leaderboardResult.data?.perPerson?.map((p: { userId: string }) => p.userId) || []).filter(isValidUUID)
+  const userIdsFromAssignments = allAssignments.flatMap((a: { assigned_to: string; assigned_by: string }) => [a.assigned_to, a.assigned_by]).filter(isValidUUID)
+  const userIdsFromMembers = members.map((m: { user_id: string }) => m.user_id).filter(isValidUUID)
   const uniqueUserIds = [...new Set([...userIdsFromOutings, ...userIdsFromLeaderboard, ...userIdsFromAssignments, ...userIdsFromMembers])]
   const userNames: Record<string, string> = {}
 

@@ -57,8 +57,12 @@ export function MyDailyAssignments({ assignments, canManageOutings }: MyDailyAss
   const completed = assignments.filter((a) => a.outing_id !== null)
 
   function handleRecord(animalId: string, duration: number) {
-    if (rating != null && rating <= 5 && !ratingComment.trim()) {
-      toast.error('Un commentaire est obligatoire pour une note de 5 ou moins')
+    if (rating == null) {
+      toast.error('Une notation de 1 a 10 est obligatoire')
+      return
+    }
+    if (!ratingComment.trim()) {
+      toast.error('Un commentaire est obligatoire pour toute sortie')
       return
     }
     startTransition(async () => {
@@ -177,24 +181,17 @@ export function MyDailyAssignments({ assignments, canManageOutings }: MyDailyAss
                       </div>
                     </div>
 
-                    {/* Rating comment (mandatory for 1-5) */}
-                    {rating != null && rating <= 5 && (
+                    {/* Rating comment (always mandatory) */}
+                    {rating != null && (
                       <textarea
                         value={ratingComment}
                         onChange={(e) => setRatingComment(e.target.value)}
-                        placeholder="Commentaire obligatoire pour une note <= 5"
+                        placeholder="Commentaire obligatoire pour toute sortie"
                         required
                         rows={2}
-                        className="w-full px-2 py-1.5 bg-surface border border-red-500/30 rounded text-xs focus:outline-none focus:ring-1 focus:ring-red-500/50 resize-none"
-                      />
-                    )}
-                    {rating != null && rating > 5 && (
-                      <textarea
-                        value={ratingComment}
-                        onChange={(e) => setRatingComment(e.target.value)}
-                        placeholder="Commentaire (optionnel)"
-                        rows={2}
-                        className="w-full px-2 py-1.5 bg-surface border border-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
+                        className={`w-full px-2 py-1.5 bg-surface border rounded text-xs focus:outline-none focus:ring-1 resize-none ${
+                          rating <= 5 ? 'border-red-500/30 focus:ring-red-500/50' : 'border-border focus:ring-primary/50'
+                        }`}
                       />
                     )}
 
@@ -204,7 +201,7 @@ export function MyDailyAssignments({ assignments, canManageOutings }: MyDailyAss
                         <button
                           key={d.value}
                           onClick={() => handleRecord(assignment.animal_id, d.value)}
-                          disabled={isPending || (rating != null && rating <= 5 && !ratingComment.trim())}
+                          disabled={isPending || rating == null || !ratingComment.trim()}
                           className="flex-1 px-1 py-1.5 rounded text-xs font-medium bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-50"
                         >
                           {isPending ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : d.label}

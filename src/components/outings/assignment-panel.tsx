@@ -87,6 +87,13 @@ export default function AssignmentPanel({
   )
 
   function getMemberDisplayName(userId: string): string {
+    // Validate UUID format to prevent displaying animal IDs or names
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)
+    if (!isValidUUID) {
+      console.warn(`Invalid user ID format: ${userId}`)
+      return 'ID invalide'
+    }
+
     if (userNames[userId]) return userNames[userId]
     const member = members.find((m) => m.user_id === userId)
     if (member) {
