@@ -85,6 +85,15 @@ export default async function PlanningPage(props: { searchParams: Promise<{ view
   // View mode (timeline or cards)
   const viewMode = (searchParams.view === 'cards' ? 'cards' : 'timeline') as 'cards' | 'timeline'
 
+  // Wrappers for delete functions to match expected Promise<void> signature
+  const handleDeleteSchedule = async (id: string): Promise<void> => {
+    await deleteSchedule(id)
+  }
+
+  const handleDeleteAppointment = async (id: string): Promise<void> => {
+    await deleteAppointment(id)
+  }
+
   return (
     <div className="animate-fade-up">
       {/* Header */}
@@ -205,8 +214,8 @@ export default async function PlanningPage(props: { searchParams: Promise<{ view
           userNames={userNames}
           animalNames={animalNames}
           canManage={canManage}
-          onDeleteSchedule={deleteSchedule}
-          onDeleteAppointment={deleteAppointment}
+          onDeleteSchedule={handleDeleteSchedule}
+          onDeleteAppointment={handleDeleteAppointment}
         />
       ) : (
         <ScheduleView
