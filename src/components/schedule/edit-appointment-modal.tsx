@@ -60,13 +60,13 @@ export function EditAppointmentModal({
         type: showCustomType ? customType : type,
         animal_id: animalId || null,
         assigned_user_id: assignedUserId || null,
-        client_name: clientName.trim() || null,
-        client_phone: clientPhone.trim() || null,
-        client_email: clientEmail.trim() || null,
+        client_name: clientName.trim() || undefined,
+        client_phone: clientPhone.trim() || undefined,
+        client_email: clientEmail.trim() || undefined,
         date,
         start_time: startTime,
         end_time: endTime,
-        notes: notes.trim() || null,
+        notes: notes.trim() || undefined,
         status,
       })
 
