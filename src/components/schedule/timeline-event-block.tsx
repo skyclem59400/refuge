@@ -113,7 +113,7 @@ export function TimelineEventBlock({
             <>
               <User className="w-3 h-3 shrink-0" />
               <span className="truncate font-medium">
-                {userNames[data.user_id] || 'Inconnu'}
+                {userNames[(data as StaffSchedule).user_id] || 'Inconnu'}
               </span>
             </>
           ) : (
@@ -152,7 +152,7 @@ export function TimelineEventBlock({
         <div className="absolute z-50 left-0 top-full mt-1 bg-surface border border-border rounded-lg shadow-lg p-3 min-w-[200px] text-sm text-text">
           {isSchedule ? (
             <>
-              <p className="font-semibold">{userNames[data.user_id] || 'Inconnu'}</p>
+              <p className="font-semibold">{userNames[(data as StaffSchedule).user_id] || 'Inconnu'}</p>
               <p className="text-xs text-muted mt-1">
                 {event.start_time} - {event.end_time}
               </p>

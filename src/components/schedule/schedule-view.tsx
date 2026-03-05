@@ -167,7 +167,7 @@ export function ScheduleView({ schedules, appointments = [], userNames, animalNa
     if (
       !confirm(
         `Dupliquer toutes les planifications de cette semaine vers la semaine suivante ?\n\nCela va copier ${
-          filteredSchedules.filter(
+          schedules.filter(
             (s) =>
               s.date >= weekDays[0].toISOString().split('T')[0] &&
               s.date <= weekDays[6].toISOString().split('T')[0]
@@ -396,7 +396,7 @@ export function ScheduleView({ schedules, appointments = [], userNames, animalNa
                       )
                     } else {
                       const appointment = event.data
-                      const colorClass = APPOINTMENT_COLORS[appointment.type]
+                      const colorClass = APPOINTMENT_COLORS[appointment.type as keyof typeof APPOINTMENT_COLORS] || 'bg-gray-600/15 border-gray-600/40 text-gray-800'
                       const icon = appointment.type === 'adoption' ? Heart : Stethoscope
                       const Icon = icon
                       const duration =
@@ -416,7 +416,7 @@ export function ScheduleView({ schedules, appointments = [], userNames, animalNa
                               <p className="text-sm font-semibold truncate">{appointment.client_name}</p>
                             </div>
                             <button
-                              onClick={() => handleDeleteAppointment(appointment.id, appointment.client_name)}
+                              onClick={() => handleDeleteAppointment(appointment.id, appointment.client_name || 'Client inconnu')}
                               disabled={isPending && deletingId === appointment.id}
                               className="text-error hover:text-error/80 transition-colors disabled:opacity-50 shrink-0"
                               title="Supprimer"

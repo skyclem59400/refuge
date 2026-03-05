@@ -165,6 +165,7 @@ export async function updateAppointment(
   data: {
     type?: AppointmentType
     animal_id?: string | null
+    assigned_user_id?: string | null
     client_name?: string
     client_phone?: string | null
     client_email?: string | null

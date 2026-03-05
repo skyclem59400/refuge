@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import {
   Plus,
   Pencil,
@@ -131,7 +131,7 @@ function formatValue(value: unknown): string {
   return String(value)
 }
 
-function renderDetails(details: Record<string, unknown>): JSX.Element {
+function renderDetails(details: Record<string, unknown>): React.ReactElement {
   const changes = Object.entries(details).filter(([, value]) =>
     value && typeof value === 'object' && 'old' in value && 'new' in value
   )
