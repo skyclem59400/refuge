@@ -70,7 +70,7 @@ export default async function PlanningPage(props: { searchParams: Promise<{ view
   const { data: allAnimals } = await admin
     .from('animals')
     .select('id, nom')
-    .eq('establishment_id', ctx.establishmentId)
+    .eq('establishment_id', ctx.establishment.id)
     .order('nom')
 
   const animalsForForm = (allAnimals || []).map((a: { id: string; nom: string }) => ({ id: a.id, nom: a.nom }))
