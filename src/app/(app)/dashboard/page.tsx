@@ -2,11 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { getAssignments } from '@/lib/actions/outings'
 import { WelcomeBanner } from '@/components/dashboard/welcome-banner'
-import { StatsCards } from '@/components/dashboard/stats-cards'
-import { RevenueChart } from '@/components/dashboard/revenue-chart'
 import { ShelterDashboard } from '@/components/dashboard/shelter-dashboard'
-import { TypeBadge } from '@/components/documents/status-badge'
-import Link from 'next/link'
 import type { Animal, AnimalPhoto } from '@/lib/types/database'
 
 type AnimalWithPhotos = Animal & { animal_photos: AnimalPhoto[] }
@@ -19,63 +15,8 @@ export default async function DashboardPage() {
   const estabType = ctx!.establishment.type
   const admin = createAdminClient()
 
-  const showFarm = estabType === 'farm' || estabType === 'both'
   const showShelter = estabType === 'shelter' || estabType === 'both'
-
-  // ---------------------------------------------------------------
-  // Farm queries (only when relevant)
-  // ---------------------------------------------------------------
-  let farmStats = {
-    totalDocuments: 0,
-    totalDevis: 0,
-    totalFactures: 0,
-    caTotal: 0,
-    caEnAttente: 0,
-    totalClients: 0,
-  }
-  let recentDocs: Array<{ id: string; type: string; numero: string; client_name: string; total: number }> = []
-  let invoicesByMonth: Array<{ date: string; total: number; status: string }> = []
-
-  if (showFarm) {
-    const [
-      { count: totalDocuments },
-      { count: totalDevis },
-      { count: totalFactures },
-      { data: caPaidData },
-      { data: caSentData },
-      { count: totalClients },
-      { data: rawRecentDocs },
-      { data: rawInvoicesByMonth },
-    ] = await Promise.all([
-      admin.from('documents').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId).neq('status', 'converted'),
-      admin.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'devis').eq('establishment_id', estabId).neq('status', 'converted'),
-      admin.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'facture').eq('establishment_id', estabId),
-      admin.from('documents').select('total').eq('type', 'facture').eq('status', 'paid').eq('establishment_id', estabId),
-      admin.from('documents').select('total').eq('type', 'facture').in('status', ['validated', 'sent']).eq('establishment_id', estabId),
-      admin.from('clients').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId),
-      admin.from('documents').select('*').eq('establishment_id', estabId).neq('status', 'converted').order('created_at', { ascending: false }).limit(5),
-      admin.from('documents')
-        .select('date, total, status')
-        .eq('type', 'facture')
-        .eq('establishment_id', estabId)
-        .in('status', ['paid', 'sent', 'validated'])
-        .order('date', { ascending: true }),
-    ])
-
-    const caTotal = caPaidData?.reduce((sum, d) => sum + (d.total || 0), 0) || 0
-    const caEnAttente = caSentData?.reduce((sum, d) => sum + (d.total || 0), 0) || 0
-
-    farmStats = {
-      totalDocuments: totalDocuments || 0,
-      totalDevis: totalDevis || 0,
-      totalFactures: totalFactures || 0,
-      caTotal,
-      caEnAttente,
-      totalClients: totalClients || 0,
-    }
-    recentDocs = (rawRecentDocs as typeof recentDocs) || []
-    invoicesByMonth = (rawInvoicesByMonth as typeof invoicesByMonth) || []
-  }
+  const showFarm = estabType === 'farm' || estabType === 'both'
 
   // ---------------------------------------------------------------
   // Shelter queries (only when relevant)
@@ -203,51 +144,6 @@ export default async function DashboardPage() {
             healthAlerts={healthAlerts}
             dailyAssignments={dailyAssignments}
           />
-        </div>
-      )}
-
-      {/* Farm dashboard */}
-      {showFarm && (
-        <div>
-          {showShelter && (
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-1 h-6 rounded-full bg-secondary" />
-              <h2 className="text-lg font-bold text-text">Facturation</h2>
-            </div>
-          )}
-          <StatsCards stats={farmStats} />
-
-          <div className="mb-6">
-            <RevenueChart invoices={(invoicesByMonth || []).map(inv => ({ date: inv.date, total: inv.total || 0, status: inv.status as 'paid' | 'sent' }))} />
-          </div>
-
-          {/* Recent documents */}
-          <div className="bg-surface rounded-xl border border-border">
-            <div className="flex items-center justify-between p-5 border-b border-border">
-              <h3 className="font-semibold">Documents recents</h3>
-              <Link href="/documents" className="text-sm text-primary hover:text-primary-light transition-colors">
-                Voir tout
-              </Link>
-            </div>
-            <div className="divide-y divide-border">
-              {recentDocs && recentDocs.length > 0 ? (
-                recentDocs.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between px-5 py-3 hover:bg-surface-hover transition-colors">
-                    <div className="flex items-center gap-3">
-                      <TypeBadge type={doc.type} />
-                      <span className="text-sm font-medium">{doc.numero}</span>
-                      <span className="text-sm text-muted">{doc.client_name}</span>
-                    </div>
-                    <span className="text-sm font-semibold">
-                      {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(doc.total)}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="p-5 text-sm text-muted text-center">Aucun document pour le moment</p>
-              )}
-            </div>
-          </div>
         </div>
       )}
     </div>

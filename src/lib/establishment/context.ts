@@ -24,6 +24,7 @@ function buildPermissions(groups: PermissionGroup[], membership: EstablishmentMe
     canManageOutings: has('manage_outings'),
     canManageOutingAssignments: has('manage_outing_assignments'),
     canManageAdoptions: has('manage_adoptions'),
+    canManagePlanning: has('manage_planning'),
     canViewPound: has('view_pound'),
     canViewStatistics: has('view_statistics'),
   }

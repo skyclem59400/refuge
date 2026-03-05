@@ -2,7 +2,7 @@ export type RoleType = 'admin' | 'salarie' | 'benevole'
 export type ContactCategory = 'client' | 'member' | 'volunteer' | 'board_member' | 'foster_family' | 'veterinarian'
 export type DocumentType = 'devis' | 'facture' | 'avoir'
 export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'converted' | 'validated'
-export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings' | 'manage_outing_assignments' | 'manage_adoptions'
+export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings' | 'manage_outing_assignments' | 'manage_adoptions' | 'manage_planning'
 
 export interface LineItem {
   description: string
@@ -91,6 +91,7 @@ export interface PermissionGroup {
   manage_outings: boolean
   manage_outing_assignments: boolean
   manage_adoptions: boolean
+  manage_planning: boolean
   view_pound: boolean
   view_statistics: boolean
   created_at: string
@@ -138,6 +139,7 @@ export interface Permissions {
   canManageOutings: boolean
   canManageOutingAssignments: boolean
   canManageAdoptions: boolean
+  canManagePlanning: boolean
   canViewPound: boolean
   canViewStatistics: boolean
   isAdmin: boolean
@@ -284,6 +286,42 @@ export interface OutingAssignment {
   outing_id: string | null
   notes: string | null
   created_at: string
+}
+
+export interface StaffSchedule {
+  id: string
+  establishment_id: string
+  user_id: string
+  date: string
+  start_time: string
+  end_time: string
+  notes: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+// Common appointment types - but any string is allowed for custom types
+export type AppointmentType = string
+export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled'
+
+export interface Appointment {
+  id: string
+  establishment_id: string
+  type: AppointmentType
+  animal_id: string | null
+  assigned_user_id: string | null
+  client_name: string | null
+  client_phone: string | null
+  client_email: string | null
+  date: string
+  start_time: string
+  end_time: string
+  notes: string | null
+  status: AppointmentStatus
+  created_by: string
+  created_at: string
+  updated_at: string
 }
 
 export interface ActivityLog {

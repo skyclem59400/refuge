@@ -20,6 +20,7 @@ const PERMISSION_LABELS: { key: Permission; label: string }[] = [
   { key: 'manage_outings', label: 'Sorties' },
   { key: 'manage_outing_assignments', label: 'Assignations sorties' },
   { key: 'manage_adoptions', label: 'Gestion adoptions' },
+  { key: 'manage_planning', label: 'Planning' },
   { key: 'manage_documents', label: 'Documents' },
   { key: 'manage_clients', label: 'Repertoire' },
   { key: 'manage_donations', label: 'Dons' },

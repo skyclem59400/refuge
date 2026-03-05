@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
 import { logActivity } from '@/lib/actions/activity-log'
+import { trackChanges } from '@/lib/utils/activity'
 import type { HealthRecordType } from '@/lib/types/database'
 
 // ============================================
@@ -158,11 +159,12 @@ export async function updateHealthRecord(id: string, data: {
   try {
     await requirePermission('manage_health')
     const supabase = await createClient()
+    const admin = createAdminClient()
 
-    // Fetch the record to get animal_id for activity logging
-    const { data: record } = await supabase
+    // Fetch current record for change tracking
+    const { data: currentRecord } = await admin
       .from('animal_health_records')
-      .select('animal_id')
+      .select('*')
       .eq('id', id)
       .single()
 
@@ -175,8 +177,17 @@ export async function updateHealthRecord(id: string, data: {
       return { error: error.message }
     }
 
+    const changes = trackChanges(currentRecord, data)
+
     revalidatePath('/health')
-    logActivity({ action: 'update', entityType: 'health_record', entityId: id, parentType: 'animal', parentId: record?.animal_id })
+    logActivity({
+      action: 'update',
+      entityType: 'health_record',
+      entityId: id,
+      parentType: 'animal',
+      parentId: currentRecord?.animal_id,
+      details: changes,
+    })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }

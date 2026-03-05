@@ -4,7 +4,11 @@ import { getStatusLabel } from '@/lib/sda-utils'
 import { AnimalsByStatusChart } from '@/components/statistics/animals-by-status-chart'
 import { AnimalsBySpeciesChart } from '@/components/statistics/animals-by-species-chart'
 import { MonthlyTrendsChart } from '@/components/statistics/monthly-trends-chart'
-import { BarChart3 } from 'lucide-react'
+import { StatsCards } from '@/components/dashboard/stats-cards'
+import { RevenueChart } from '@/components/dashboard/revenue-chart'
+import { TypeBadge } from '@/components/documents/status-badge'
+import Link from 'next/link'
+import { BarChart3, TrendingUp, FileText } from 'lucide-react'
 
 const STATUS_COLORS: Record<string, string> = {
   pound: '#f59e0b',
@@ -21,7 +25,11 @@ const STATUS_COLORS: Record<string, string> = {
 export default async function StatistiquesPage() {
   const ctx = await getEstablishmentContext()
   const estabId = ctx!.establishment.id
+  const estabType = ctx!.establishment.type
+  const canManage = ctx!.permissions.canManageEstablishment
   const admin = createAdminClient()
+
+  const showFarm = estabType === 'farm' || estabType === 'both'
 
   const now = new Date()
   const twelveMonthsAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1)
@@ -36,6 +44,59 @@ export default async function StatistiquesPage() {
 
   const animalList = animals || []
   const movementList = movements || []
+
+  // Financial data (farm only, admins only)
+  let farmStats = {
+    totalDocuments: 0,
+    totalDevis: 0,
+    totalFactures: 0,
+    caTotal: 0,
+    caEnAttente: 0,
+    totalClients: 0,
+  }
+  let recentDocs: Array<{ id: string; type: string; numero: string; client_name: string; total: number }> = []
+  let invoicesByMonth: Array<{ date: string; total: number; status: string }> = []
+
+  if (showFarm && canManage) {
+    const [
+      { count: totalDocuments },
+      { count: totalDevis },
+      { count: totalFactures },
+      { data: caPaidData },
+      { data: caSentData },
+      { count: totalClients },
+      { data: rawRecentDocs },
+      { data: rawInvoicesByMonth },
+    ] = await Promise.all([
+      admin.from('documents').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId).neq('status', 'converted'),
+      admin.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'devis').eq('establishment_id', estabId).neq('status', 'converted'),
+      admin.from('documents').select('*', { count: 'exact', head: true }).eq('type', 'facture').eq('establishment_id', estabId),
+      admin.from('documents').select('total').eq('type', 'facture').eq('status', 'paid').eq('establishment_id', estabId),
+      admin.from('documents').select('total').eq('type', 'facture').in('status', ['validated', 'sent']).eq('establishment_id', estabId),
+      admin.from('clients').select('*', { count: 'exact', head: true }).eq('establishment_id', estabId),
+      admin.from('documents').select('*').eq('establishment_id', estabId).neq('status', 'converted').order('created_at', { ascending: false }).limit(5),
+      admin.from('documents')
+        .select('date, total, status')
+        .eq('type', 'facture')
+        .eq('establishment_id', estabId)
+        .in('status', ['paid', 'sent', 'validated'])
+        .order('date', { ascending: true }),
+    ])
+
+    const caTotal = caPaidData?.reduce((sum, d) => sum + (d.total || 0), 0) || 0
+    const caEnAttente = caSentData?.reduce((sum, d) => sum + (d.total || 0), 0) || 0
+
+    farmStats = {
+      totalDocuments: totalDocuments || 0,
+      totalDevis: totalDevis || 0,
+      totalFactures: totalFactures || 0,
+      caTotal,
+      caEnAttente,
+      totalClients: totalClients || 0,
+    }
+    recentDocs = (rawRecentDocs as typeof recentDocs) || []
+    invoicesByMonth = (rawInvoicesByMonth as typeof invoicesByMonth) || []
+  }
 
   // Stats by status
   const statusCounts: Record<string, number> = {}
@@ -88,6 +149,57 @@ export default async function StatistiquesPage() {
           <p className="text-sm text-muted mt-1">Vue d&apos;ensemble de l&apos;activite du refuge</p>
         </div>
       </div>
+
+      {/* Financial section - admins only */}
+      {showFarm && canManage && (
+        <div className="mb-8 space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-success/10">
+              <TrendingUp className="w-6 h-6 text-success" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">Données financières</h2>
+              <p className="text-sm text-muted mt-1">Réservé aux managers</p>
+            </div>
+          </div>
+
+          <StatsCards stats={farmStats} />
+
+          <div>
+            <RevenueChart invoices={(invoicesByMonth || []).map(inv => ({ date: inv.date, total: inv.total || 0, status: inv.status as 'paid' | 'sent' }))} />
+          </div>
+
+          {recentDocs && recentDocs.length > 0 && (
+            <div className="bg-surface rounded-xl border border-border">
+              <div className="flex items-center justify-between p-5 border-b border-border">
+                <h3 className="font-semibold">Documents récents</h3>
+                <Link href="/documents" className="text-sm text-primary hover:text-primary-light transition-colors">
+                  Voir tout
+                </Link>
+              </div>
+              <div className="divide-y divide-border">
+                {recentDocs.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between px-5 py-3 hover:bg-surface-hover transition-colors">
+                    <div className="flex items-center gap-3">
+                      <TypeBadge type={doc.type} />
+                      <span className="text-sm font-medium">{doc.numero}</span>
+                      <span className="text-sm text-muted">{doc.client_name}</span>
+                    </div>
+                    <span className="text-sm font-semibold">
+                      {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(doc.total)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Separator */}
+      {showFarm && canManage && (
+        <div className="border-t border-border my-8" />
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">

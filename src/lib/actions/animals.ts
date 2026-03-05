@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
 import { logActivity } from '@/lib/actions/activity-log'
+import { trackChanges } from '@/lib/utils/activity'
 import type {
   AnimalSpecies,
   AnimalSex,
@@ -249,6 +250,15 @@ export async function updateAnimal(id: string, data: {
   try {
     const { establishmentId } = await requirePermission('manage_animals')
     const supabase = await createClient()
+    const admin = createAdminClient()
+
+    // Fetch current state to track changes
+    const { data: currentAnimal } = await admin
+      .from('animals')
+      .select('*')
+      .eq('id', id)
+      .eq('establishment_id', establishmentId)
+      .single()
 
     const { error } = await supabase
       .from('animals')
@@ -260,11 +270,20 @@ export async function updateAnimal(id: string, data: {
       return { error: error.message }
     }
 
+    // Build details object with changed fields
+    const changes = trackChanges(currentAnimal, data)
+
     revalidatePath('/animals')
     revalidatePath(`/animals/${id}`)
     revalidatePath('/pound')
     revalidatePath('/dashboard')
-    logActivity({ action: 'update', entityType: 'animal', entityId: id, entityName: data.name || undefined })
+    logActivity({
+      action: 'update',
+      entityType: 'animal',
+      entityId: id,
+      entityName: data.name || currentAnimal?.name || undefined,
+      details: changes,
+    })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }

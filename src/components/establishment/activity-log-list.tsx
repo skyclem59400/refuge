@@ -65,8 +65,30 @@ const DETAIL_LABELS: Record<string, string> = {
   statut: 'statut',
   name: 'nom',
   nom: 'nom',
+  name_secondary: 'nom secondaire',
   species: 'espece',
   espece: 'espece',
+  breed: 'race',
+  breed_cross: 'croisement',
+  sex: 'sexe',
+  birth_date: 'date de naissance',
+  birth_place: 'lieu de naissance',
+  color: 'couleur',
+  weight: 'poids',
+  sterilized: 'sterilise',
+  chip_number: 'puce',
+  tattoo_number: 'tatouage',
+  tattoo_position: 'position tatouage',
+  medal_number: 'medaille',
+  loof_number: 'LOOF',
+  passport_number: 'passeport',
+  icad_updated: 'ICAD à jour',
+  behavior_score: 'score comportement',
+  description: 'description',
+  capture_location: 'lieu de capture',
+  capture_circumstances: 'circonstances',
+  origin_type: 'type d\'origine',
+  box_id: 'box',
   rating: 'note',
   note: 'note',
   is_tig: 'TIG',
@@ -80,9 +102,23 @@ const DETAIL_LABELS: Record<string, string> = {
   annule_facture: 'annule facture',
   capacite: 'capacite',
   montant: 'montant',
+  amount: 'montant',
   donateur: 'donateur',
+  donor_name: 'donateur',
+  donor_email: 'email donateur',
+  donor_phone: 'tel donateur',
+  donor_address: 'adresse donateur',
+  donor_postal_code: 'code postal',
+  donor_city: 'ville',
+  payment_method: 'methode paiement',
   methode: 'methode',
   nature: 'nature',
+  date: 'date',
+  notes: 'notes',
+  // Health records
+  veterinarian: 'veterinaire',
+  next_due_date: 'prochaine echeance',
+  cost: 'cout',
   plateforme: 'plateforme',
   intervention: 'intervention',
   appelant: 'appelant',
@@ -106,7 +142,16 @@ function buildDetailString(details: Record<string, unknown>): string | null {
   const parts: string[] = []
   for (const [key, value] of Object.entries(details)) {
     const label = DETAIL_LABELS[key] || key
-    parts.push(`${label} → ${formatDetailValue(key, value)}`)
+
+    // Handle change objects with old/new values
+    if (value && typeof value === 'object' && 'old' in value && 'new' in value) {
+      const change = value as { old: unknown; new: unknown }
+      const oldVal = formatDetailValue(key, change.old)
+      const newVal = formatDetailValue(key, change.new)
+      parts.push(`${label}: ${oldVal} → ${newVal}`)
+    } else {
+      parts.push(`${label} → ${formatDetailValue(key, value)}`)
+    }
   }
   return parts.join(', ')
 }

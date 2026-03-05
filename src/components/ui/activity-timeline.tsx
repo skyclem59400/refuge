@@ -77,6 +77,92 @@ const entityTypeLabels: Record<string, string> = {
   intervention: "l'intervention",
 }
 
+const fieldLabels: Record<string, string> = {
+  name: 'Nom',
+  name_secondary: 'Nom secondaire',
+  species: 'Espèce',
+  breed: 'Race',
+  breed_cross: 'Croisement',
+  sex: 'Sexe',
+  birth_date: 'Date de naissance',
+  birth_place: 'Lieu de naissance',
+  color: 'Couleur',
+  weight: 'Poids',
+  sterilized: 'Stérilisé',
+  chip_number: 'Numéro de puce',
+  tattoo_number: 'Numéro de tatouage',
+  tattoo_position: 'Position tatouage',
+  medal_number: 'Numéro de médaille',
+  loof_number: 'LOOF',
+  passport_number: 'Passeport',
+  icad_updated: 'ICAD à jour',
+  behavior_score: 'Score comportement',
+  description: 'Description',
+  capture_location: 'Lieu de capture',
+  capture_circumstances: 'Circonstances',
+  origin_type: 'Type d\'origine',
+  box_id: 'Box',
+  status: 'Statut',
+  adoptable: 'Adoptable',
+  reserved: 'Réservé',
+  // Donations
+  donor_name: 'Donateur',
+  donor_email: 'Email donateur',
+  donor_phone: 'Téléphone donateur',
+  donor_address: 'Adresse',
+  donor_postal_code: 'Code postal',
+  donor_city: 'Ville',
+  amount: 'Montant',
+  payment_method: 'Méthode de paiement',
+  nature: 'Nature',
+  date: 'Date',
+  notes: 'Notes',
+  // Health records
+  type: 'Type',
+  veterinarian: 'Vétérinaire',
+  next_due_date: 'Prochaine échéance',
+  cost: 'Coût',
+}
+
+function formatValue(value: unknown): string {
+  if (value === true) return 'Oui'
+  if (value === false) return 'Non'
+  if (value === null || value === undefined) return '(vide)'
+  return String(value)
+}
+
+function renderDetails(details: Record<string, unknown>): JSX.Element {
+  const changes = Object.entries(details).filter(([, value]) =>
+    value && typeof value === 'object' && 'old' in value && 'new' in value
+  )
+
+  if (changes.length > 0) {
+    return (
+      <div className="mt-2 space-y-1">
+        {changes.map(([key, value]) => {
+          const change = value as { old: unknown; new: unknown }
+          const label = fieldLabels[key] || key
+          return (
+            <div key={key} className="text-xs">
+              <span className="font-medium text-muted">{label}:</span>{' '}
+              <span className="text-error line-through">{formatValue(change.old)}</span>
+              {' → '}
+              <span className="text-success">{formatValue(change.new)}</span>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  // Fallback to JSON for other detail types
+  return (
+    <pre className="mt-2 p-2 bg-surface-hover rounded text-xs font-mono overflow-x-auto text-text">
+      {JSON.stringify(details, null, 2)}
+    </pre>
+  )
+}
+
 export function ActivityTimeline({ logs, userNames }: ActivityTimelineProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
@@ -142,14 +228,10 @@ export function ActivityTimeline({ logs, userNames }: ActivityTimelineProps) {
                     ) : (
                       <ChevronDown className="w-3 h-3" />
                     )}
-                    Details
+                    Détails
                   </button>
 
-                  {isExpanded && (
-                    <pre className="mt-2 p-2 bg-surface-hover rounded text-xs font-mono overflow-x-auto text-text">
-                      {JSON.stringify(log.details, null, 2)}
-                    </pre>
-                  )}
+                  {isExpanded && renderDetails(log.details)}
                 </div>
               )}
             </div>

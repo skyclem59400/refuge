@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
 import type { Donation, DonationPaymentMethod, DonationNature } from '@/lib/types/database'
 import { logActivity } from '@/lib/actions/activity-log'
+import { trackChanges } from '@/lib/utils/activity'
 
 export async function getDonations(filters?: { year?: number }) {
   try {
@@ -123,6 +124,15 @@ export async function updateDonation(id: string, data: {
   try {
     const { establishmentId } = await requirePermission('manage_donations')
     const supabase = await createClient()
+    const admin = createAdminClient()
+
+    // Fetch current donation for change tracking
+    const { data: currentDonation } = await admin
+      .from('donations')
+      .select('*')
+      .eq('id', id)
+      .eq('establishment_id', establishmentId)
+      .single()
 
     const { data: donation, error } = await supabase
       .from('donations')
@@ -134,6 +144,8 @@ export async function updateDonation(id: string, data: {
 
     if (error) return { error: error.message }
 
+    const changes = trackChanges(currentDonation, data)
+
     revalidatePath('/donations')
     revalidatePath('/dashboard')
     logActivity({
@@ -141,7 +153,7 @@ export async function updateDonation(id: string, data: {
       entityType: 'donation',
       entityId: id,
       entityName: data.donor_name,
-      details: { montant: data.amount, donateur: data.donor_name },
+      details: changes,
     })
     return { data: donation as Donation }
   } catch (e) {
