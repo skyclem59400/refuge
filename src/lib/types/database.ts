@@ -223,6 +223,7 @@ export interface Animal {
   status: AnimalStatus
   behavior_score: number | null
   description: string | null
+  description_external: string | null
   capture_location: string | null
   capture_circumstances: string | null
   origin_type: AnimalOrigin
@@ -233,6 +234,9 @@ export interface Animal {
   adoptable: boolean
   reserved: boolean
   retirement_basket: boolean
+  ok_cats: boolean | null
+  ok_males: boolean | null
+  ok_females: boolean | null
   // Hunimalis sync fields
   hunimalis_id: number | null
   photo_url: string | null

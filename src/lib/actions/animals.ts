@@ -150,6 +150,7 @@ export async function createAnimal(data: {
   status: AnimalStatus
   behavior_score?: number | null
   description?: string | null
+  description_external?: string | null
   capture_location?: string | null
   capture_circumstances?: string | null
   origin_type: AnimalOrigin
@@ -242,6 +243,7 @@ export async function updateAnimal(id: string, data: {
   icad_updated?: boolean
   behavior_score?: number | null
   description?: string | null
+  description_external?: string | null
   capture_location?: string | null
   capture_circumstances?: string | null
   origin_type?: AnimalOrigin

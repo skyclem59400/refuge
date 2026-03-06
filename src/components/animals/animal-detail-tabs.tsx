@@ -11,7 +11,6 @@ import { MovementForm } from '@/components/animals/movement-form'
 import { updatePost, deletePost } from '@/lib/actions/social-posts'
 import { formatDateShort, formatCurrency } from '@/lib/utils'
 import {
-  getOriginLabel,
   getSexLabel,
   getMovementLabel,
   getHealthTypeLabel,
@@ -114,7 +113,7 @@ export function AnimalDetailTabs({
   canManagePosts,
   isAdmin = false,
   activityLogs = [],
-}: AnimalDetailTabsProps) {
+}: Readonly<AnimalDetailTabsProps>) {
   const [activeTab, setActiveTab] = useState<TabId>('info')
   const [showHealthForm, setShowHealthForm] = useState(false)
   const [showMovementForm, setShowMovementForm] = useState(false)
@@ -150,6 +149,7 @@ export function AnimalDetailTabs({
               src={displayPhotoUrl}
               alt={animal.name}
               fill
+              unoptimized={displayPhotoUrl.includes('hunimalis.com')}
               className="object-cover"
               sizes="160px"
             />
@@ -292,11 +292,11 @@ function InfoTab({
   animal,
   boxes,
   canManageAnimals,
-}: {
+}: Readonly<{
   animal: Animal
   boxes: Box[]
   canManageAnimals: boolean
-}) {
+}>) {
   return (
     <div className="grid lg:grid-cols-2 gap-6">
       {/* Left column */}
@@ -414,12 +414,23 @@ function InfoTab({
 
       {/* Right column */}
       <div className="space-y-4">
-        {/* Description card */}
-        {animal.description && (
+        {/* Description externe (publique) */}
+        {animal.description_external && (
           <div className="bg-surface rounded-xl border border-border p-5">
             <div className="flex items-center gap-2 mb-4">
               <FileText className="w-4 h-4 text-muted" />
               <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">Description</h3>
+            </div>
+            <p className="text-sm text-muted whitespace-pre-wrap">{animal.description_external}</p>
+          </div>
+        )}
+
+        {/* Description interne (staff uniquement) */}
+        {canManageAnimals && animal.description && (
+          <div className="bg-surface rounded-xl border border-border p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <FileText className="w-4 h-4 text-muted" />
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">Notes internes</h3>
             </div>
             <p className="text-sm text-muted whitespace-pre-wrap">{animal.description}</p>
           </div>
@@ -450,11 +461,11 @@ function PhotosTab({
   animal,
   photos,
   canManageAnimals,
-}: {
+}: Readonly<{
   animal: Animal
   photos: AnimalPhoto[]
   canManageAnimals: boolean
-}) {
+}>) {
   return (
     <div className="max-w-2xl">
       <AnimalPhotos animalId={animal.id} photos={photos} canManage={canManageAnimals} fallbackPhotoUrl={animal.photo_url} />
@@ -474,7 +485,7 @@ function HealthTab({
   onToggleForm,
   today,
   in30Days,
-}: {
+}: Readonly<{
   animal: Animal
   healthRecords: AnimalHealthRecord[]
   canManageHealth: boolean
@@ -482,7 +493,7 @@ function HealthTab({
   onToggleForm: () => void
   today: string
   in30Days: string
-}) {
+}>) {
   return (
     <div className="space-y-4">
       {/* Add button */}
@@ -544,7 +555,11 @@ function HealthTab({
                       )}
                       {hr.next_due_date && (
                         <div className={`flex items-center gap-1 mt-1 text-xs ${
-                          isOverdue ? 'text-error font-semibold' : isSoon ? 'text-warning' : 'text-muted'
+                          (() => {
+                            if (isOverdue) return 'text-error font-semibold'
+                            if (isSoon) return 'text-warning'
+                            return 'text-muted'
+                          })()
                         }`}>
                           {isOverdue ? (
                             <AlertTriangle className="w-3 h-3" />
@@ -583,14 +598,14 @@ function MovementsTab({
   canManageMovements,
   showForm,
   onToggleForm,
-}: {
+}: Readonly<{
   animal: Animal
   movements: AnimalMovement[]
   userNames: Record<string, string>
   canManageMovements: boolean
   showForm: boolean
   onToggleForm: () => void
-}) {
+}>) {
   const canAddMovement = canManageMovements && (animal.status === 'pound' || animal.status === 'shelter')
 
   return (
@@ -672,14 +687,14 @@ function PostsTab({
   establishmentName,
   establishmentPhone,
   canManagePosts,
-}: {
+}: Readonly<{
   animal: Animal
   photos: AnimalPhoto[]
   socialPosts: SocialPost[]
   establishmentName: string
   establishmentPhone: string
   canManagePosts: boolean
-}) {
+}>) {
   const [showGenerator, setShowGenerator] = useState(false)
   const [editingPostId, setEditingPostId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
@@ -815,13 +830,17 @@ function PostsTab({
                         </span>
                       </div>
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold backdrop-blur-sm ${
-                        post.status === 'draft'
-                          ? 'bg-white/20 text-white'
-                          : post.status === 'published'
-                            ? 'bg-success/80 text-white'
-                            : 'bg-white/10 text-white/60'
+                        (() => {
+                          if (post.status === 'draft') return 'bg-white/20 text-white'
+                          if (post.status === 'published') return 'bg-success/80 text-white'
+                          return 'bg-white/10 text-white/60'
+                        })()
                       }`}>
-                        {post.status === 'draft' ? 'Brouillon' : post.status === 'published' ? 'Publie' : 'Archive'}
+                        {(() => {
+                          if (post.status === 'draft') return 'Brouillon'
+                          if (post.status === 'published') return 'Publie'
+                          return 'Archive'
+                        })()}
                       </span>
                     </div>
 
@@ -942,7 +961,11 @@ function PostsTab({
                   {/* Date & platform info */}
                   <p className="text-center text-xs text-muted">
                     Cree le {formatDateShort(post.created_at)}
-                    {post.platform === 'facebook' ? ' · Facebook' : post.platform === 'instagram' ? ' · Instagram' : ' · FB + IG'}
+                    {(() => {
+                      if (post.platform === 'facebook') return ' · Facebook'
+                      if (post.platform === 'instagram') return ' · Instagram'
+                      return ' · FB + IG'
+                    })()}
                   </p>
                 </div>
               </div>
@@ -961,10 +984,10 @@ function PostsTab({
 function OutingsTab({
   outings,
   userNames,
-}: {
+}: Readonly<{
   outings: AnimalOuting[]
   userNames: Record<string, string>
-}) {
+}>) {
   return (
     <div className="space-y-4">
       <div className="bg-surface rounded-xl border border-border">
@@ -998,10 +1021,12 @@ function OutingsTab({
                       {outing.rating != null ? (
                         <span
                           className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold
-                            ${outing.rating <= 3 ? 'bg-red-500/15 text-red-400'
-                              : outing.rating <= 5 ? 'bg-orange-500/15 text-orange-400'
-                              : outing.rating <= 7 ? 'bg-yellow-500/15 text-yellow-400'
-                              : 'bg-green-500/15 text-green-400'
+                            ${(() => {
+                              if (outing.rating! <= 3) return 'bg-red-500/15 text-red-400'
+                              if (outing.rating! <= 5) return 'bg-orange-500/15 text-orange-400'
+                              if (outing.rating! <= 7) return 'bg-yellow-500/15 text-yellow-400'
+                              return 'bg-green-500/15 text-green-400'
+                            })()
                             }`}
                           title={outing.rating_comment || undefined}
                         >

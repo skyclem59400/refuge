@@ -30,10 +30,10 @@ interface OutingPriorityListProps {
 }
 
 const QUICK_DURATIONS = [
-  { label: '15 min', value: 15 },
-  { label: '30 min', value: 30 },
-  { label: '45 min', value: 45 },
-  { label: '1h', value: 60 },
+  { label: '15', value: 15 },
+  { label: '30', value: 30 },
+  { label: '45', value: 45 },
+  { label: '60', value: 60 },
 ]
 
 function getAnimalPhoto(animal: AnimalWithPriority): string | null {
@@ -43,7 +43,7 @@ function getAnimalPhoto(animal: AnimalWithPriority): string | null {
   return animal.photo_url
 }
 
-export function OutingPriorityList({ animals, canManageOutings, canCreateTig = false }: OutingPriorityListProps) {
+export function OutingPriorityList({ animals, canManageOutings, canCreateTig = false }: Readonly<OutingPriorityListProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [activeAnimalId, setActiveAnimalId] = useState<string | null>(null)
@@ -52,6 +52,7 @@ export function OutingPriorityList({ animals, canManageOutings, canCreateTig = f
   const [notes, setNotes] = useState('')
   const [rating, setRating] = useState<number | null>(null)
   const [ratingComment, setRatingComment] = useState('')
+  const [customDuration, setCustomDuration] = useState('')
   const [search, setSearch] = useState('')
 
   const filtered = search.trim()
@@ -65,6 +66,7 @@ export function OutingPriorityList({ animals, canManageOutings, canCreateTig = f
     setNotes('')
     setRating(null)
     setRatingComment('')
+    setCustomDuration('')
   }
 
   function handleRecord(animalId: string, duration: number) {
@@ -112,7 +114,7 @@ export function OutingPriorityList({ animals, canManageOutings, canCreateTig = f
         <div className="bg-surface rounded-xl border border-border p-8 text-center">
           <PawPrint className="w-10 h-10 text-muted mx-auto mb-3" />
           <p className="text-muted text-sm">
-            {search.trim() ? 'Aucun chien trouve' : 'Aucun chien actif'}
+            {search.trim() !== '' ? 'Aucun chien trouve' : 'Aucun chien actif'}
           </p>
         </div>
       ) : (
@@ -196,20 +198,25 @@ export function OutingPriorityList({ animals, canManageOutings, canCreateTig = f
                     <div>
                       <p className="text-[11px] font-medium text-muted mb-1">Note de la sortie</p>
                       <div className="flex gap-1">
-                        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => setRating(rating === n ? null : n)}
-                            className={`flex-1 py-1 rounded text-[11px] font-bold transition-colors
-                              ${rating === n
-                                ? n <= 3 ? 'bg-red-500 text-white' : n <= 5 ? 'bg-orange-500 text-white' : n <= 7 ? 'bg-yellow-500 text-white' : 'bg-green-500 text-white'
-                                : 'bg-surface-hover text-muted hover:text-text'
-                              }`}
-                          >
-                            {n}
-                          </button>
-                        ))}
+                        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+                          let ratingColorClass = 'bg-surface-hover text-muted hover:text-text'
+                          if (rating === n) {
+                            if (n <= 3) ratingColorClass = 'bg-red-500 text-white'
+                            else if (n <= 5) ratingColorClass = 'bg-orange-500 text-white'
+                            else if (n <= 7) ratingColorClass = 'bg-yellow-500 text-white'
+                            else ratingColorClass = 'bg-green-500 text-white'
+                          }
+                          return (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setRating(rating === n ? null : n)}
+                              className={`flex-1 py-1 rounded text-[11px] font-bold transition-colors ${ratingColorClass}`}
+                            >
+                              {n}
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
 
@@ -234,18 +241,45 @@ export function OutingPriorityList({ animals, canManageOutings, canCreateTig = f
                       />
                     )}
 
-                    {/* Duration buttons */}
-                    <div className="flex gap-1.5">
-                      {QUICK_DURATIONS.map((d) => (
+                    {/* Duration input */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min="1"
+                          value={customDuration}
+                          onChange={(e) => setCustomDuration(e.target.value)}
+                          placeholder="Duree (min)"
+                          className="flex-1 px-2 py-1.5 bg-surface border border-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                        />
                         <button
-                          key={d.value}
-                          onClick={() => handleRecord(animal.id, d.value)}
-                          disabled={isPending || (rating != null && rating <= 5 && !ratingComment.trim())}
-                          className="flex-1 px-1 py-1.5 rounded text-xs font-medium bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-50"
+                          onClick={() => {
+                            const d = parseInt(customDuration)
+                            if (!d || d < 1) { toast.error('Duree invalide'); return }
+                            handleRecord(animal.id, d)
+                          }}
+                          disabled={isPending || !customDuration || (rating != null && rating <= 5 && !ratingComment.trim())}
+                          className="px-3 py-1.5 rounded text-xs font-medium bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-50"
                         >
-                          {isPending ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : d.label}
+                          {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'OK'}
                         </button>
-                      ))}
+                      </div>
+                      <div className="flex gap-1">
+                        {QUICK_DURATIONS.map((d) => (
+                          <button
+                            key={d.value}
+                            type="button"
+                            onClick={() => setCustomDuration(String(d.value))}
+                            className={`flex-1 py-1 rounded text-[11px] font-medium transition-colors ${
+                              customDuration === String(d.value)
+                                ? 'bg-primary/20 text-primary'
+                                : 'bg-surface-hover text-muted hover:text-text'
+                            }`}
+                          >
+                            {d.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <input
                       type="text"

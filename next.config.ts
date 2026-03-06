@@ -13,7 +13,12 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'app.hunimalis.com',
-        pathname: '/app/ajax/media.php',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.hunimalis.com',
+        pathname: '/**',
       },
     ],
   },

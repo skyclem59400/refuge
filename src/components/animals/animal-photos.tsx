@@ -19,7 +19,7 @@ interface AnimalPhotosProps {
   fallbackPhotoUrl?: string | null
 }
 
-export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: AnimalPhotosProps) {
+export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: Readonly<AnimalPhotosProps>) {
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -107,6 +107,7 @@ export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: 
             alt="Photo principale"
             width={600}
             height={600}
+            unoptimized={displayUrl.includes('hunimalis.com')}
             className="h-full w-full object-cover"
           />
         ) : (

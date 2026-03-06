@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { Loader2, Sparkles } from 'lucide-react'
 import { createAnimal, updateAnimal } from '@/lib/actions/animals'
 import { CommuneAutocomplete } from '@/components/ui/commune-autocomplete'
 import { getBreedsForSpecies } from '@/lib/breeds'
@@ -13,7 +14,7 @@ interface AnimalFormProps {
   boxes?: Box[]
 }
 
-export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
+export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
   const isEditing = !!animal
 
   // Identity fields
@@ -30,12 +31,17 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
   const [behaviorScore, setBehaviorScore] = useState(animal?.behavior_score?.toString() || '')
   const [boxId, setBoxId] = useState(animal?.box_id || '')
   const [description, setDescription] = useState(animal?.description || '')
+  const [descriptionExternal, setDescriptionExternal] = useState(animal?.description_external || '')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [okCats, setOkCats] = useState<boolean | null>(animal?.ok_cats ?? null)
+  const [okMales, setOkMales] = useState<boolean | null>(animal?.ok_males ?? null)
+  const [okFemales, setOkFemales] = useState<boolean | null>(animal?.ok_females ?? null)
 
   // Identification fields
   const [chipNumber, setChipNumber] = useState(animal?.chip_number || '')
   const [tattooNumber, setTattooNumber] = useState(animal?.tattoo_number || '')
   const [tattooPosition, setTattooPosition] = useState(animal?.tattoo_position || '')
-  const [medalNumber, setMedalNumber] = useState(animal?.medal_number || '')
+  const [medalNumber] = useState(animal?.medal_number || '')
   const [loofNumber, setLoofNumber] = useState(animal?.loof_number || '')
   const [passportNumber, setPassportNumber] = useState(animal?.passport_number || '')
 
@@ -46,7 +52,7 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
     if (!name.trim()) {
@@ -69,6 +75,7 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
         behavior_score: behaviorScore ? parseInt(behaviorScore) : null,
         box_id: boxId || null,
         description: description || null,
+        description_external: descriptionExternal || null,
         chip_number: chipNumber || null,
         tattoo_number: tattooNumber || null,
         tattoo_position: tattooPosition || null,
@@ -77,6 +84,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
         passport_number: passportNumber || null,
         capture_location: captureLocation || null,
         capture_circumstances: captureCircumstances || null,
+        ok_cats: species === 'dog' ? okCats : null,
+        ok_males: species === 'dog' ? okMales : null,
+        ok_females: species === 'dog' ? okFemales : null,
       }
 
       if (isEditing) {
@@ -127,8 +137,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Nom */}
           <div>
-            <label className={labelClass}>Nom *</label>
+            <label htmlFor="animal-name" className={labelClass}>Nom *</label>
             <input
+              id="animal-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -140,8 +151,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Espece */}
           <div>
-            <label className={labelClass}>Espece *</label>
+            <label htmlFor="animal-species" className={labelClass}>Espece *</label>
             <select
+              id="animal-species"
               value={species}
               onChange={(e) => setSpecies(e.target.value as AnimalSpecies)}
               className={inputClass}
@@ -154,8 +166,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Sexe */}
           <div>
-            <label className={labelClass}>Sexe *</label>
+            <label htmlFor="animal-sex" className={labelClass}>Sexe *</label>
             <select
+              id="animal-sex"
               value={sex}
               onChange={(e) => setSex(e.target.value as AnimalSex)}
               className={inputClass}
@@ -168,8 +181,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Origine */}
           <div>
-            <label className={labelClass}>Origine *</label>
+            <label htmlFor="animal-origin" className={labelClass}>Origine *</label>
             <select
+              id="animal-origin"
               value={originType}
               onChange={(e) => setOriginType(e.target.value as AnimalOrigin)}
               className={inputClass}
@@ -182,8 +196,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Race */}
           <div>
-            <label className={labelClass}>Race</label>
+            <label htmlFor="animal-breed" className={labelClass}>Race</label>
             <input
+              id="animal-breed"
               type="text"
               list="breed-list"
               value={breed}
@@ -200,8 +215,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Croisement */}
           <div>
-            <label className={labelClass}>Croisement</label>
+            <label htmlFor="animal-breed-cross" className={labelClass}>Croisement</label>
             <input
+              id="animal-breed-cross"
               type="text"
               list="breed-cross-list"
               value={breedCross}
@@ -218,8 +234,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Date de naissance */}
           <div>
-            <label className={labelClass}>Date de naissance</label>
+            <label htmlFor="animal-birth-date" className={labelClass}>Date de naissance</label>
             <input
+              id="animal-birth-date"
               type="date"
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
@@ -229,8 +246,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Lieu de naissance */}
           <div>
-            <label className={labelClass}>Lieu de naissance</label>
+            <label htmlFor="animal-birth-place" className={labelClass}>Lieu de naissance</label>
             <input
+              id="animal-birth-place"
               type="text"
               value={birthPlace}
               onChange={(e) => setBirthPlace(e.target.value)}
@@ -241,8 +259,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Couleur */}
           <div>
-            <label className={labelClass}>Couleur / Robe</label>
+            <label htmlFor="animal-color" className={labelClass}>Couleur / Robe</label>
             <input
+              id="animal-color"
               type="text"
               value={color}
               onChange={(e) => setColor(e.target.value)}
@@ -253,8 +272,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Poids */}
           <div>
-            <label className={labelClass}>Poids (kg)</label>
+            <label htmlFor="animal-weight" className={labelClass}>Poids (kg)</label>
             <input
+              id="animal-weight"
               type="number"
               step="0.1"
               min="0"
@@ -267,8 +287,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Score comportemental */}
           <div>
-            <label className={labelClass}>Score comportemental</label>
+            <label htmlFor="animal-behavior-score" className={labelClass}>Score comportemental</label>
             <select
+              id="animal-behavior-score"
               value={behaviorScore}
               onChange={(e) => setBehaviorScore(e.target.value)}
               className={inputClass}
@@ -284,8 +305,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Box */}
           <div>
-            <label className={labelClass}>Box</label>
+            <label htmlFor="animal-box" className={labelClass}>Box</label>
             <select
+              id="animal-box"
               value={boxId}
               onChange={(e) => setBoxId(e.target.value)}
               className={inputClass}
@@ -293,21 +315,105 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
               <option value="">Aucun box</option>
               {boxes.map((box) => (
                 <option key={box.id} value={box.id}>
-                  {box.name} ({box.species_type === 'cat' ? 'Chats' : box.species_type === 'dog' ? 'Chiens' : 'Mixte'})
+                  {box.name} ({(() => { if (box.species_type === 'cat') return 'Chats'; if (box.species_type === 'dog') return 'Chiens'; return 'Mixte'; })()})
                 </option>
               ))}
             </select>
           </div>
         </div>
 
-        {/* Description - full width */}
+        {/* Compatibilite - dogs only */}
+        {species === 'dog' && (
+          <div className="col-span-full mt-4">
+            <p className={labelClass}>Compatibilite</p>
+            <div className="flex flex-wrap gap-3">
+              {([
+                { label: 'OK chats', value: okCats, setter: setOkCats },
+                { label: 'OK males', value: okMales, setter: setOkMales },
+                { label: 'OK femelles', value: okFemales, setter: setOkFemales },
+              ] as const).map((item) => (
+                <div key={item.label} className="flex items-center gap-2">
+                  <span className="text-sm">{item.label}</span>
+                  <div className="flex rounded-lg border border-border overflow-hidden">
+                    {([
+                      { val: true, text: 'Oui', color: 'bg-green-500 text-white' },
+                      { val: null, text: '?', color: 'bg-surface-hover text-muted' },
+                      { val: false, text: 'Non', color: 'bg-red-500 text-white' },
+                    ] as const).map((opt) => (
+                      <button
+                        key={String(opt.val)}
+                        type="button"
+                        onClick={() => item.setter(opt.val)}
+                        className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+                          item.value === opt.val ? opt.color : 'bg-surface text-muted hover:bg-surface-hover'
+                        }`}
+                      >
+                        {opt.text}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Description interne - full width */}
         <div className="mt-4">
-          <label className={labelClass}>Description</label>
+          <label htmlFor="animal-description" className={labelClass}>Description interne</label>
           <textarea
+            id="animal-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Description de l'animal, particularites..."
+            placeholder="Notes internes : comportement, particularites, infos medicales..."
             rows={3}
+            className={`${inputClass} resize-y`}
+          />
+        </div>
+
+        {/* Description externe (publique) - full width */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-1">
+            <label htmlFor="animal-description-external" className={labelClass}>Description externe (publique)</label>
+            <button
+              type="button"
+              disabled={isGenerating || !animal?.id}
+              onClick={async () => {
+                if (!animal?.id) return
+                setIsGenerating(true)
+                try {
+                  const res = await fetch('/api/ai/generate-description', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ animalId: animal.id }),
+                  })
+                  const data = await res.json()
+                  if (res.ok && data.content) {
+                    setDescriptionExternal(data.content)
+                  } else {
+                    alert(data.error || 'Erreur lors de la generation')
+                  }
+                } catch {
+                  alert('Erreur reseau')
+                } finally {
+                  setIsGenerating(false)
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-white hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isGenerating ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generation...</>
+              ) : (
+                <><Sparkles className="w-3.5 h-3.5" /> Generer avec l&apos;IA</>
+              )}
+            </button>
+          </div>
+          <textarea
+            id="animal-description-external"
+            value={descriptionExternal}
+            onChange={(e) => setDescriptionExternal(e.target.value)}
+            placeholder={animal?.id ? "Cliquez sur 'Generer avec l'IA' ou redigez manuellement..." : "Enregistrez l'animal d'abord pour generer avec l'IA"}
+            rows={5}
             className={`${inputClass} resize-y`}
           />
         </div>
@@ -320,8 +426,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Numero de puce */}
           <div>
-            <label className={labelClass}>Numero de puce</label>
+            <label htmlFor="animal-chip-number" className={labelClass}>Numero de puce</label>
             <input
+              id="animal-chip-number"
               type="text"
               value={chipNumber}
               onChange={(e) => setChipNumber(e.target.value)}
@@ -332,8 +439,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Numero de tatouage */}
           <div>
-            <label className={labelClass}>Numero de tatouage</label>
+            <label htmlFor="animal-tattoo-number" className={labelClass}>Numero de tatouage</label>
             <input
+              id="animal-tattoo-number"
               type="text"
               value={tattooNumber}
               onChange={(e) => setTattooNumber(e.target.value)}
@@ -344,8 +452,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Position tatouage */}
           <div>
-            <label className={labelClass}>Position du tatouage</label>
+            <label htmlFor="animal-tattoo-position" className={labelClass}>Position du tatouage</label>
             <input
+              id="animal-tattoo-position"
               type="text"
               value={tattooPosition}
               onChange={(e) => setTattooPosition(e.target.value)}
@@ -356,9 +465,10 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Numero de medaille */}
           <div>
-            <label className={labelClass}>Numero de medaille</label>
+            <label htmlFor="animal-medal-number" className={labelClass}>Numero de medaille</label>
             {isEditing ? (
               <input
+                id="animal-medal-number"
                 type="text"
                 value={medalNumber}
                 readOnly
@@ -373,8 +483,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Numero LOOF */}
           <div>
-            <label className={labelClass}>Numero LOOF</label>
+            <label htmlFor="animal-loof-number" className={labelClass}>Numero LOOF</label>
             <input
+              id="animal-loof-number"
               type="text"
               value={loofNumber}
               onChange={(e) => setLoofNumber(e.target.value)}
@@ -385,8 +496,9 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
 
           {/* Numero de passeport */}
           <div>
-            <label className={labelClass}>Numero de passeport</label>
+            <label htmlFor="animal-passport-number" className={labelClass}>Numero de passeport</label>
             <input
+              id="animal-passport-number"
               type="text"
               value={passportNumber}
               onChange={(e) => setPassportNumber(e.target.value)}
@@ -405,19 +517,22 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Lieu de capture */}
             <div>
-              <label className={labelClass}>Lieu de capture</label>
-              <CommuneAutocomplete
-                value={captureLocation}
-                onChange={setCaptureLocation}
-                placeholder="Commune de capture"
-                className={inputClass}
-              />
+              <label className={labelClass}>
+                Lieu de capture
+                <CommuneAutocomplete
+                  value={captureLocation}
+                  onChange={setCaptureLocation}
+                  placeholder="Commune de capture"
+                  className={inputClass}
+                />
+              </label>
             </div>
 
             {/* Circonstances */}
             <div>
-              <label className={labelClass}>Circonstances</label>
+              <label htmlFor="animal-capture-circumstances" className={labelClass}>Circonstances</label>
               <textarea
+                id="animal-capture-circumstances"
                 value={captureCircumstances}
                 onChange={(e) => setCaptureCircumstances(e.target.value)}
                 placeholder="Circonstances de la capture..."
@@ -447,11 +562,11 @@ export function AnimalForm({ animal, boxes = [] }: AnimalFormProps) {
             disabled:opacity-50 disabled:cursor-not-allowed
             shadow-lg shadow-primary/25"
         >
-          {isPending
-            ? 'Enregistrement...'
-            : isEditing
-              ? 'Mettre a jour'
-              : 'Enregistrer l\'animal'}
+          {(() => {
+            if (isPending) return 'Enregistrement...'
+            if (isEditing) return 'Mettre a jour'
+            return 'Enregistrer l\'animal'
+          })()}
         </button>
       </div>
     </form>
