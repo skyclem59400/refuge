@@ -15,6 +15,7 @@ export async function getOutings(filters?: {
   dateFrom?: string
   dateTo?: string
   limit?: number
+  offset?: number
 }) {
   try {
     const { establishmentId } = await requireEstablishment()
@@ -22,7 +23,7 @@ export async function getOutings(filters?: {
 
     let query = supabase
       .from('animal_outings')
-      .select('*, animals!inner(id, name, species, photo_url, establishment_id, animal_photos(id, url, is_primary))')
+      .select('*, animals!inner(id, name, species, photo_url, establishment_id, animal_photos(id, url, is_primary))', { count: 'exact' })
       .eq('animals.establishment_id', establishmentId)
 
     if (filters?.animalId) {
@@ -35,12 +36,15 @@ export async function getOutings(filters?: {
       query = query.lte('started_at', filters.dateTo)
     }
 
-    const { data, error } = await query
+    const limit = filters?.limit ?? 15
+    const offset = filters?.offset ?? 0
+
+    const { data, error, count } = await query
       .order('started_at', { ascending: false })
-      .limit(filters?.limit ?? 50)
+      .range(offset, offset + limit - 1)
 
     if (error) return { error: error.message }
-    return { data }
+    return { data, count: count ?? 0 }
   } catch (e) {
     return { error: (e as Error).message }
   }
@@ -61,7 +65,7 @@ export async function getAnimalOutingPriority() {
       .select('id, name, species, photo_url, status, box_id, animal_photos(id, url, is_primary)')
       .eq('establishment_id', establishmentId)
       .eq('species', 'dog')
-      .in('status', ['pound', 'shelter', 'foster_family', 'boarding'])
+      .in('status', ['pound', 'shelter', 'boarding'])
       .order('name')
 
     if (animalsError) return { error: animalsError.message }
@@ -151,7 +155,7 @@ export async function getOutingStats() {
         .select('id', { count: 'exact', head: true })
         .eq('establishment_id', establishmentId)
         .eq('species', 'dog')
-        .in('status', ['pound', 'shelter', 'foster_family', 'boarding']),
+        .in('status', ['pound', 'shelter', 'boarding']),
     ])
 
     return {
@@ -181,7 +185,7 @@ export async function getOutingLeaderboard() {
       .select('walked_by, animal_id, duration_minutes, started_at, is_tig, animals!inner(id, name, species, photo_url, establishment_id, animal_photos(id, url, is_primary), status)')
       .eq('animals.establishment_id', establishmentId)
       .eq('animals.species', 'dog')
-      .in('animals.status', ['pound', 'shelter', 'foster_family', 'boarding'])
+      .in('animals.status', ['pound', 'shelter', 'boarding'])
       .order('started_at', { ascending: false })
 
     if (error) return { error: error.message }
@@ -210,7 +214,7 @@ export async function getOutingLeaderboard() {
       }))
       .sort((a, b) => b.count - a.count || b.totalMinutes - a.totalMinutes)
 
-    // --- Per animal ---
+    // --- Per animal (include dogs with 0 outings) ---
     type AnimalInfo = { id: string; name: string; species: string; photo_url: string | null; establishment_id: string; animal_photos: { id: string; url: string; is_primary: boolean }[] }
     const animalMap = new Map<string, { count: number; totalMinutes: number; animal: AnimalInfo }>()
     for (const o of allOutings) {
@@ -220,6 +224,23 @@ export async function getOutingLeaderboard() {
       prev.totalMinutes += o.duration_minutes || 0
       animalMap.set(o.animal_id, prev)
     }
+
+    // Fetch all active dogs to include those with 0 outings
+    const { data: allActiveDogs } = await supabase
+      .from('animals')
+      .select('id, name, species, photo_url, establishment_id, animal_photos(id, url, is_primary)')
+      .eq('establishment_id', establishmentId)
+      .eq('species', 'dog')
+      .in('status', ['pound', 'shelter', 'boarding'])
+
+    if (allActiveDogs) {
+      for (const dog of allActiveDogs) {
+        if (!animalMap.has(dog.id)) {
+          animalMap.set(dog.id, { count: 0, totalMinutes: 0, animal: dog as AnimalInfo })
+        }
+      }
+    }
+
     const perAnimal = Array.from(animalMap.entries())
       .map(([animalId, stats]) => ({
         animalId,
@@ -434,7 +455,7 @@ export async function deleteOuting(id: string) {
       action: 'delete',
       entityType: 'outing',
       entityId: id,
-      entityName: (outing.animals as any)?.name || undefined,
+      entityName: (outing.animals as { name?: string } | null)?.name || undefined,
       parentType: 'animal',
       parentId: outing.animal_id,
     })
@@ -560,7 +581,7 @@ export async function deleteAssignment(id: string) {
       action: 'delete',
       entityType: 'outing_assignment',
       entityId: id,
-      entityName: (assignment?.animals as any)?.name || undefined,
+      entityName: (assignment?.animals as { name?: string } | null)?.name || undefined,
       parentType: 'animal',
       parentId: assignment?.animal_id,
     })
