@@ -7,10 +7,10 @@ import { TimelineEventBlock } from './timeline-event-block'
 import { TimelineFiltersComponent, type TimelineFilters } from './timeline-filters'
 import { EditScheduleModal } from './edit-schedule-modal'
 import { EditAppointmentModal } from './edit-appointment-modal'
-import { groupEventsByDate, assignColumns, type TimelineEvent } from '@/lib/utils/timeline'
+import { groupEventsByDate, assignColumns, type TimelineEvent, type PositionedEvent } from '@/lib/utils/timeline'
 import type { StaffSchedule, Appointment } from '@/lib/types/database'
-import { updateSchedule } from '@/lib/actions/schedule'
-import { updateAppointment } from '@/lib/actions/appointments'
+import { updateSchedule, deleteSchedule } from '@/lib/actions/schedule'
+import { updateAppointment, deleteAppointment } from '@/lib/actions/appointments'
 import { toast } from 'sonner'
 
 interface TimelineCalendarViewProps {
@@ -21,8 +21,6 @@ interface TimelineCalendarViewProps {
   userNames: Record<string, string>
   animalNames: Record<string, string>
   canManage: boolean
-  onDeleteSchedule: (id: string) => Promise<void>
-  onDeleteAppointment: (id: string) => Promise<void>
 }
 
 const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
@@ -38,9 +36,7 @@ export function TimelineCalendarView({
   userNames,
   animalNames,
   canManage,
-  onDeleteSchedule,
-  onDeleteAppointment,
-}: TimelineCalendarViewProps) {
+}: Readonly<TimelineCalendarViewProps>) {
   const router = useRouter()
   const [weekOffset, setWeekOffset] = useState(0)
   const [editingSchedule, setEditingSchedule] = useState<StaffSchedule | null>(null)
@@ -53,7 +49,7 @@ export function TimelineCalendarView({
   const allAppointmentTypes = useMemo(() => {
     const types = new Set<string>()
     appointments.forEach((a) => types.add(a.type))
-    return Array.from(types).sort()
+    return Array.from(types).sort((a, b) => a.localeCompare(b))
   }, [appointments])
 
   const allUsers = useMemo(() => {
@@ -68,20 +64,18 @@ export function TimelineCalendarView({
   }, [schedules, appointments, userNames])
 
   // Filter state
-  const [filters, setFilters] = useState<TimelineFilters>({
+  const [filters, setFilters] = useState<TimelineFilters>(() => ({
     showSchedules: true,
     appointmentTypes: new Set(allAppointmentTypes),
     userIds: new Set(allUsers.map((u) => u.id)),
-  })
+  }))
 
-  // Update filters when data changes
-  useMemo(() => {
-    setFilters((prev) => ({
-      ...prev,
-      appointmentTypes: new Set([...prev.appointmentTypes, ...allAppointmentTypes]),
-      userIds: new Set([...prev.userIds, ...allUsers.map((u) => u.id)]),
-    }))
-  }, [allAppointmentTypes, allUsers])
+  // Merge new types/users into filters when data changes
+  const effectiveFilters = useMemo<TimelineFilters>(() => ({
+    ...filters,
+    appointmentTypes: new Set([...filters.appointmentTypes, ...allAppointmentTypes]),
+    userIds: new Set([...filters.userIds, ...allUsers.map((u) => u.id)]),
+  }), [filters, allAppointmentTypes, allUsers])
 
   // Calculate week dates
   const weekDates = useMemo(() => {
@@ -99,9 +93,9 @@ export function TimelineCalendarView({
 
   // Convert to unified event format and apply filters
   const allEvents: TimelineEvent[] = useMemo(() => {
-    const scheduleEvents: TimelineEvent[] = filters.showSchedules
+    const scheduleEvents: TimelineEvent[] = effectiveFilters.showSchedules
       ? schedules
-          .filter((s) => filters.userIds.has(s.user_id))
+          .filter((s) => effectiveFilters.userIds.has(s.user_id))
           .map((s) => ({
             id: s.id,
             date: s.date,
@@ -115,9 +109,9 @@ export function TimelineCalendarView({
     const appointmentEvents: TimelineEvent[] = appointments
       .filter((a) => {
         // Filter by appointment type
-        if (!filters.appointmentTypes.has(a.type)) return false
+        if (!effectiveFilters.appointmentTypes.has(a.type)) return false
         // Filter by assigned user
-        if (a.assigned_user_id && !filters.userIds.has(a.assigned_user_id)) return false
+        if (a.assigned_user_id && !effectiveFilters.userIds.has(a.assigned_user_id)) return false
         return true
       })
       .map((a) => ({
@@ -130,7 +124,7 @@ export function TimelineCalendarView({
       }))
 
     return [...scheduleEvents, ...appointmentEvents]
-  }, [schedules, appointments, filters])
+  }, [schedules, appointments, effectiveFilters])
 
   // Group and position events
   const eventsByDate = useMemo(() => {
@@ -138,7 +132,7 @@ export function TimelineCalendarView({
   }, [allEvents])
 
   const positionedEventsByDate = useMemo(() => {
-    const result: Record<string, any[]> = {}
+    const result: Record<string, PositionedEvent[]> = {}
     for (const [date, events] of Object.entries(eventsByDate)) {
       result[date] = assignColumns(events)
     }
@@ -148,9 +142,9 @@ export function TimelineCalendarView({
   // Handlers
   const handleDelete = async (id: string, type: 'schedule' | 'appointment') => {
     if (type === 'schedule') {
-      await onDeleteSchedule(id)
+      await deleteSchedule(id)
     } else {
-      await onDeleteAppointment(id)
+      await deleteAppointment(id)
     }
   }
 
@@ -231,7 +225,7 @@ export function TimelineCalendarView({
             router.refresh()
           }
         }
-      } catch (error) {
+      } catch {
         toast.error('Erreur lors du déplacement')
       } finally {
         setDraggedEvent(null)

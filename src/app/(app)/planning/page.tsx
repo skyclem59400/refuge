@@ -4,45 +4,84 @@ import { CalendarDays, Info, Heart, Stethoscope, Calendar, Grid } from 'lucide-r
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { getEstablishmentMembers } from '@/lib/actions/establishments'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getSchedule, deleteSchedule } from '@/lib/actions/schedule'
-import { getAppointments, deleteAppointment } from '@/lib/actions/appointments'
+import { getSchedule } from '@/lib/actions/schedule'
+import { getAppointments } from '@/lib/actions/appointments'
 import { ScheduleForm } from '@/components/schedule/schedule-form'
 import { AppointmentForm } from '@/components/appointments/appointment-form'
 import { ScheduleView } from '@/components/schedule/schedule-view'
 import { TimelineCalendarView } from '@/components/schedule/timeline-calendar-view'
 
-export default async function PlanningPage(props: { searchParams: Promise<{ view?: string }> }) {
-  const searchParams = await props.searchParams
-  const ctx = await getEstablishmentContext()
-  if (!ctx) redirect('/login')
+type SupabaseAdmin = ReturnType<typeof createAdminClient>
 
-  // Only managers/admins can access
-  const canManage = ctx.permissions.canManagePlanning
-  if (!canManage) {
-    redirect('/dashboard')
-  }
-
-  // Fetch data (include past 60 days and future 60 days for timeline navigation)
+function buildDateRange() {
   const sixtyDaysAgo = new Date()
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60)
   const sixtyDaysFromNow = new Date()
   sixtyDaysFromNow.setDate(sixtyDaysFromNow.getDate() + 60)
+  return {
+    dateFrom: sixtyDaysAgo.toISOString().split('T')[0],
+    dateTo: sixtyDaysFromNow.toISOString().split('T')[0],
+  }
+}
+
+interface PlanningData {
+  schedules: Awaited<ReturnType<typeof getSchedule>>['data'] & unknown[]
+  appointments: Awaited<ReturnType<typeof getAppointments>>['data'] & unknown[]
+  members: { user_id: string; full_name?: string | null; pseudo: string | null; email?: string }[]
+}
+
+async function fetchPlanningData(): Promise<PlanningData> {
+  const { dateFrom, dateTo } = buildDateRange()
 
   const [scheduleResult, appointmentsResult, membersResult] = await Promise.all([
-    getSchedule({
-      dateFrom: sixtyDaysAgo.toISOString().split('T')[0],
-      dateTo: sixtyDaysFromNow.toISOString().split('T')[0],
-    }),
-    getAppointments({
-      dateFrom: sixtyDaysAgo.toISOString().split('T')[0],
-      dateTo: sixtyDaysFromNow.toISOString().split('T')[0],
-    }),
+    getSchedule({ dateFrom, dateTo }),
+    getAppointments({ dateFrom, dateTo }),
     getEstablishmentMembers(),
   ])
 
-  const schedules = scheduleResult.data || []
-  const appointments = appointmentsResult.data || []
-  const members = (membersResult as { data?: { user_id: string; full_name?: string | null; pseudo: string | null; email?: string }[] }).data || []
+  return {
+    schedules: scheduleResult.data || [],
+    appointments: appointmentsResult.data || [],
+    members: (membersResult.data || []) as PlanningData['members'],
+  }
+}
+
+async function resolveUserNames(
+  admin: SupabaseAdmin,
+  userIds: string[]
+): Promise<Record<string, string>> {
+  const names: Record<string, string> = {}
+  if (userIds.length === 0) return names
+
+  const { data: usersInfo } = await admin.rpc('get_users_info', { user_ids: userIds })
+  if (usersInfo && Array.isArray(usersInfo)) {
+    for (const u of usersInfo) {
+      names[u.id] = u.full_name || u.email || u.id
+    }
+  }
+  return names
+}
+
+function buildAnimalMaps(allAnimals: { id: string; nom: string }[] | null) {
+  const animals = allAnimals || []
+  const animalsForForm = animals.map((a) => ({ id: a.id, nom: a.nom }))
+  const animalNames: Record<string, string> = {}
+  for (const animal of animals) {
+    animalNames[animal.id] = animal.nom
+  }
+  return { animalsForForm, animalNames }
+}
+
+export default async function PlanningPage(props: Readonly<{ searchParams: Promise<{ view?: string }> }>) {
+  const searchParams = await props.searchParams
+  const ctx = await getEstablishmentContext()
+  if (!ctx) redirect('/login')
+
+  if (!ctx.permissions.canManagePlanning) {
+    redirect('/dashboard')
+  }
+
+  const { schedules, appointments, members } = await fetchPlanningData()
 
   // Resolve user names
   const allUserIds = [
@@ -54,45 +93,19 @@ export default async function PlanningPage(props: { searchParams: Promise<{ view
     ]),
   ]
 
-  const userNames: Record<string, string> = {}
-  if (allUserIds.length > 0) {
-    const admin = createAdminClient()
-    const { data: usersInfo } = await admin.rpc('get_users_info', { user_ids: allUserIds })
-    if (usersInfo && Array.isArray(usersInfo)) {
-      for (const u of usersInfo) {
-        userNames[u.id] = u.full_name || u.email || u.id
-      }
-    }
-  }
+  const admin = createAdminClient()
+  const userNames = await resolveUserNames(admin, allUserIds)
 
   // Fetch animals for appointment linking and form
-  const admin = createAdminClient()
   const { data: allAnimals } = await admin
     .from('animals')
     .select('id, nom')
     .eq('establishment_id', ctx.establishment.id)
     .order('nom')
 
-  const animalsForForm = (allAnimals || []).map((a: { id: string; nom: string }) => ({ id: a.id, nom: a.nom }))
+  const { animalsForForm, animalNames } = buildAnimalMaps(allAnimals)
 
-  const animalNames: Record<string, string> = {}
-  if (allAnimals) {
-    for (const animal of allAnimals) {
-      animalNames[animal.id] = animal.nom
-    }
-  }
-
-  // View mode (timeline or cards)
   const viewMode = (searchParams.view === 'cards' ? 'cards' : 'timeline') as 'cards' | 'timeline'
-
-  // Wrappers for delete functions to match expected Promise<void> signature
-  const handleDeleteSchedule = async (id: string): Promise<void> => {
-    await deleteSchedule(id)
-  }
-
-  const handleDeleteAppointment = async (id: string): Promise<void> => {
-    await deleteAppointment(id)
-  }
 
   return (
     <div className="animate-fade-up">
@@ -113,9 +126,9 @@ export default async function PlanningPage(props: { searchParams: Promise<{ view
       <div className="flex gap-3 p-4 mb-6 bg-info/5 border border-info/20 rounded-xl">
         <Info className="w-5 h-5 text-info shrink-0 mt-0.5" />
         <div className="text-sm text-muted">
-          <p className="font-medium text-text mb-1">Planning unifié</p>
+          <p className="font-medium text-text mb-1">Planning unifie</p>
           <p>
-            Gérez les horaires de présence du personnel et les rendez-vous (adoptions, vétérinaire) dans un seul calendrier.
+            Gerez les horaires de presence du personnel et les rendez-vous (adoptions, veterinaire) dans un seul calendrier.
             Filtrez par collaborateur, dupliquez une semaine facilement.
           </p>
         </div>
@@ -140,7 +153,7 @@ export default async function PlanningPage(props: { searchParams: Promise<{ view
           <p className="text-2xl font-bold">
             {appointments.filter((a) => a.type === 'veterinary').length}
           </p>
-          <p className="text-xs text-muted mt-1">Vétérinaire</p>
+          <p className="text-xs text-muted mt-1">Veterinaire</p>
         </div>
         <div className="bg-surface rounded-xl border border-border p-4 text-center">
           <CalendarDays className="w-5 h-5 text-success mx-auto mb-1" />
@@ -148,7 +161,7 @@ export default async function PlanningPage(props: { searchParams: Promise<{ view
             {schedules.filter((s) => new Date(s.date) >= new Date()).length +
              appointments.filter((a) => new Date(a.date) >= new Date()).length}
           </p>
-          <p className="text-xs text-muted mt-1">À venir</p>
+          <p className="text-xs text-muted mt-1">A venir</p>
         </div>
         <div className="bg-surface rounded-xl border border-border p-4 text-center">
           <CalendarDays className="w-5 h-5 text-info mx-auto mb-1" />
@@ -213,9 +226,7 @@ export default async function PlanningPage(props: { searchParams: Promise<{ view
           members={members}
           userNames={userNames}
           animalNames={animalNames}
-          canManage={canManage}
-          onDeleteSchedule={handleDeleteSchedule}
-          onDeleteAppointment={handleDeleteAppointment}
+          canManage={true}
         />
       ) : (
         <ScheduleView
