@@ -57,7 +57,7 @@ export function PostGenerator({
   establishmentName,
   establishmentPhone,
   onPostCreated,
-}: PostGeneratorProps) {
+}: Readonly<PostGeneratorProps>) {
   const defaultPostType: AnimalPostType = animal.status === 'pound' ? 'search_owner' : 'adoption'
   const primaryPhoto = photos.find((p) => p.is_primary) || photos[0] || null
   const photoUrl = primaryPhoto?.url || animal.photo_url || null
@@ -174,8 +174,9 @@ export function PostGenerator({
       <div className="bg-surface rounded-xl border border-border p-5 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className={labelClass}>Type de publication</label>
+            <label htmlFor="post-gen-type" className={labelClass}>Type de publication</label>
             <select
+              id="post-gen-type"
               value={postType}
               onChange={(e) => setPostType(e.target.value as AnimalPostType)}
               className={inputClass}
@@ -189,8 +190,9 @@ export function PostGenerator({
             </select>
           </div>
           <div>
-            <label className={labelClass}>Plateforme</label>
+            <label htmlFor="post-gen-platform" className={labelClass}>Plateforme</label>
             <select
+              id="post-gen-platform"
               value={platform}
               onChange={(e) => setPlatform(e.target.value as SocialPlatform)}
               className={inputClass}
@@ -206,8 +208,9 @@ export function PostGenerator({
         </div>
 
         <div>
-          <label className={labelClass}>Notes supplementaires (optionnel)</label>
+          <label htmlFor="post-gen-notes" className={labelClass}>Notes supplementaires (optionnel)</label>
           <textarea
+            id="post-gen-notes"
             value={additionalNotes}
             onChange={(e) => setAdditionalNotes(e.target.value)}
             placeholder="Caractere de l'animal, urgence, details..."
@@ -224,17 +227,19 @@ export function PostGenerator({
             disabled={isGenerating}
             className="gradient-primary hover:opacity-90 transition-opacity text-white px-6 py-3 rounded-lg font-semibold text-sm flex items-center gap-2 shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isGenerating ? (
+            {isGenerating && (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Generation en cours...
               </>
-            ) : generatedContent ? (
+            )}
+            {!isGenerating && generatedContent && (
               <>
                 <RefreshCw className="h-4 w-4" />
                 Regenerer
               </>
-            ) : (
+            )}
+            {!isGenerating && !generatedContent && (
               <>
                 <Sparkles className="h-4 w-4" />
                 Generer avec l&apos;IA
@@ -261,7 +266,7 @@ export function PostGenerator({
                   src={photoUrl}
                   alt={animal.name}
                   className="absolute inset-0 w-full h-full object-cover"
-                  crossOrigin="anonymous"
+                  crossOrigin={photoUrl.includes('hunimalis.com') ? undefined : 'anonymous'}
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)' }}>
@@ -384,8 +389,9 @@ export function PostGenerator({
 
             {showEditor && (
               <div>
-                <label className={labelClass}>Contenu de la publication</label>
+                <label htmlFor="post-gen-content" className={labelClass}>Contenu de la publication</label>
                 <textarea
+                  id="post-gen-content"
                   value={generatedContent}
                   onChange={(e) => setGeneratedContent(e.target.value)}
                   rows={8}
