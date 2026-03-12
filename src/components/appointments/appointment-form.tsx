@@ -14,7 +14,7 @@ interface AppointmentFormProps {
   onClose?: () => void
 }
 
-export function AppointmentForm({ animals = [], members = [], userNames = {}, onClose }: AppointmentFormProps) {
+export function AppointmentForm({ animals = [], members = [], userNames = {}, onClose }: Readonly<AppointmentFormProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -35,10 +35,19 @@ export function AppointmentForm({ animals = [], members = [], userNames = {}, on
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validation
-    if (!animalId || !assignedUserId || !date || !startTime || !endTime) {
-      toast.error('Veuillez remplir tous les champs obligatoires')
-      return
+    const isCustomType = showCustomType
+    // For standard types: animal, collaborateur, date, heures are required
+    // For custom types ("Autre"): nothing is required except type name
+    if (!isCustomType) {
+      if (!animalId || !assignedUserId || !date || !startTime || !endTime) {
+        toast.error('Veuillez remplir tous les champs obligatoires')
+        return
+      }
+    } else {
+      if (!customType.trim()) {
+        toast.error('Veuillez indiquer le type de rendez-vous')
+        return
+      }
     }
 
     // For adoption appointments, client name is required
@@ -107,10 +116,10 @@ export function AppointmentForm({ animals = [], members = [], userNames = {}, on
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Type */}
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium mb-2">
+          <span id="appointment-type-label" className="block text-sm font-medium mb-2">
             Type de rendez-vous <span className="text-error">*</span>
-          </label>
-          <div className="flex flex-wrap gap-2 mb-2">
+          </span>
+          <div className="flex flex-wrap gap-2 mb-2" role="group" aria-labelledby="appointment-type-label">
             <button
               type="button"
               onClick={() => {
@@ -169,17 +178,17 @@ export function AppointmentForm({ animals = [], members = [], userNames = {}, on
           )}
         </div>
 
-        {/* Animal (required) */}
+        {/* Animal */}
         <div>
           <label htmlFor="animal" className="block text-sm font-medium mb-2">
             <PawPrint className="w-3.5 h-3.5 inline mr-1" />
-            Animal <span className="text-error">*</span>
+            Animal {!showCustomType && <span className="text-error">*</span>}
           </label>
           <select
             id="animal"
             value={animalId}
             onChange={(e) => setAnimalId(e.target.value)}
-            required
+            required={!showCustomType}
             className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
             <option value="">
@@ -193,17 +202,17 @@ export function AppointmentForm({ animals = [], members = [], userNames = {}, on
           </select>
         </div>
 
-        {/* Assigned staff member (required) */}
+        {/* Assigned staff member */}
         <div>
           <label htmlFor="assignedUser" className="block text-sm font-medium mb-2">
             <User className="w-3.5 h-3.5 inline mr-1" />
-            Collaborateur assigné <span className="text-error">*</span>
+            Collaborateur assigné {!showCustomType && <span className="text-error">*</span>}
           </label>
           <select
             id="assignedUser"
             value={assignedUserId}
             onChange={(e) => setAssignedUserId(e.target.value)}
-            required
+            required={!showCustomType}
             className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
             <option value="">
@@ -275,14 +284,14 @@ export function AppointmentForm({ animals = [], members = [], userNames = {}, on
         <div>
           <label htmlFor="date" className="block text-sm font-medium mb-2">
             <CalendarDays className="w-3.5 h-3.5 inline mr-1" />
-            Date <span className="text-error">*</span>
+            Date {!showCustomType && <span className="text-error">*</span>}
           </label>
           <input
             type="date"
             id="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            required
+            required={!showCustomType}
             className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
@@ -291,14 +300,14 @@ export function AppointmentForm({ animals = [], members = [], userNames = {}, on
         <div>
           <label htmlFor="startTime" className="block text-sm font-medium mb-2">
             <Clock className="w-3.5 h-3.5 inline mr-1" />
-            Heure de début <span className="text-error">*</span>
+            Heure de début {!showCustomType && <span className="text-error">*</span>}
           </label>
           <input
             type="time"
             id="startTime"
             value={startTime}
             onChange={(e) => setStartTime(e.target.value)}
-            required
+            required={!showCustomType}
             className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
@@ -307,14 +316,14 @@ export function AppointmentForm({ animals = [], members = [], userNames = {}, on
         <div>
           <label htmlFor="endTime" className="block text-sm font-medium mb-2">
             <Clock className="w-3.5 h-3.5 inline mr-1" />
-            Heure de fin <span className="text-error">*</span>
+            Heure de fin {!showCustomType && <span className="text-error">*</span>}
           </label>
           <input
             type="time"
             id="endTime"
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
-            required
+            required={!showCustomType}
             className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>

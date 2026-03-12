@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { getAssignments } from '@/lib/actions/outings'
+import { getTodayTreatments } from '@/lib/actions/treatments'
 import { WelcomeBanner } from '@/components/dashboard/welcome-banner'
 import { ShelterDashboard } from '@/components/dashboard/shelter-dashboard'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -196,10 +197,22 @@ async function ShelterDashboardAsync({ estabId }: { estabId: string }) {
   const admin = createAdminClient()
 
   // Parallel fetch instead of sequential
-  const [shelterData, dailyAssignments] = await Promise.all([
+  const [shelterData, dailyAssignments, treatmentsResult] = await Promise.all([
     fetchShelterData(admin, estabId),
     fetchDailyAssignments(admin),
+    getTodayTreatments(),
   ])
+
+  const todayTreatments = treatmentsResult.data || []
+
+  // Resolve user names for treatment administrations
+  const treatmentUserIds = new Set<string>()
+  for (const t of todayTreatments) {
+    for (const a of t.administrations_today || []) {
+      treatmentUserIds.add(a.administered_by)
+    }
+  }
+  const treatmentUserNames = await resolveUserNames(admin, [...treatmentUserIds])
 
   return (
     <ShelterDashboard
@@ -208,6 +221,8 @@ async function ShelterDashboardAsync({ estabId }: { estabId: string }) {
       shelterAnimals={shelterData.shelterAnimals}
       healthAlerts={shelterData.healthAlerts}
       dailyAssignments={dailyAssignments}
+      todayTreatments={todayTreatments}
+      treatmentUserNames={treatmentUserNames}
     />
   )
 }

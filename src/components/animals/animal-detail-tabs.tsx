@@ -17,7 +17,8 @@ import {
 } from '@/lib/sda-utils'
 import { PostGenerator } from '@/components/social/post-generator'
 import { IcadDeclarations } from '@/components/icad/icad-declarations'
-import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, Box, SocialPost, IcadDeclaration, ActivityLog } from '@/lib/types/database'
+import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, AnimalTreatment, Box, SocialPost, IcadDeclaration, ActivityLog } from '@/lib/types/database'
+import { stopTreatment } from '@/lib/actions/treatments'
 import { ActivityTimeline } from '@/components/ui/activity-timeline'
 import { formatOutingDuration } from '@/lib/sda-utils'
 import {
@@ -45,6 +46,9 @@ import {
   ClipboardList,
   Footprints,
   HardHat,
+  Pill,
+  StopCircle,
+  Clock,
 } from 'lucide-react'
 
 type TabId = 'info' | 'photos' | 'health' | 'movements' | 'outings' | 'posts' | 'icad' | 'activity'
@@ -69,6 +73,7 @@ interface AnimalDetailTabsProps {
   photos: AnimalPhoto[]
   movements: AnimalMovement[]
   healthRecords: AnimalHealthRecord[]
+  treatments?: AnimalTreatment[]
   outings?: AnimalOuting[]
   socialPosts: SocialPost[]
   icadDeclarations: IcadDeclaration[]
@@ -109,6 +114,7 @@ export function AnimalDetailTabs({
   canManageAnimals,
   canManageHealth,
   canManageMovements,
+  treatments = [],
   outings = [],
   canManagePosts,
   isAdmin = false,
@@ -232,6 +238,7 @@ export function AnimalDetailTabs({
           <HealthTab
             animal={animal}
             healthRecords={healthRecords}
+            treatments={treatments}
             canManageHealth={canManageHealth}
             showForm={showHealthForm}
             onToggleForm={() => setShowHealthForm(!showHealthForm)}
@@ -480,6 +487,7 @@ function PhotosTab({
 function HealthTab({
   animal,
   healthRecords,
+  treatments,
   canManageHealth,
   showForm,
   onToggleForm,
@@ -488,12 +496,23 @@ function HealthTab({
 }: Readonly<{
   animal: Animal
   healthRecords: AnimalHealthRecord[]
+  treatments: AnimalTreatment[]
   canManageHealth: boolean
   showForm: boolean
   onToggleForm: () => void
   today: string
   in30Days: string
 }>) {
+  const activeTreatments = treatments.filter((t) => t.active)
+  const stoppedTreatments = treatments.filter((t) => !t.active)
+
+  const frequencyLabels: Record<string, string> = {
+    daily: 'Quotidien',
+    twice_daily: '2x/jour',
+    weekly: 'Hebdo',
+    custom: 'Personnalise',
+  }
+
   return (
     <div className="space-y-4">
       {/* Add button */}
@@ -516,6 +535,42 @@ function HealthTab({
           animalId={animal.id}
           onClose={onToggleForm}
         />
+      )}
+
+      {/* Active treatments */}
+      {activeTreatments.length > 0 && (
+        <div className="bg-surface rounded-xl border border-border">
+          <div className="p-5 border-b border-border flex items-center gap-2">
+            <Pill className="w-4 h-4 text-primary" />
+            <div>
+              <h3 className="font-semibold">Traitements en cours</h3>
+              <p className="text-xs text-muted mt-0.5">{activeTreatments.length} traitement(s) actif(s)</p>
+            </div>
+          </div>
+          <div className="divide-y divide-border">
+            {activeTreatments.map((t) => (
+              <AnimalTreatmentRow key={t.id} treatment={t} frequencyLabels={frequencyLabels} canManage={canManageHealth} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Stopped treatments */}
+      {stoppedTreatments.length > 0 && (
+        <div className="bg-surface rounded-xl border border-border opacity-60">
+          <div className="p-5 border-b border-border flex items-center gap-2">
+            <Pill className="w-4 h-4 text-muted" />
+            <div>
+              <h3 className="font-semibold text-muted">Traitements termines</h3>
+              <p className="text-xs text-muted mt-0.5">{stoppedTreatments.length} traitement(s)</p>
+            </div>
+          </div>
+          <div className="divide-y divide-border">
+            {stoppedTreatments.map((t) => (
+              <AnimalTreatmentRow key={t.id} treatment={t} frequencyLabels={frequencyLabels} canManage={false} />
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Health records timeline */}
@@ -581,6 +636,72 @@ function HealthTab({
               )
             })}
           </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function AnimalTreatmentRow({
+  treatment,
+  frequencyLabels,
+  canManage,
+}: Readonly<{
+  treatment: AnimalTreatment
+  frequencyLabels: Record<string, string>
+  canManage: boolean
+}>) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+
+  function handleStop() {
+    startTransition(async () => {
+      const result = await stopTreatment(treatment.id)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Traitement arrete')
+        router.refresh()
+      }
+    })
+  }
+
+  return (
+    <div className="p-4 hover:bg-surface-hover/30 transition-colors">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-semibold">{treatment.name}</span>
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-primary/10 text-primary">
+              {frequencyLabels[treatment.frequency] || treatment.frequency}
+            </span>
+          </div>
+          {treatment.description && (
+            <p className="text-xs text-muted mt-1">{treatment.description}</p>
+          )}
+          <div className="flex items-center gap-3 mt-2 text-xs text-muted">
+            <span className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {new Date(treatment.start_date).toLocaleDateString('fr-FR')}
+              {treatment.end_date && ` — ${new Date(treatment.end_date).toLocaleDateString('fr-FR')}`}
+            </span>
+            {treatment.times.length > 0 && (
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {treatment.times.join(', ')}
+              </span>
+            )}
+          </div>
+        </div>
+        {canManage && treatment.active && (
+          <button
+            onClick={handleStop}
+            disabled={isPending}
+            className="p-1.5 rounded-lg text-muted hover:text-warning hover:bg-warning/10 transition-colors disabled:opacity-50"
+            title="Arreter le traitement"
+          >
+            <StopCircle className="w-4 h-4" />
+          </button>
         )}
       </div>
     </div>

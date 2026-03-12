@@ -21,6 +21,7 @@ export function EstablishmentForm({ establishment }: EstablishmentFormProps) {
   const [address, setAddress] = useState(establishment.address)
   const [iban, setIban] = useState(establishment.iban)
   const [bic, setBic] = useState(establishment.bic)
+  const [googleCalendarId, setGoogleCalendarId] = useState(establishment.google_calendar_id || '')
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -42,6 +43,7 @@ export function EstablishmentForm({ establishment }: EstablishmentFormProps) {
         address: address.trim(),
         iban: iban.trim(),
         bic: bic.trim(),
+        google_calendar_id: googleCalendarId.trim(),
       })
 
       if (result.error) {
@@ -187,6 +189,24 @@ export function EstablishmentForm({ establishment }: EstablishmentFormProps) {
               focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
           />
         </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+          Google Calendar ID
+        </label>
+        <input
+          type="text"
+          value={googleCalendarId}
+          onChange={(e) => setGoogleCalendarId(e.target.value)}
+          placeholder="abc123@group.calendar.google.com"
+          className="w-full px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm font-mono
+            focus:border-primary focus:ring-1 focus:ring-primary transition-colors
+            placeholder:text-muted/50"
+        />
+        <p className="text-xs text-muted mt-1">
+          Identifiant de l&apos;agenda Google a synchroniser avec le planning.
+        </p>
       </div>
 
       <div className="pt-2">

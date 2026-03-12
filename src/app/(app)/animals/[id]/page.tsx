@@ -5,17 +5,34 @@ import { getEstablishmentContext } from '@/lib/establishment/context'
 import { AnimalDetailTabs } from '@/components/animals/animal-detail-tabs'
 import { AnimalStatusBadge, SpeciesBadge } from '@/components/animals/animal-status-badge'
 import { getSexIcon, calculateAge, getOriginLabel } from '@/lib/sda-utils'
-import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, Box, SocialPost, IcadDeclaration, ActivityLog } from '@/lib/types/database'
+import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, AnimalTreatment, Box, SocialPost, IcadDeclaration, ActivityLog } from '@/lib/types/database'
+import { getTreatments } from '@/lib/actions/treatments'
 import { getActivityLogs } from '@/lib/actions/activity-log'
 import { getOutings } from '@/lib/actions/outings'
 import { ArrowLeft } from 'lucide-react'
 
-export default async function AnimalDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const ctx = await getEstablishmentContext()
-  const estabId = ctx!.establishment.id
-  const admin = createAdminClient()
+type SupabaseAdmin = ReturnType<typeof createAdminClient>
 
+async function resolveUserNames(
+  admin: SupabaseAdmin,
+  userIds: string[],
+  existing: Record<string, string> = {}
+): Promise<Record<string, string>> {
+  const names = { ...existing }
+  const newIds = userIds.filter((uid) => !names[uid])
+  const uniqueIds = [...new Set(newIds)]
+  if (uniqueIds.length === 0) return names
+
+  const { data: usersInfo } = await admin.rpc('get_users_info', { user_ids: uniqueIds })
+  if (usersInfo && Array.isArray(usersInfo)) {
+    for (const u of usersInfo) {
+      names[u.id] = u.full_name || u.email || u.id
+    }
+  }
+  return names
+}
+
+async function fetchAnimalData(admin: SupabaseAdmin, id: string, estabId: string) {
   const [
     { data: animal },
     { data: photos },
@@ -34,76 +51,62 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
     admin.from('icad_declarations').select('*').eq('animal_id', id).order('created_at', { ascending: false }),
   ])
 
-  // Fetch outings for this animal
-  const outingsResult = await getOutings({ animalId: id, limit: 100 })
-  const outings = outingsResult.data || []
-
-  if (!animal) notFound()
-
-  const typedAnimal = animal as Animal
-  const typedPhotos = (photos as AnimalPhoto[]) || []
-  const typedMovements = (movements as AnimalMovement[]) || []
-  const typedHealth = (healthRecords as AnimalHealthRecord[]) || []
-  const typedBoxes = (boxes as Box[]) || []
-  const typedPosts = (socialPosts as SocialPost[]) || []
-  const typedIcad = (icadDeclarations as IcadDeclaration[]) || []
-
-  // Resolve user names for created_by fields
-  const allCreatedByIds = [
-    ...typedMovements.map((m) => m.created_by),
-    ...typedHealth.map((h) => h.created_by),
-    ...outings.map((o: { walked_by: string }) => o.walked_by),
-  ].filter((id): id is string => !!id)
-  const uniqueUserIds = [...new Set(allCreatedByIds)]
-
-  const userNames: Record<string, string> = {}
-  if (uniqueUserIds.length > 0) {
-    const { data: usersInfo } = await admin.rpc('get_users_info', { user_ids: uniqueUserIds })
-    if (usersInfo && Array.isArray(usersInfo)) {
-      for (const u of usersInfo) {
-        userNames[u.id] = u.full_name || u.email || u.id
-      }
-    }
+  return {
+    animal: animal as Animal | null,
+    photos: (photos as AnimalPhoto[]) || [],
+    movements: (movements as AnimalMovement[]) || [],
+    healthRecords: (healthRecords as AnimalHealthRecord[]) || [],
+    boxes: (boxes as Box[]) || [],
+    socialPosts: (socialPosts as SocialPost[]) || [],
+    icadDeclarations: (icadDeclarations as IcadDeclaration[]) || [],
   }
+}
 
-  const canManageAnimals = ctx!.permissions.canManageAnimals
-  const canManageHealth = ctx!.permissions.canManageHealth
-  const canManageMovements = ctx!.permissions.canManageMovements
-  const canManagePosts = ctx!.permissions.canManagePosts
-  const isAdmin = ctx!.permissions.isAdmin
+async function fetchActivityLogsDeduped(id: string): Promise<ActivityLog[]> {
+  const [logsResult, directLogsResult] = await Promise.all([
+    getActivityLogs({ parentType: 'animal', parentId: id, limit: 50 }),
+    getActivityLogs({ entityType: 'animal', entityId: id, limit: 50 }),
+  ])
+  const allLogs = [...(logsResult.data || []), ...(directLogsResult.data || [])]
+  const logMap = new Map(allLogs.map((l) => [l.id, l]))
+  return Array.from(logMap.values()).sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )
+}
+
+export default async function AnimalDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const ctx = await getEstablishmentContext()
+  const estabId = ctx!.establishment.id
+  const admin = createAdminClient()
+
+  const data = await fetchAnimalData(admin, id, estabId)
+  if (!data.animal) notFound()
+
+  const [outingsResult, treatmentsResult] = await Promise.all([
+    getOutings({ animalId: id, limit: 100 }),
+    getTreatments({ animalId: id }),
+  ])
+  const outings = outingsResult.data || []
+  const treatments = (treatmentsResult.data || []) as AnimalTreatment[]
+
+  // Collect user IDs from movements, health records, and outings
+  const allCreatedByIds = [
+    ...data.movements.map((m) => m.created_by),
+    ...data.healthRecords.map((h) => h.created_by),
+    ...outings.map((o: { walked_by: string }) => o.walked_by),
+  ].filter((uid): uid is string => !!uid)
+
+  let userNames = await resolveUserNames(admin, allCreatedByIds)
+
+  const { canManageAnimals, canManageHealth, canManageMovements, canManagePosts, isAdmin } = ctx!.permissions
 
   // Fetch activity logs for admin only
   let activityLogs: ActivityLog[] = []
   if (isAdmin) {
-    const logsResult = await getActivityLogs({
-      parentType: 'animal',
-      parentId: id,
-      limit: 50,
-    })
-    // Also fetch direct entity logs
-    const directLogsResult = await getActivityLogs({
-      entityType: 'animal',
-      entityId: id,
-      limit: 50,
-    })
-    const allLogs = [...(logsResult.data || []), ...(directLogsResult.data || [])]
-    // Deduplicate by id and sort by date
-    const logMap = new Map(allLogs.map(l => [l.id, l]))
-    activityLogs = Array.from(logMap.values()).sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
-
-    // Add log user IDs to resolve names
-    const logUserIds = activityLogs.map(l => l.user_id).filter(uid => !userNames[uid])
-    if (logUserIds.length > 0) {
-      const uniqueLogUserIds = [...new Set(logUserIds)]
-      const { data: logUsersInfo } = await admin.rpc('get_users_info', { user_ids: uniqueLogUserIds })
-      if (logUsersInfo && Array.isArray(logUsersInfo)) {
-        for (const u of logUsersInfo) {
-          userNames[u.id] = u.full_name || u.email || u.id
-        }
-      }
-    }
+    activityLogs = await fetchActivityLogsDeduped(id)
+    const logUserIds = activityLogs.map((l) => l.user_id)
+    userNames = await resolveUserNames(admin, logUserIds, userNames)
   }
 
   return (
@@ -116,32 +119,33 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold">
-              {typedAnimal.name}
-              <span className="ml-2 text-muted text-xl">{getSexIcon(typedAnimal.sex)}</span>
+              {data.animal.name}
+              <span className="ml-2 text-muted text-xl">{getSexIcon(data.animal.sex)}</span>
             </h1>
-            <AnimalStatusBadge status={typedAnimal.status} />
-            <SpeciesBadge species={typedAnimal.species} />
+            <AnimalStatusBadge status={data.animal.status} />
+            <SpeciesBadge species={data.animal.species} />
           </div>
           <div className="flex items-center gap-2 text-sm text-muted mt-1 flex-wrap">
-            {typedAnimal.breed && <span>{typedAnimal.breed}{typedAnimal.breed_cross ? ` x ${typedAnimal.breed_cross}` : ''}</span>}
-            {typedAnimal.breed && <span>-</span>}
-            <span>{calculateAge(typedAnimal.birth_date)}</span>
+            {data.animal.breed && <span>{data.animal.breed}{data.animal.breed_cross ? ` x ${data.animal.breed_cross}` : ''}</span>}
+            {data.animal.breed && <span>-</span>}
+            <span>{calculateAge(data.animal.birth_date)}</span>
             <span>-</span>
-            <span>{getOriginLabel(typedAnimal.origin_type)}</span>
+            <span>{getOriginLabel(data.animal.origin_type)}</span>
           </div>
         </div>
       </div>
 
       {/* Tabbed content */}
       <AnimalDetailTabs
-        animal={typedAnimal}
-        photos={typedPhotos}
-        movements={typedMovements}
-        healthRecords={typedHealth}
+        animal={data.animal}
+        photos={data.photos}
+        movements={data.movements}
+        healthRecords={data.healthRecords}
+        treatments={treatments}
         outings={outings}
-        socialPosts={typedPosts}
-        icadDeclarations={typedIcad}
-        boxes={typedBoxes}
+        socialPosts={data.socialPosts}
+        icadDeclarations={data.icadDeclarations}
+        boxes={data.boxes}
         userNames={userNames}
         establishmentName={ctx!.establishment.name}
         establishmentPhone={ctx!.establishment.phone}

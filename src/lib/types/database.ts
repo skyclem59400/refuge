@@ -68,6 +68,7 @@ export interface Establishment {
   legal_name: string
   logo_url: string | null
   type: EstablishmentType
+  google_calendar_id: string
   created_at: string
   updated_at: string
 }
@@ -359,6 +360,36 @@ export interface AnimalHealthRecord {
   cost: number | null
   notes: string | null
   created_by: string | null
+  created_at: string
+}
+
+export type TreatmentFrequency = 'daily' | 'twice_daily' | 'weekly' | 'custom'
+
+export interface AnimalTreatment {
+  id: string
+  establishment_id: string
+  animal_id: string
+  health_record_id: string | null
+  name: string
+  description: string | null
+  frequency: TreatmentFrequency
+  times: string[]
+  start_date: string
+  end_date: string | null
+  active: boolean
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TreatmentAdministration {
+  id: string
+  treatment_id: string
+  date: string
+  time_slot: string | null
+  administered_by: string
+  notes: string | null
   created_at: string
 }
 
@@ -771,6 +802,7 @@ export type NotificationType =
   | 'leave_request_approved'
   | 'leave_request_refused'
   | 'payslip_uploaded'
+  | 'treatment_new'
   | 'general'
 
 export interface Notification {

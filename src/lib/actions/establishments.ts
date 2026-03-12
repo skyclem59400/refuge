@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requirePermission, requireEstablishment } from '@/lib/establishment/permissions'
 import { logActivity } from '@/lib/actions/activity-log'
-import type { EstablishmentMember, UnassignedUser, PermissionGroup, Permission, RoleType } from '@/lib/types/database'
+import type { EstablishmentMember, PermissionGroup, Permission } from '@/lib/types/database'
 
 function stripAccents(str: string): string {
   return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -31,6 +31,7 @@ export async function updateEstablishment(data: {
   address?: string
   legal_name?: string
   logo_url?: string
+  google_calendar_id?: string
 }) {
   try {
     const { establishmentId } = await requirePermission('manage_establishment')
@@ -401,12 +402,13 @@ export async function removeMember(memberId: string) {
     if (!member) return { error: 'Membre introuvable' }
 
     // Prevent self-removal
-    if ((member as EstablishmentMember).user_id === userId) {
+    const typedMember = member as EstablishmentMember
+    if (typedMember.user_id === userId) {
       return { error: 'Vous ne pouvez pas vous retirer vous-meme' }
     }
 
-    const isPseudoUser = (member as EstablishmentMember).is_pseudo_user
-    const memberUserId = (member as EstablishmentMember).user_id
+    const isPseudoUser = typedMember.is_pseudo_user
+    const memberUserId = typedMember.user_id
 
     const { error } = await admin
       .from('establishment_members')
@@ -433,11 +435,41 @@ export async function removeMember(memberId: string) {
       action: 'delete',
       entityType: 'member',
       entityId: memberId,
-      entityName: (member as any).full_name || (member as any).pseudo || (member as any).email || undefined,
+      entityName: typedMember.full_name || typedMember.pseudo || typedMember.email || undefined,
     })
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
+  }
+}
+
+function enrichMembersWithUserInfo(
+  members: EstablishmentMember[],
+  usersInfo: { id: string; email: string; full_name: string | null; avatar_url: string | null }[]
+) {
+  const userMap = new Map(usersInfo.map(u => [u.id, u]))
+  for (const member of members) {
+    const info = userMap.get(member.user_id)
+    if (info) {
+      member.email = info.email
+      member.full_name = info.full_name
+      member.avatar_url = info.avatar_url
+    }
+  }
+}
+
+function enrichMembersWithGroups(
+  members: EstablishmentMember[],
+  allMemberGroups: { member_id: string; group_id: string }[],
+  groupMap: Map<string, PermissionGroup>
+) {
+  for (const member of members) {
+    const memberGroupIds = allMemberGroups
+      .filter(mg => mg.member_id === member.id)
+      .map(mg => mg.group_id)
+    member.groups = memberGroupIds
+      .map(gid => groupMap.get(gid))
+      .filter(Boolean) as PermissionGroup[]
   }
 }
 
@@ -456,55 +488,37 @@ export async function getEstablishmentMembers() {
 
     const typedMembers = (members as EstablishmentMember[]) || []
 
+    if (typedMembers.length === 0) return { data: typedMembers }
+
     // Enrich with user info (email, name, avatar) via SECURITY DEFINER RPC
-    if (typedMembers.length > 0) {
-      const userIds = typedMembers.map(m => m.user_id)
-      const { data: usersInfo } = await supabase.rpc('get_users_info', {
-        user_ids: userIds,
-      })
+    const userIds = typedMembers.map(m => m.user_id)
+    const { data: usersInfo } = await supabase.rpc('get_users_info', {
+      user_ids: userIds,
+    })
 
-      if (usersInfo && Array.isArray(usersInfo)) {
-        const userMap = new Map(
-          usersInfo.map((u: { id: string; email: string; full_name: string | null; avatar_url: string | null }) => [u.id, u])
-        )
-        for (const member of typedMembers) {
-          const info = userMap.get(member.user_id)
-          if (info) {
-            member.email = info.email
-            member.full_name = info.full_name
-            member.avatar_url = info.avatar_url
-          }
-        }
-      }
+    if (usersInfo && Array.isArray(usersInfo)) {
+      enrichMembersWithUserInfo(typedMembers, usersInfo)
+    }
 
-      // Enrich with groups
-      const memberIds = typedMembers.map(m => m.id)
-      const { data: allMemberGroups } = await supabase
-        .from('member_groups')
-        .select('member_id, group_id')
-        .in('member_id', memberIds)
+    // Enrich with groups
+    const memberIds = typedMembers.map(m => m.id)
+    const { data: allMemberGroups } = await supabase
+      .from('member_groups')
+      .select('member_id, group_id')
+      .in('member_id', memberIds)
 
-      if (allMemberGroups && allMemberGroups.length > 0) {
-        const allGroupIds = [...new Set(allMemberGroups.map((mg: { group_id: string }) => mg.group_id))]
-        const { data: groups } = await supabase
-          .from('permission_groups')
-          .select('*')
-          .in('id', allGroupIds)
+    if (allMemberGroups && allMemberGroups.length > 0) {
+      const allGroupIds = [...new Set(allMemberGroups.map((mg: { group_id: string }) => mg.group_id))]
+      const { data: groups } = await supabase
+        .from('permission_groups')
+        .select('*')
+        .in('id', allGroupIds)
 
-        const groupMap = new Map((groups as PermissionGroup[] || []).map(g => [g.id, g]))
-
-        for (const member of typedMembers) {
-          const memberGroupIds = allMemberGroups
-            .filter((mg: { member_id: string }) => mg.member_id === member.id)
-            .map((mg: { group_id: string }) => mg.group_id)
-          member.groups = memberGroupIds
-            .map((gid: string) => groupMap.get(gid))
-            .filter(Boolean) as PermissionGroup[]
-        }
-      } else {
-        for (const member of typedMembers) {
-          member.groups = []
-        }
+      const groupMap = new Map((groups as PermissionGroup[] || []).map(g => [g.id, g]))
+      enrichMembersWithGroups(typedMembers, allMemberGroups, groupMap)
+    } else {
+      for (const member of typedMembers) {
+        member.groups = []
       }
     }
 

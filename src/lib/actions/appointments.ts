@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/establishment/permissions'
 import { logActivity } from '@/lib/actions/activity-log'
-import type { Appointment, AppointmentType, AppointmentStatus } from '@/lib/types/database'
+import type { AppointmentType, AppointmentStatus } from '@/lib/types/database'
 
 // ===========================================================================
 // READ OPERATIONS (use createAdminClient)
@@ -95,9 +95,9 @@ export async function createAppointment(data: {
   client_name?: string | null
   client_phone?: string | null
   client_email?: string | null
-  date: string
-  start_time: string
-  end_time: string
+  date?: string
+  start_time?: string
+  end_time?: string
   notes?: string | null
   status?: AppointmentStatus
 }) {
@@ -106,8 +106,17 @@ export async function createAppointment(data: {
     const supabase = await createClient()
 
     // Validation
-    if (!data.type || !data.animal_id || !data.assigned_user_id || !data.date || !data.start_time || !data.end_time) {
-      return { error: 'Tous les champs obligatoires doivent etre remplis (animal, collaborateur, date, horaires)' }
+    if (!data.type) {
+      return { error: 'Le type de rendez-vous est obligatoire' }
+    }
+
+    const isStandardType = data.type === 'adoption' || data.type === 'veterinary'
+
+    // Standard types require animal, collaborateur, date, heures
+    if (isStandardType) {
+      if (!data.animal_id || !data.assigned_user_id || !data.date || !data.start_time || !data.end_time) {
+        return { error: 'Tous les champs obligatoires doivent etre remplis (animal, collaborateur, date, horaires)' }
+      }
     }
 
     // For adoption, client name is required
@@ -115,8 +124,8 @@ export async function createAppointment(data: {
       return { error: 'Le nom du client est obligatoire pour les rendez-vous d\'adoption' }
     }
 
-    // Validate time range
-    if (data.start_time >= data.end_time) {
+    // Validate time range only if both times are provided
+    if (data.start_time && data.end_time && data.start_time >= data.end_time) {
       return { error: "L'heure de debut doit etre avant l'heure de fin" }
     }
 
@@ -130,9 +139,9 @@ export async function createAppointment(data: {
         client_name: data.client_name || null,
         client_phone: data.client_phone || null,
         client_email: data.client_email || null,
-        date: data.date,
-        start_time: data.start_time,
-        end_time: data.end_time,
+        date: data.date || null,
+        start_time: data.start_time || null,
+        end_time: data.end_time || null,
         notes: data.notes || null,
         status: data.status || 'scheduled',
         created_by: userId,

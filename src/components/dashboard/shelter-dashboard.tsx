@@ -17,6 +17,7 @@ import {
   MapPin,
 } from 'lucide-react'
 import type { Animal, AnimalPhoto } from '@/lib/types/database'
+import { DailyTreatments } from './daily-treatments'
 import { AnimalStatusBadge } from '@/components/animals/animal-status-badge'
 import { calculateAge, calculateBusinessDays, getOriginLabel } from '@/lib/sda-utils'
 import { formatDate } from '@/lib/utils'
@@ -33,6 +34,26 @@ interface DailyAssignment {
     photo_url: string | null
     done: boolean
   }[]
+}
+
+interface TreatmentItem {
+  id: string
+  name: string
+  description: string | null
+  frequency: string
+  times: string[]
+  animal_name: string
+  animal_photo: string | null
+  animal_species: string
+  administrations_today: {
+    id: string
+    time_slot: string | null
+    administered_by: string
+    created_at: string
+  }[]
+  is_complete: boolean
+  completed_count: number
+  expected_count: number
 }
 
 interface ShelterDashboardProps {
@@ -52,6 +73,8 @@ interface ShelterDashboardProps {
     next_due_date: string
   }[]
   dailyAssignments?: DailyAssignment[]
+  todayTreatments?: TreatmentItem[]
+  treatmentUserNames?: Record<string, string>
 }
 
 const statConfig = [
@@ -87,6 +110,12 @@ const statConfig = [
   },
 ]
 
+function getBusinessDaysBadgeClass(businessDays: number): string {
+  if (businessDays >= 8) return 'bg-error/15 text-error'
+  if (businessDays >= 6) return 'bg-warning/15 text-warning'
+  return 'bg-muted/10 text-muted'
+}
+
 const PAGE_SIZE = 5
 
 export function ShelterDashboard({
@@ -95,7 +124,9 @@ export function ShelterDashboard({
   shelterAnimals,
   healthAlerts,
   dailyAssignments = [],
-}: ShelterDashboardProps) {
+  todayTreatments = [],
+  treatmentUserNames = {},
+}: Readonly<ShelterDashboardProps>) {
   const [poundPage, setPoundPage] = useState(0)
   const [shelterPage, setShelterPage] = useState(0)
 
@@ -156,11 +187,7 @@ export function ShelterDashboard({
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-muted">Entree :</span>
                   <span>{formatDate(animal.pound_entry_date)}</span>
-                  <span className={`font-medium px-1.5 py-0.5 rounded-full text-[10px] ${
-                    businessDays >= 8 ? 'bg-error/15 text-error' :
-                    businessDays >= 6 ? 'bg-warning/15 text-warning' :
-                    'bg-muted/10 text-muted'
-                  }`}>
+                  <span className={`font-medium px-1.5 py-0.5 rounded-full text-[10px] ${getBusinessDaysBadgeClass(businessDays)}`}>
                     J{businessDays}
                   </span>
                 </div>
@@ -312,6 +339,9 @@ export function ShelterDashboard({
           </div>
         </div>
       )}
+
+      {/* Daily treatments */}
+      <DailyTreatments treatments={todayTreatments} userNames={treatmentUserNames} />
 
       {/* Daily outing assignments */}
       {dailyAssignments.length > 0 && (

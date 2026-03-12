@@ -172,6 +172,24 @@ export default async function PlanningPage(props: Readonly<{ searchParams: Promi
         </div>
       </div>
 
+      {/* Google Calendar embed */}
+      {ctx.establishment.google_calendar_id && (
+        <div className="bg-surface rounded-xl border border-border p-4 mb-6">
+          <h3 className="text-sm font-semibold text-muted mb-3 flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            Agenda Google
+          </h3>
+          <div className="rounded-lg overflow-hidden border border-border">
+            <iframe
+              src={`https://calendar.google.com/calendar/embed?src=${encodeURIComponent(ctx.establishment.google_calendar_id)}&ctz=Europe/Paris&mode=WEEK&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0&showTz=0`}
+              className="w-full border-0"
+              height="400"
+              title="Agenda Google"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Forms */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div>

@@ -1,10 +1,13 @@
 import Link from 'next/link'
-import { HeartPulse, AlertTriangle, Stethoscope, Calendar } from 'lucide-react'
+import { HeartPulse, AlertTriangle, Stethoscope, Calendar, Pill } from 'lucide-react'
 import { getHealthRecords, getUpcomingReminders, getOverdueReminders } from '@/lib/actions/health'
+import { getTreatments } from '@/lib/actions/treatments'
 import { getEstablishmentContext } from '@/lib/establishment/context'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getHealthTypeLabel } from '@/lib/sda-utils'
 import { formatDateShort, formatCurrency } from '@/lib/utils'
-import type { HealthRecordType } from '@/lib/types/database'
+import { HealthTreatmentsSection } from '@/components/treatments/health-treatments-section'
+import type { HealthRecordType, AnimalTreatment } from '@/lib/types/database'
 
 // ---------------------------------------------------------------------------
 // Types for the joined data returned by the server actions
@@ -51,11 +54,12 @@ const healthTypes: { value: string; label: string }[] = [
 
 export default async function HealthPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ type?: string; search?: string }>
-}) {
+}>) {
   const params = await searchParams
   const ctx = await getEstablishmentContext()
+  const admin = createAdminClient()
 
   // Build filters
   const filters: { type?: HealthRecordType } = {}
@@ -63,11 +67,21 @@ export default async function HealthPage({
     filters.type = params.type as HealthRecordType
   }
 
-  const [recordsResult, remindersResult, overdueResult] = await Promise.all([
+  const [recordsResult, remindersResult, overdueResult, treatmentsResult] = await Promise.all([
     getHealthRecords(filters),
     getUpcomingReminders(),
     getOverdueReminders(),
+    getTreatments(),
   ])
+
+  // Fetch animals for the treatment form
+  const { data: allAnimals } = await admin
+    .from('animals')
+    .select('id, nom')
+    .eq('establishment_id', ctx!.establishment.id)
+    .order('nom')
+
+  const animalsForForm = (allAnimals || []).map((a: { id: string; nom: string }) => ({ id: a.id, nom: a.nom }))
 
   const records = (recordsResult.data as HealthRecordWithAnimal[] | undefined) || []
   const reminders = (remindersResult.data as HealthRecordWithAnimal[] | undefined) || []
@@ -118,6 +132,14 @@ export default async function HealthPage({
           <p className="text-xs text-muted mt-1">Cout total</p>
         </div>
       </div>
+
+      {/* Active treatments section */}
+      <HealthTreatmentsSection
+        treatments={(treatmentsResult.data || []) as (AnimalTreatment & { animals: { id: string; nom: string; species: string } })[]}
+        animals={animalsForForm}
+        healthRecords={records}
+        canManageHealth={ctx!.permissions.canManageHealth}
+      />
 
       {/* Overdue reminders section */}
       {overdueReminders.length > 0 && (
