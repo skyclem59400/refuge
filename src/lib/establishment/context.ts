@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import type { Establishment, EstablishmentMember, EstablishmentContext, Permissions, PermissionGroup } from '@/lib/types/database'
@@ -5,11 +6,12 @@ import type { Establishment, EstablishmentMember, EstablishmentContext, Permissi
 const COOKIE_NAME = 'current-establishment-id'
 
 function buildPermissions(groups: PermissionGroup[], membership: EstablishmentMember): Permissions {
+  const isAdmin = groups.some(g => g.is_system && g.name === 'Administrateur')
   const has = (field: keyof PermissionGroup) =>
-    groups.some(g => g[field] === true)
+    isAdmin || groups.some(g => g[field] === true)
 
   return {
-    isAdmin: groups.some(g => g.is_system && g.name === 'Administrateur'),
+    isAdmin,
     isOwner: !!(membership as EstablishmentMember & { is_owner?: boolean }).is_owner,
     canManageEstablishment: has('manage_establishment'),
     canManageDocuments: has('manage_documents'),
@@ -27,6 +29,9 @@ function buildPermissions(groups: PermissionGroup[], membership: EstablishmentMe
     canManagePlanning: has('manage_planning'),
     canViewPound: has('view_pound'),
     canViewStatistics: has('view_statistics'),
+    canManageLeaves: has('manage_leaves'),
+    canViewOwnLeaves: has('manage_leaves') || has('view_own_leaves'),
+    canManagePayslips: has('manage_payslips'),
   }
 }
 
@@ -52,7 +57,7 @@ export async function getCurrentEstablishmentId(): Promise<string | null> {
   return cookieStore.get(COOKIE_NAME)?.value || null
 }
 
-export async function getUserEstablishments(): Promise<{ establishments: Establishment[]; memberships: EstablishmentMember[] }> {
+export const getUserEstablishments = cache(async function getUserEstablishments(): Promise<{ establishments: Establishment[]; memberships: EstablishmentMember[] }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { establishments: [], memberships: [] }
@@ -77,9 +82,9 @@ export async function getUserEstablishments(): Promise<{ establishments: Establi
     establishments: (establishments as Establishment[]) || [],
     memberships: memberships as EstablishmentMember[],
   }
-}
+})
 
-export async function getEstablishmentContext(): Promise<EstablishmentContext | null> {
+export const getEstablishmentContext = cache(async function getEstablishmentContext(): Promise<EstablishmentContext | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
@@ -144,4 +149,4 @@ export async function getEstablishmentContext(): Promise<EstablishmentContext | 
     membership,
     permissions: buildPermissions(groups, membership),
   }
-}
+})

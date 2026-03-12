@@ -27,9 +27,12 @@ const PERMISSION_LABELS: { key: Permission; label: string }[] = [
   { key: 'manage_posts', label: 'Publications' },
   { key: 'view_pound', label: 'Fourriere' },
   { key: 'view_statistics', label: 'Statistiques' },
+  { key: 'manage_leaves', label: 'Gestion conges' },
+  { key: 'view_own_leaves', label: 'Voir ses conges' },
+  { key: 'manage_payslips', label: 'Bulletins de paie' },
 ]
 
-function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
+function ToggleSwitch({ checked, onChange, disabled }: Readonly<{ checked: boolean; onChange: () => void; disabled?: boolean }>) {
   return (
     <button
       type="button"
@@ -48,7 +51,7 @@ function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onCha
 }
 
 interface PermissionGroupsProps {
-  groups: PermissionGroup[]
+  readonly groups: PermissionGroup[]
 }
 
 export function PermissionGroups({ groups: initialGroups }: PermissionGroupsProps) {
@@ -62,73 +65,81 @@ export function PermissionGroups({ groups: initialGroups }: PermissionGroupsProp
 
   useEffect(() => { setGroups(initialGroups) }, [initialGroups])
 
-  function handleTogglePermission(groupId: string, permission: Permission, currentValue: boolean) {
+  const togglePermissionAction = async (groupId: string, permission: Permission, currentValue: boolean) => {
+    const result = await updatePermissionGroup(groupId, { [permission]: !currentValue })
+    if (result.error) {
+      toast.error(result.error)
+      // Revert
+      setGroups(prev => prev.map(g =>
+        g.id === groupId ? { ...g, [permission]: currentValue } : g
+      ))
+    }
+  }
+
+  const handleTogglePermission = (groupId: string, permission: Permission, currentValue: boolean) => {
     // Optimistic update
     setGroups(prev => prev.map(g =>
       g.id === groupId ? { ...g, [permission]: !currentValue } : g
     ))
 
-    startTransition(async () => {
-      const result = await updatePermissionGroup(groupId, { [permission]: !currentValue })
-      if (result.error) {
-        toast.error(result.error)
-        // Revert
-        setGroups(prev => prev.map(g =>
-          g.id === groupId ? { ...g, [permission]: currentValue } : g
-        ))
-      }
-    })
+    startTransition(() => togglePermissionAction(groupId, permission, currentValue))
   }
 
-  function handleCreate() {
+  const createGroupAction = async () => {
+    const result = await createPermissionGroup({ name: creatingName.trim() })
+    if (result.error) {
+      toast.error(result.error)
+    } else if (result.data) {
+      setGroups(prev => [...prev, result.data!])
+      setCreatingName('')
+      setShowCreate(false)
+      toast.success('Groupe cree')
+      router.refresh()
+    }
+  }
+
+  const handleCreate = () => {
     if (!creatingName.trim()) return
-    startTransition(async () => {
-      const result = await createPermissionGroup({ name: creatingName.trim() })
-      if (result.error) {
-        toast.error(result.error)
-      } else if (result.data) {
-        setGroups(prev => [...prev, result.data!])
-        setCreatingName('')
-        setShowCreate(false)
-        toast.success('Groupe cree')
-        router.refresh()
-      }
-    })
+    startTransition(() => createGroupAction())
   }
 
-  function handleDelete(groupId: string, groupName: string) {
+  const deleteGroupAction = async (groupId: string) => {
+    const result = await deletePermissionGroup(groupId)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      setGroups(prev => prev.filter(g => g.id !== groupId))
+      toast.success('Groupe supprime')
+      router.refresh()
+    }
+  }
+
+  const handleDelete = (groupId: string, groupName: string) => {
     if (!confirm(`Supprimer le groupe "${groupName}" ?`)) return
-    startTransition(async () => {
-      const result = await deletePermissionGroup(groupId)
-      if (result.error) {
-        toast.error(result.error)
-      } else {
-        setGroups(prev => prev.filter(g => g.id !== groupId))
-        toast.success('Groupe supprime')
-        router.refresh()
-      }
-    })
+    startTransition(() => deleteGroupAction(groupId))
   }
 
-  function handleStartEditName(group: PermissionGroup) {
+  const handleStartEditName = (group: PermissionGroup) => {
     setEditingNameId(group.id)
     setEditingNameValue(group.name)
   }
 
-  function handleSaveName(groupId: string) {
+  const saveNameAction = async (groupId: string) => {
+    const result = await updatePermissionGroup(groupId, { name: editingNameValue.trim() })
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      setGroups(prev => prev.map(g =>
+        g.id === groupId ? { ...g, name: editingNameValue.trim() } : g
+      ))
+      toast.success('Nom mis a jour')
+    }
+    setEditingNameId(null)
+  }
+
+  const handleSaveName = (groupId: string) => {
     if (!editingNameValue.trim()) return
-    startTransition(async () => {
-      const result = await updatePermissionGroup(groupId, { name: editingNameValue.trim() })
-      if (result.error) {
-        toast.error(result.error)
-      } else {
-        setGroups(prev => prev.map(g =>
-          g.id === groupId ? { ...g, name: editingNameValue.trim() } : g
-        ))
-        toast.success('Nom mis a jour')
-      }
-      setEditingNameId(null)
-    })
+    startTransition(() => saveNameAction(groupId))
   }
 
   return (
@@ -246,8 +257,8 @@ export function PermissionGroups({ groups: initialGroups }: PermissionGroupsProp
                 <div key={key} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded bg-surface/50">
                   <span className="text-xs text-text truncate">{label}</span>
                   <ToggleSwitch
-                    checked={group[key] as boolean}
-                    onChange={() => handleTogglePermission(group.id, key, group[key] as boolean)}
+                    checked={!!group[key]}
+                    onChange={() => handleTogglePermission(group.id, key, !!group[key])}
                     disabled={isPending}
                   />
                 </div>

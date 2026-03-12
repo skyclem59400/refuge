@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/components/theme-provider'
+import { NotificationBell } from '@/components/notifications/notification-bell'
 import { EstablishmentSwitcher } from '@/components/establishment/establishment-switcher'
 import type { ComponentType } from 'react'
 import type { Establishment, EstablishmentType, Permissions } from '@/lib/types/database'
@@ -25,6 +26,8 @@ import {
   PhoneCall,
   Footprints,
   Scale,
+  Briefcase,
+  CalendarCheck,
 } from 'lucide-react'
 
 interface NavItem {
@@ -56,11 +59,13 @@ const shelterItems: NavItem[] = [
   { href: '/icad', label: 'I-CAD', Icon: Shield, permission: 'canManageMovements' },
   { href: '/documents', label: 'Documents', Icon: FileText, permission: 'canManageDocuments' },
   { href: '/clients', label: 'Répertoire', Icon: Users, permission: 'canManageClients' },
+  { href: '/espace-collaborateur', label: 'Mon espace', Icon: Briefcase, permission: 'canViewOwnLeaves' },
   { href: '/statistiques', label: 'Statistiques', Icon: BarChart3, permission: 'canViewStatistics' },
 ]
 
 const adminItems: NavItem[] = [
   { href: '/etablissement', label: 'Établissement', Icon: Building2, permission: 'canManageEstablishment' },
+  { href: '/admin/conges', label: 'Conges', Icon: CalendarCheck, permission: 'canManageLeaves' },
 ]
 
 function getNavItems(type: EstablishmentType, permissions: Permissions): NavItem[] {
@@ -103,7 +108,7 @@ interface HeaderProps {
   establishments: Establishment[]
 }
 
-export function Header({ userEmail, userAvatarUrl, permissions, currentEstablishment, establishments }: HeaderProps) {
+export function Header({ userEmail, userAvatarUrl, permissions, currentEstablishment, establishments }: Readonly<HeaderProps>) {
   const [showMenu, setShowMenu] = useState(false)
   const [showMobileNav, setShowMobileNav] = useState(false)
   const router = useRouter()
@@ -166,6 +171,8 @@ export function Header({ userEmail, userAvatarUrl, permissions, currentEstablish
             )}
           </button>
 
+          <NotificationBell />
+
         {/* User menu */}
         <div className="relative">
           <button
@@ -189,7 +196,7 @@ export function Header({ userEmail, userAvatarUrl, permissions, currentEstablish
 
           {showMenu && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+              <div className="fixed inset-0 z-40" role="presentation" tabIndex={-1} onClick={() => setShowMenu(false)} onKeyDown={(e) => { if (e.key === 'Escape') setShowMenu(false) }} />
               <div className="absolute right-0 top-full mt-1 w-56 bg-surface border border-border rounded-xl shadow-xl z-50 animate-fade-up">
                 <div className="p-3 border-b border-border">
                   <p className="text-sm font-medium truncate">{userEmail}</p>

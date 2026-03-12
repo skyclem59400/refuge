@@ -2,7 +2,7 @@ export type RoleType = 'admin' | 'salarie' | 'benevole'
 export type ContactCategory = 'client' | 'member' | 'volunteer' | 'board_member' | 'foster_family' | 'veterinarian'
 export type DocumentType = 'devis' | 'facture' | 'avoir'
 export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'converted' | 'validated'
-export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings' | 'manage_outing_assignments' | 'manage_adoptions' | 'manage_planning'
+export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings' | 'manage_outing_assignments' | 'manage_adoptions' | 'manage_planning' | 'manage_leaves' | 'view_own_leaves' | 'manage_payslips'
 
 export interface LineItem {
   description: string
@@ -94,6 +94,9 @@ export interface PermissionGroup {
   manage_planning: boolean
   view_pound: boolean
   view_statistics: boolean
+  manage_leaves: boolean
+  view_own_leaves: boolean
+  manage_payslips: boolean
   created_at: string
   updated_at: string
 }
@@ -142,6 +145,9 @@ export interface Permissions {
   canManagePlanning: boolean
   canViewPound: boolean
   canViewStatistics: boolean
+  canManageLeaves: boolean
+  canViewOwnLeaves: boolean
+  canManagePayslips: boolean
   isAdmin: boolean
   isOwner: boolean
 }
@@ -683,4 +689,114 @@ export interface RingoverTopCaller {
   total_calls: number
   missed_calls: number
   last_call_time: string
+}
+
+// ============================================
+// Leave Management & Employee Space
+// ============================================
+
+export type LeaveRequestStatus = 'pending' | 'approved' | 'refused' | 'cancelled'
+
+export interface LeaveType {
+  id: string
+  establishment_id: string
+  name: string
+  code: string
+  color: string
+  requires_approval: boolean
+  deducts_balance: boolean
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface LeaveBalance {
+  id: string
+  establishment_id: string
+  member_id: string
+  leave_type_id: string
+  year: number
+  initial_balance: number
+  used: number
+  adjustment: number
+  created_at: string
+  updated_at: string
+}
+
+export interface LeaveRequest {
+  id: string
+  establishment_id: string
+  member_id: string
+  leave_type_id: string
+  start_date: string
+  end_date: string
+  half_day_start: boolean
+  half_day_end: boolean
+  days_count: number
+  status: LeaveRequestStatus
+  reason: string | null
+  admin_comment: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface LeaveRequestWithDetails extends LeaveRequest {
+  leave_type?: LeaveType
+  member?: EstablishmentMember
+  reviewer?: EstablishmentMember
+}
+
+export interface Payslip {
+  id: string
+  establishment_id: string
+  member_id: string
+  year: number
+  month: number
+  label: string | null
+  file_path: string
+  file_url: string
+  file_size: number | null
+  uploaded_by: string
+  created_at: string
+}
+
+// ============================================
+// Notifications
+// ============================================
+
+export type NotificationType =
+  | 'leave_request_submitted'
+  | 'leave_request_approved'
+  | 'leave_request_refused'
+  | 'payslip_uploaded'
+  | 'general'
+
+export interface Notification {
+  id: string
+  establishment_id: string
+  user_id: string
+  type: NotificationType
+  title: string
+  body: string | null
+  link: string | null
+  read: boolean
+  read_at: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface NotificationPreferences {
+  id: string
+  user_id: string
+  email_enabled: boolean
+  push_enabled: boolean
+  push_subscription: Record<string, unknown> | null
+  leave_email: boolean
+  leave_push: boolean
+  payslip_email: boolean
+  payslip_push: boolean
+  created_at: string
+  updated_at: string
 }

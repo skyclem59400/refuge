@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from '@/components/theme-provider'
 import { EstablishmentSwitcher } from '@/components/establishment/establishment-switcher'
 import type { ComponentType } from 'react'
-import type { Establishment, EstablishmentType, Permissions } from '@/lib/types/database'
+import type { Establishment, EstablishmentType, Permissions, RoleType } from '@/lib/types/database'
 import {
   LayoutDashboard,
   FileText,
@@ -17,12 +17,13 @@ import {
   Package,
   BarChart3,
   Heart,
-  Shield,
   Share2,
   PhoneCall,
   Footprints,
   Scale,
   CalendarDays,
+  Briefcase,
+  CalendarCheck,
 } from 'lucide-react'
 
 interface NavItem {
@@ -30,6 +31,8 @@ interface NavItem {
   label: string
   Icon: ComponentType<{ className?: string }>
   permission?: keyof Permissions
+  /** If set, only these role types can see the item */
+  roles?: RoleType[]
 }
 
 const commonItems: NavItem[] = [
@@ -52,17 +55,18 @@ const shelterItems: NavItem[] = [
   { href: '/donations', label: 'Dons', Icon: Heart, permission: 'canManageDonations' },
   { href: '/publications', label: 'Publications', Icon: Share2, permission: 'canManagePosts' },
   { href: '/appels', label: 'Appels', Icon: PhoneCall, permission: 'canManageEstablishment' },
-  { href: '/icad', label: 'I-CAD', Icon: Shield, permission: 'canManageMovements' },
   { href: '/documents', label: 'Documents', Icon: FileText, permission: 'canManageDocuments' },
   { href: '/clients', label: 'R\u00e9pertoire', Icon: Users, permission: 'canManageClients' },
-  { href: '/statistiques', label: 'Statistiques', Icon: BarChart3, permission: 'canViewStatistics' },
+  { href: '/espace-collaborateur', label: 'Mon espace', Icon: Briefcase, permission: 'canViewOwnLeaves', roles: ['admin', 'salarie'] },
+  { href: '/statistiques', label: 'Statistiques', Icon: BarChart3, permission: 'canViewStatistics', roles: ['admin', 'salarie'] },
 ]
 
 const adminItems: NavItem[] = [
   { href: '/etablissement', label: '\u00c9tablissement', Icon: Building2, permission: 'canManageEstablishment' },
+  { href: '/admin/conges', label: 'Conges', Icon: CalendarCheck, permission: 'canManageLeaves' },
 ]
 
-function getNavItems(type: EstablishmentType, permissions: Permissions): NavItem[] {
+function getNavItems(type: EstablishmentType, permissions: Permissions, roleType: RoleType): NavItem[] {
   let typeItems: NavItem[]
 
   switch (type) {
@@ -89,8 +93,9 @@ function getNavItems(type: EstablishmentType, permissions: Permissions): NavItem
   const allItems = [...commonItems, ...typeItems, ...adminItems]
 
   return allItems.filter((item) => {
-    if (!item.permission) return true
-    return permissions[item.permission]
+    if (item.permission && !permissions[item.permission]) return false
+    if (item.roles && !item.roles.includes(roleType)) return false
+    return true
   })
 }
 
@@ -98,15 +103,16 @@ interface SidebarProps {
   establishments: Establishment[]
   currentEstablishment: Establishment
   permissions: Permissions
+  roleType: RoleType
   userEmail?: string
 }
 
-export function Sidebar({ establishments, currentEstablishment, permissions, userEmail }: SidebarProps) {
+export function Sidebar({ establishments, currentEstablishment, permissions, roleType, userEmail }: Readonly<SidebarProps>) {
   const pathname = usePathname()
   const { sidebarCollapsed, toggleSidebar } = useTheme()
 
   const establishmentType: EstablishmentType = currentEstablishment.type || 'farm'
-  const navItems = getNavItems(establishmentType, permissions)
+  const navItems = getNavItems(establishmentType, permissions, roleType)
 
   return (
     <aside

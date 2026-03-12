@@ -27,10 +27,19 @@ export async function createClient() {
   )
 }
 
-export function createAdminClient() {
+function _newAdminClient() {
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
+}
+
+let _adminClient: ReturnType<typeof _newAdminClient> | null = null
+
+export function createAdminClient() {
+  if (!_adminClient) {
+    _adminClient = _newAdminClient()
+  }
+  return _adminClient
 }
