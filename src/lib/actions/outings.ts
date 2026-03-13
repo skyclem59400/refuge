@@ -420,6 +420,90 @@ export async function createOuting(data: {
 }
 
 // ---------------------------------------------------------------------------
+// updateOuting — edit an existing outing (manager or walker)
+// ---------------------------------------------------------------------------
+
+export async function updateOuting(id: string, data: Partial<{
+  duration_minutes: number
+  notes: string | null
+  rating: number
+  rating_comment: string
+  is_tig: boolean
+  tig_walker_name: string | null
+}>) {
+  try {
+    const { userId, groups } = await requirePermission('manage_outings')
+    const supabase = createAdminClient()
+
+    // Fetch existing outing to check ownership
+    const { data: existing, error: fetchError } = await supabase
+      .from('animal_outings')
+      .select('id, animal_id, walked_by, started_at, duration_minutes, animals(name)')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !existing) return { error: 'Sortie introuvable' }
+
+    // Permission: walker can edit their own, managers/admins can edit any
+    const isManagerOrAdmin = (groups || []).some(
+      (g) => (g.is_system && g.name === 'Administrateur') || g.manage_outing_assignments
+    )
+    if (existing.walked_by !== userId && !isManagerOrAdmin) {
+      return { error: 'Vous ne pouvez modifier que vos propres sorties' }
+    }
+
+    // Validate rating if provided
+    if (data.rating != null) {
+      if (data.rating < 1 || data.rating > 10 || !Number.isInteger(data.rating)) {
+        return { error: 'La note doit etre un entier entre 1 et 10' }
+      }
+    }
+
+    // Build update payload
+    const updatePayload: Record<string, unknown> = {}
+    if (data.duration_minutes != null) {
+      updatePayload.duration_minutes = data.duration_minutes
+      // Recalculate started_at based on ended_at
+      const endedAt = new Date(existing.started_at).getTime() + (existing.duration_minutes || 0) * 60 * 1000
+      updatePayload.started_at = new Date(endedAt - data.duration_minutes * 60 * 1000).toISOString()
+    }
+    if (data.notes !== undefined) updatePayload.notes = data.notes
+    if (data.rating != null) updatePayload.rating = data.rating
+    if (data.rating_comment !== undefined) updatePayload.rating_comment = data.rating_comment?.trim() || null
+    if (data.is_tig !== undefined) updatePayload.is_tig = data.is_tig
+    if (data.tig_walker_name !== undefined) updatePayload.tig_walker_name = data.tig_walker_name?.trim() || null
+
+    if (Object.keys(updatePayload).length === 0) {
+      return { error: 'Aucune modification' }
+    }
+
+    const { error } = await supabase
+      .from('animal_outings')
+      .update(updatePayload)
+      .eq('id', id)
+
+    if (error) return { error: error.message }
+
+    logActivity({
+      action: 'update',
+      entityType: 'outing',
+      entityId: id,
+      entityName: (existing.animals as { name?: string } | null)?.name || undefined,
+      parentType: 'animal',
+      parentId: existing.animal_id,
+      details: updatePayload,
+    })
+
+    revalidatePath('/sorties')
+    revalidatePath(`/animals/${existing.animal_id}`)
+    revalidatePath('/dashboard')
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // deleteOuting — admin only
 // ---------------------------------------------------------------------------
 
@@ -550,6 +634,46 @@ export async function createAssignment(data: {
     })
 
     return { data: assignment }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// updateAssignment — manager edits assignment notes
+// ---------------------------------------------------------------------------
+
+export async function updateAssignment(id: string, data: { notes?: string | null }) {
+  try {
+    await requirePermission('manage_outing_assignments')
+    const supabase = createAdminClient()
+
+    const { data: assignment, error: fetchError } = await supabase
+      .from('outing_assignments')
+      .select('animal_id, animals(name)')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !assignment) return { error: 'Assignation introuvable' }
+
+    const { error } = await supabase
+      .from('outing_assignments')
+      .update({ notes: data.notes ?? null })
+      .eq('id', id)
+
+    if (error) return { error: error.message }
+
+    logActivity({
+      action: 'update',
+      entityType: 'outing_assignment',
+      entityId: id,
+      entityName: (assignment.animals as { name?: string } | null)?.name || undefined,
+      parentType: 'animal',
+      parentId: assignment.animal_id,
+    })
+
+    revalidatePath('/sorties')
+    return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
   }

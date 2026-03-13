@@ -267,7 +267,7 @@ function PromenadeViewContent({
         </div>
       )}
 
-      <OutingHistory outings={outings} userNames={userNames} isAdmin={isAdmin} currentUserId={currentUserId} currentPage={currentPage} totalPages={totalPages} />
+      <OutingHistory outings={outings} userNames={userNames} isAdmin={isAdmin} canManageAssignments={canManageAssignments} currentUserId={currentUserId} currentPage={currentPage} totalPages={totalPages} />
 
       <OutingPriorityList animals={sortedPriorityAnimals} canManageOutings={canManageOutings} canCreateTig={canManageAssignments || isAdmin} />
     </>

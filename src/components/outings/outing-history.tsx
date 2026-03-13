@@ -4,8 +4,8 @@ import { Fragment, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Trash2, Footprints, PawPrint, HardHat, ChevronLeft, ChevronRight, X, Clock, Star, MessageSquare, Calendar, User } from 'lucide-react'
-import { deleteOuting } from '@/lib/actions/outings'
+import { Trash2, Footprints, PawPrint, HardHat, ChevronLeft, ChevronRight, X, Clock, Star, MessageSquare, Calendar, User, Pencil, Save, Loader2 } from 'lucide-react'
+import { deleteOuting, updateOuting } from '@/lib/actions/outings'
 import { formatOutingDuration, getSpeciesLabel } from '@/lib/sda-utils'
 import { formatDateShort } from '@/lib/utils'
 
@@ -36,6 +36,7 @@ interface OutingHistoryProps {
   outings: OutingWithAnimal[]
   userNames: Record<string, string>
   isAdmin: boolean
+  canManageAssignments?: boolean
   currentUserId: string
   currentPage: number
   totalPages: number
@@ -58,13 +59,56 @@ function getAnimalPhoto(animal: OutingWithAnimal['animals']): string | null {
 function OutingDetailPanel({
   outing,
   userNames,
+  canEdit,
   onClose,
 }: Readonly<{
   outing: OutingWithAnimal
   userNames: Record<string, string>
+  canEdit: boolean
   onClose: () => void
 }>) {
+  const router = useRouter()
   const photo = getAnimalPhoto(outing.animals)
+  const [editing, setEditing] = useState(false)
+  const [editPending, startEditTransition] = useTransition()
+
+  // Editable fields
+  const [editDuration, setEditDuration] = useState(outing.duration_minutes || 0)
+  const [editRating, setEditRating] = useState(outing.rating || 5)
+  const [editComment, setEditComment] = useState(outing.rating_comment || '')
+  const [editNotes, setEditNotes] = useState(outing.notes || '')
+  const [editIsTig, setEditIsTig] = useState(outing.is_tig || false)
+  const [editTigName, setEditTigName] = useState(outing.tig_walker_name || '')
+
+  function startEditing() {
+    setEditDuration(outing.duration_minutes || 0)
+    setEditRating(outing.rating || 5)
+    setEditComment(outing.rating_comment || '')
+    setEditNotes(outing.notes || '')
+    setEditIsTig(outing.is_tig || false)
+    setEditTigName(outing.tig_walker_name || '')
+    setEditing(true)
+  }
+
+  function handleSave() {
+    startEditTransition(async () => {
+      const result = await updateOuting(outing.id, {
+        duration_minutes: editDuration,
+        rating: editRating,
+        rating_comment: editComment,
+        notes: editNotes || null,
+        is_tig: editIsTig,
+        tig_walker_name: editIsTig ? editTigName || null : null,
+      })
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Sortie modifiee')
+        setEditing(false)
+        router.refresh()
+      }
+    })
+  }
 
   return (
     <div className="bg-primary/5 p-5 animate-fade-up border-t border-border">
@@ -83,99 +127,248 @@ function OutingDetailPanel({
             <p className="text-xs text-muted">{getSpeciesLabel(outing.animals.species)}</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors text-muted hover:text-text"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          {canEdit && !editing && (
+            <button
+              type="button"
+              onClick={startEditing}
+              className="p-1.5 rounded-lg hover:bg-primary/10 transition-colors text-muted hover:text-primary"
+              title="Modifier la sortie"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors text-muted hover:text-text"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted shrink-0" />
-          <div>
-            <p className="text-xs text-muted">Date</p>
-            <p className="text-sm font-medium">{formatDateShort(outing.started_at)}</p>
+      {editing ? (
+        /* ---- Edit mode ---- */
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Duration */}
+            <div>
+              <label htmlFor={`edit-duration-${outing.id}`} className="block text-xs font-medium text-muted mb-1">Duree (minutes)</label>
+              <input
+                id={`edit-duration-${outing.id}`}
+                type="number"
+                min={1}
+                max={300}
+                value={editDuration}
+                onChange={(e) => setEditDuration(Number(e.target.value))}
+                className="w-full px-3 py-2 bg-surface-dark border border-border rounded-lg text-sm
+                  focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+              />
+              <div className="flex gap-1 mt-1.5">
+                {[15, 30, 45, 60, 90].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setEditDuration(d)}
+                    className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                      editDuration === d ? 'bg-primary text-white' : 'bg-surface-dark text-muted hover:bg-surface-hover'
+                    }`}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Rating */}
+            <div>
+              <label htmlFor={`edit-rating-${outing.id}`} className="block text-xs font-medium text-muted mb-1">Note (1-10)</label>
+              <div className="flex gap-1">
+                {Array.from({ length: 10 }, (_, i) => i + 1).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setEditRating(r)}
+                    className={`w-7 h-7 rounded-lg text-xs font-bold transition-colors ${
+                      editRating === r
+                        ? getRatingBadgeClass(r).replace('/15', '')
+                        : 'bg-surface-dark text-muted hover:bg-surface-hover'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-muted shrink-0" />
+
+          {/* Comment */}
           <div>
-            <p className="text-xs text-muted">Duree</p>
-            <p className="text-sm font-medium">
-              {outing.duration_minutes ? formatOutingDuration(outing.duration_minutes) : '-'}
-            </p>
+            <label htmlFor={`edit-comment-${outing.id}`} className="block text-xs font-medium text-muted mb-1">Commentaire</label>
+            <textarea
+              id={`edit-comment-${outing.id}`}
+              value={editComment}
+              onChange={(e) => setEditComment(e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 bg-surface-dark border border-border rounded-lg text-sm resize-y
+                focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+            />
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <User className="w-4 h-4 text-muted shrink-0" />
+
+          {/* Notes */}
           <div>
-            <p className="text-xs text-muted">Promene par</p>
-            <p className="text-sm font-medium">
-              {outing.is_tig ? (
-                <span className="inline-flex items-center gap-1">
-                  <HardHat className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="text-amber-500">TIG</span>
-                  {outing.tig_walker_name && <span> — {outing.tig_walker_name}</span>}
-                </span>
-              ) : (
-                userNames[outing.walked_by] || 'Inconnu'
-              )}
-            </p>
+            <label htmlFor={`edit-notes-${outing.id}`} className="block text-xs font-medium text-muted mb-1">Notes supplementaires</label>
+            <textarea
+              id={`edit-notes-${outing.id}`}
+              value={editNotes}
+              onChange={(e) => setEditNotes(e.target.value)}
+              rows={2}
+              placeholder="Notes..."
+              className="w-full px-3 py-2 bg-surface-dark border border-border rounded-lg text-sm resize-y
+                focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+            />
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Star className="w-4 h-4 text-muted shrink-0" />
-          <div>
-            <p className="text-xs text-muted">Note</p>
-            {outing.rating != null ? (
-              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold ${getRatingBadgeClass(outing.rating)}`}>
-                {outing.rating}/10
-              </span>
-            ) : (
-              <p className="text-sm text-muted">-</p>
+
+          {/* TIG toggle */}
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={editIsTig}
+                onChange={(e) => setEditIsTig(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+              />
+              <HardHat className="w-4 h-4 text-amber-500" />
+              Sortie TIG
+            </label>
+            {editIsTig && (
+              <input
+                type="text"
+                value={editTigName}
+                onChange={(e) => setEditTigName(e.target.value)}
+                placeholder="Nom du TIG..."
+                className="flex-1 px-3 py-1.5 bg-surface-dark border border-border rounded-lg text-sm
+                  focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+              />
             )}
           </div>
-        </div>
-      </div>
 
-      {outing.rating_comment && (
-        <div className="bg-background rounded-lg border border-border p-3 mb-3">
-          <div className="flex items-center gap-2 mb-1.5">
-            <MessageSquare className="w-3.5 h-3.5 text-muted" />
-            <p className="text-xs font-medium text-muted">Commentaire</p>
+          {/* Save/Cancel */}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              disabled={editPending}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-muted bg-surface-dark hover:bg-surface-hover transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={editPending || !editComment.trim()}
+              className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white bg-primary hover:bg-primary/90 transition-colors
+                disabled:opacity-50 flex items-center gap-2"
+            >
+              {editPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Enregistrer
+            </button>
           </div>
-          <p className="text-sm whitespace-pre-wrap">{outing.rating_comment}</p>
         </div>
-      )}
+      ) : (
+        /* ---- View mode ---- */
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-muted shrink-0" />
+              <div>
+                <p className="text-xs text-muted">Date</p>
+                <p className="text-sm font-medium">{formatDateShort(outing.started_at)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-muted shrink-0" />
+              <div>
+                <p className="text-xs text-muted">Duree</p>
+                <p className="text-sm font-medium">
+                  {outing.duration_minutes ? formatOutingDuration(outing.duration_minutes) : '-'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-muted shrink-0" />
+              <div>
+                <p className="text-xs text-muted">Promene par</p>
+                <p className="text-sm font-medium">
+                  {outing.is_tig ? (
+                    <span className="inline-flex items-center gap-1">
+                      <HardHat className="w-3.5 h-3.5 text-amber-500" />
+                      <span className="text-amber-500">TIG</span>
+                      {outing.tig_walker_name && <span> — {outing.tig_walker_name}</span>}
+                    </span>
+                  ) : (
+                    userNames[outing.walked_by] || 'Inconnu'
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Star className="w-4 h-4 text-muted shrink-0" />
+              <div>
+                <p className="text-xs text-muted">Note</p>
+                {outing.rating != null ? (
+                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold ${getRatingBadgeClass(outing.rating)}`}>
+                    {outing.rating}/10
+                  </span>
+                ) : (
+                  <p className="text-sm text-muted">-</p>
+                )}
+              </div>
+            </div>
+          </div>
 
-      {outing.notes && outing.notes !== outing.rating_comment && (
-        <div className="bg-background rounded-lg border border-border p-3">
-          <div className="flex items-center gap-2 mb-1.5">
-            <MessageSquare className="w-3.5 h-3.5 text-muted" />
-            <p className="text-xs font-medium text-muted">Notes</p>
-          </div>
-          <p className="text-sm whitespace-pre-wrap">{outing.notes}</p>
-        </div>
+          {outing.rating_comment && (
+            <div className="bg-background rounded-lg border border-border p-3 mb-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-muted" />
+                <p className="text-xs font-medium text-muted">Commentaire</p>
+              </div>
+              <p className="text-sm whitespace-pre-wrap">{outing.rating_comment}</p>
+            </div>
+          )}
+
+          {outing.notes && outing.notes !== outing.rating_comment && (
+            <div className="bg-background rounded-lg border border-border p-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-muted" />
+                <p className="text-xs font-medium text-muted">Notes</p>
+              </div>
+              <p className="text-sm whitespace-pre-wrap">{outing.notes}</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
 }
 
-export function OutingHistory({ outings, userNames, isAdmin, currentUserId, currentPage, totalPages }: Readonly<OutingHistoryProps>) {
+export function OutingHistory({ outings, userNames, isAdmin, canManageAssignments = false, currentUserId, currentPage, totalPages }: Readonly<OutingHistoryProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [selectedOuting, setSelectedOuting] = useState<OutingWithAnimal | null>(null)
 
   function canDelete(_outing: OutingWithAnimal): boolean {
-    // currentUserId is kept for future per-user delete permission
     return isAdmin
   }
 
-  const showActionsColumn = outings.some(canDelete)
+  function canEditOuting(outing: OutingWithAnimal): boolean {
+    // Walker can edit their own, managers/admins can edit any
+    return outing.walked_by === currentUserId || isAdmin || canManageAssignments
+  }
+
+  const showActionsColumn = outings.some((o) => canDelete(o) || canEditOuting(o))
 
   function handleDelete(id: string, animalName: string) {
     if (!confirm(`Supprimer la sortie de ${animalName} ?`)) return
@@ -223,6 +416,7 @@ export function OutingHistory({ outings, userNames, isAdmin, currentUserId, curr
                 {outings.map((outing) => {
                   const photo = getAnimalPhoto(outing.animals)
                   const deletable = canDelete(outing)
+                  const editable = canEditOuting(outing)
                   return (
                     <Fragment key={outing.id}>
                     <tr
@@ -289,16 +483,27 @@ export function OutingHistory({ outings, userNames, isAdmin, currentUserId, curr
                       </td>
                       {showActionsColumn && (
                         <td className="px-4 py-3 text-right">
-                          {deletable ? (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDelete(outing.id, outing.animals.name) }}
-                              disabled={isPending && pendingId === outing.id}
-                              className="text-muted hover:text-error transition-colors disabled:opacity-50"
-                              title="Supprimer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          ) : null}
+                          <div className="flex items-center justify-end gap-1">
+                            {editable && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedOuting(outing) }}
+                                className="text-muted hover:text-primary transition-colors"
+                                title="Modifier"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            )}
+                            {deletable && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDelete(outing.id, outing.animals.name) }}
+                                disabled={isPending && pendingId === outing.id}
+                                className="text-muted hover:text-error transition-colors disabled:opacity-50"
+                                title="Supprimer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -308,6 +513,7 @@ export function OutingHistory({ outings, userNames, isAdmin, currentUserId, curr
                           <OutingDetailPanel
                             outing={selectedOuting}
                             userNames={userNames}
+                            canEdit={canEditOuting(selectedOuting)}
                             onClose={() => setSelectedOuting(null)}
                           />
                         </td>

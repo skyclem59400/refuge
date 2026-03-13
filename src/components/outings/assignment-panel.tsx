@@ -12,9 +12,12 @@ import {
   Loader2,
   PawPrint,
   User,
+  Pencil,
+  Save,
+  MessageSquare,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { createAssignment, deleteAssignment } from '@/lib/actions/outings'
+import { createAssignment, deleteAssignment, updateAssignment } from '@/lib/actions/outings'
 
 interface Assignment {
   id: string
@@ -59,13 +62,15 @@ export default function AssignmentPanel({
   members,
   animals,
   userNames,
-}: AssignmentPanelProps) {
+}: Readonly<AssignmentPanelProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isOpen, setIsOpen] = useState(true)
   const [selectedMember, setSelectedMember] = useState('')
   const [selectedAnimal, setSelectedAnimal] = useState('')
   const [assignNotes, setAssignNotes] = useState('')
+  const [editingAssignment, setEditingAssignment] = useState<string | null>(null)
+  const [editNotes, setEditNotes] = useState('')
 
   // Filter animals: exclude those already assigned to selectedMember today
   const availableAnimals = animals.filter(
@@ -124,13 +129,32 @@ export default function AssignmentPanel({
   }
 
   async function handleDelete(id: string, animalName: string) {
-    if (!confirm(`Retirer l&apos;assignation de ${animalName} ?`)) return
+    if (!confirm(`Retirer l'assignation de ${animalName} ?`)) return
     startTransition(async () => {
       const result = await deleteAssignment(id)
       if (result.error) {
         toast.error(result.error)
       } else {
         toast.success('Assignation retiree')
+        router.refresh()
+      }
+    })
+  }
+
+  function startEditNotes(assignment: Assignment) {
+    setEditingAssignment(assignment.id)
+    setEditNotes(assignment.notes || '')
+  }
+
+  function handleSaveNotes() {
+    if (!editingAssignment) return
+    startTransition(async () => {
+      const result = await updateAssignment(editingAssignment, { notes: editNotes.trim() || null })
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Consignes mises a jour')
+        setEditingAssignment(null)
         router.refresh()
       }
     })
@@ -164,11 +188,12 @@ export default function AssignmentPanel({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {/* Select member */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted">
+                <label htmlFor="assignment-member" className="mb-1 block text-xs font-medium text-muted">
                   <User className="mr-1 inline h-3.5 w-3.5" />
                   Membre
                 </label>
                 <select
+                  id="assignment-member"
                   value={selectedMember}
                   onChange={(e) => {
                     setSelectedMember(e.target.value)
@@ -187,11 +212,12 @@ export default function AssignmentPanel({
 
               {/* Select animal */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted">
+                <label htmlFor="assignment-animal" className="mb-1 block text-xs font-medium text-muted">
                   <PawPrint className="mr-1 inline h-3.5 w-3.5" />
                   Animal
                 </label>
                 <select
+                  id="assignment-animal"
                   value={selectedAnimal}
                   onChange={(e) => setSelectedAnimal(e.target.value)}
                   disabled={!selectedMember}
@@ -208,10 +234,11 @@ export default function AssignmentPanel({
 
               {/* Notes */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted">
+                <label htmlFor="assignment-notes" className="mb-1 block text-xs font-medium text-muted">
                   Notes (optionnel)
                 </label>
                 <input
+                  id="assignment-notes"
                   type="text"
                   value={assignNotes}
                   onChange={(e) => setAssignNotes(e.target.value)}
@@ -252,46 +279,95 @@ export default function AssignmentPanel({
                   </div>
 
                   {/* Animal badges */}
-                  <div className="flex flex-wrap gap-2">
-                    {userAssignments.map((assignment) => {
-                      const isCompleted = assignment.outing_id !== null
-                      const today = new Date().toISOString().split('T')[0]
-                      const isOverdue = !isCompleted && assignment.date < today
-                      return (
-                        <span
-                          key={assignment.id}
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-                            isCompleted
-                              ? 'bg-success/10 text-success'
-                              : isOverdue
-                                ? 'bg-warning/10 text-warning'
-                                : 'bg-primary/10 text-primary'
-                          }`}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {userAssignments.map((assignment) => {
+                        const isCompleted = assignment.outing_id !== null
+                        const today = new Date().toISOString().split('T')[0]
+                        const isOverdue = !isCompleted && assignment.date < today
+                        const badgeClass = isCompleted
+                          ? 'bg-success/10 text-success'
+                          : isOverdue
+                            ? 'bg-warning/10 text-warning'
+                            : 'bg-primary/10 text-primary'
+                        return (
+                          <span
+                            key={assignment.id}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${badgeClass}`}
+                          >
+                            <PawPrint className="h-3 w-3" />
+                            {assignment.animals.name}
+                            {assignment.notes && (
+                              <span title={assignment.notes}>
+                                <MessageSquare className="h-3 w-3 opacity-60" />
+                              </span>
+                            )}
+                            {isOverdue && (
+                              <span className="text-[10px] opacity-75">
+                                J+{Math.round((new Date(today).getTime() - new Date(assignment.date).getTime()) / 86400000)}
+                              </span>
+                            )}
+                            {isCompleted ? (
+                              <Check className="h-3 w-3" />
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => startEditNotes(assignment)}
+                                  disabled={isPending}
+                                  className="ml-0.5 rounded-full p-0.5 text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+                                  title="Modifier les consignes"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleDelete(assignment.id, assignment.animals.name)
+                                  }
+                                  disabled={isPending}
+                                  className="ml-0.5 rounded-full p-0.5 text-error transition-colors hover:bg-error/10 disabled:opacity-50"
+                                  title="Retirer cette assignation"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </>
+                            )}
+                          </span>
+                        )
+                      })}
+                    </div>
+
+                    {/* Inline notes editor */}
+                    {userAssignments.some((a) => editingAssignment === a.id) && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="text"
+                          value={editNotes}
+                          onChange={(e) => setEditNotes(e.target.value)}
+                          placeholder="Consignes de sortie..."
+                          className="flex-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm
+                            focus:outline-none focus:ring-1 focus:ring-primary/50"
+                          // eslint-disable-next-line jsx-a11y/no-autofocus
+                          autoFocus
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleSaveNotes(); if (e.key === 'Escape') setEditingAssignment(null) }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveNotes}
+                          disabled={isPending}
+                          className="p-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+                          title="Enregistrer"
                         >
-                          <PawPrint className="h-3 w-3" />
-                          {assignment.animals.name}
-                          {isOverdue && (
-                            <span className="text-[10px] opacity-75">
-                              J+{Math.round((new Date(today).getTime() - new Date(assignment.date).getTime()) / 86400000)}
-                            </span>
-                          )}
-                          {isCompleted ? (
-                            <Check className="h-3 w-3" />
-                          ) : (
-                            <button
-                              onClick={() =>
-                                handleDelete(assignment.id, assignment.animals.name)
-                              }
-                              disabled={isPending}
-                              className="ml-0.5 rounded-full p-0.5 text-error transition-colors hover:bg-error/10 disabled:opacity-50"
-                              title="Retirer cette assignation"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          )}
-                        </span>
-                      )
-                    })}
+                          {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingAssignment(null)}
+                          className="p-1.5 rounded-lg text-muted hover:bg-surface-hover transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
