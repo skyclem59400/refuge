@@ -51,13 +51,38 @@ export async function syncAnimalsFromHunimalis(): Promise<{
       synced += batch.length
     }
 
-    // 4. Sync photos (set photo_url from Hunimalis picture)
+    // 4. Sync photos (set photo_url + insert into animal_photos if missing)
     for (const h of hunimalisAnimals) {
       if (h.picture) {
-        await supabase
+        // Update photo_url on the animal record
+        const { data: animal } = await supabase
           .from('animals')
           .update({ photo_url: h.picture })
           .eq('hunimalis_id', h.id)
+          .eq('establishment_id', establishmentId)
+          .select('id')
+          .single()
+
+        if (animal) {
+          // Check if this Hunimalis photo already exists in animal_photos
+          const { data: existingPhotos } = await supabase
+            .from('animal_photos')
+            .select('id, url')
+            .eq('animal_id', animal.id)
+
+          const hasHunimalisPhoto = existingPhotos?.some((p) => p.url === h.picture)
+
+          if (!hasHunimalisPhoto) {
+            const isFirst = !existingPhotos || existingPhotos.length === 0
+            await supabase
+              .from('animal_photos')
+              .insert({
+                animal_id: animal.id,
+                url: h.picture,
+                is_primary: isFirst,
+              })
+          }
+        }
       }
     }
 

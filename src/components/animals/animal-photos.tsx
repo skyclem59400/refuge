@@ -22,11 +22,14 @@ interface AnimalPhotosProps {
 export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: Readonly<AnimalPhotosProps>) {
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<string | null>(null)
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
   const primaryPhoto = photos.find((p) => p.is_primary) || photos[0] || null
-  const displayUrl = primaryPhoto?.url || fallbackPhotoUrl || null
+  const selectedPhoto = selectedPhotoId ? photos.find((p) => p.id === selectedPhotoId) : null
+  const displayPhoto = selectedPhoto || primaryPhoto
+  const displayUrl = displayPhoto?.url || fallbackPhotoUrl || null
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -75,6 +78,7 @@ export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: 
         toast.error(result.error)
       } else {
         toast.success('Photo supprimee')
+        if (selectedPhotoId === photoId) setSelectedPhotoId(null)
         router.refresh()
       }
 
@@ -99,7 +103,7 @@ export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: 
 
   return (
     <div className="space-y-4">
-      {/* Primary photo (large) */}
+      {/* Large photo display */}
       <div className="aspect-square w-full overflow-hidden rounded-xl border border-border bg-surface">
         {displayUrl ? (
           <Image
@@ -120,65 +124,69 @@ export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: 
 
       {/* Thumbnails grid */}
       <div className="flex flex-wrap gap-2">
-        {photos.map((photo) => (
-          <div
-            key={photo.id}
-            className={`relative group h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-surface ${
-              photo.is_primary ? 'ring-2 ring-primary' : ''
-            }`}
-          >
-            <Image
-              src={photo.url}
-              alt="Photo animal"
-              width={80}
-              height={80}
-              className="h-full w-full object-cover"
-            />
+        {photos.map((photo) => {
+          const isSelected = displayPhoto?.id === photo.id
+          return (
+            <div
+              key={photo.id}
+              className={`relative group h-20 w-20 shrink-0 overflow-hidden rounded-lg border bg-surface cursor-pointer transition-all ${
+                isSelected ? 'ring-2 ring-primary border-primary' : 'border-border hover:border-primary/50'
+              }`}
+              onClick={() => setSelectedPhotoId(photo.id)}
+            >
+              <Image
+                src={photo.url}
+                alt="Photo animal"
+                width={80}
+                height={80}
+                className="h-full w-full object-cover"
+              />
 
-            {/* Overlay actions (visible on hover when canManage) */}
-            {canManage && (
-              <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-                {/* Set as primary */}
-                <button
-                  type="button"
-                  onClick={() => handleSetPrimary(photo.id)}
-                  disabled={isPending}
-                  className="rounded-full bg-black/50 p-1 text-white transition-colors hover:bg-black/70"
-                  title="Definir comme photo principale"
-                >
-                  <Star
-                    className={`h-4 w-4 ${photo.is_primary ? 'fill-yellow-400 text-yellow-400' : ''}`}
-                  />
-                </button>
+              {/* Overlay actions (visible on hover when canManage) */}
+              {canManage && (
+                <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                  {/* Set as primary */}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleSetPrimary(photo.id) }}
+                    disabled={isPending}
+                    className="rounded-full bg-black/50 p-1 text-white transition-colors hover:bg-black/70"
+                    title="Definir comme photo principale"
+                  >
+                    <Star
+                      className={`h-4 w-4 ${photo.is_primary ? 'fill-yellow-400 text-yellow-400' : ''}`}
+                    />
+                  </button>
 
-                {/* Delete */}
-                <button
-                  type="button"
-                  onClick={() => handleDelete(photo.id)}
-                  disabled={isPending}
-                  className="rounded-full bg-black/50 p-1 text-white transition-colors hover:bg-red-600"
-                  title="Supprimer la photo"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            )}
+                  {/* Delete */}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleDelete(photo.id) }}
+                    disabled={isPending}
+                    className="rounded-full bg-black/50 p-1 text-white transition-colors hover:bg-red-600"
+                    title="Supprimer la photo"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
 
-            {/* Primary star indicator (always visible when primary, no hover needed) */}
-            {photo.is_primary && !canManage && (
-              <div className="absolute left-1 top-1">
-                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 drop-shadow" />
-              </div>
-            )}
+              {/* Primary star indicator */}
+              {photo.is_primary && (
+                <div className="absolute left-1 top-1">
+                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 drop-shadow" />
+                </div>
+              )}
 
-            {/* Loading overlay for this specific photo */}
-            {(pendingAction === `delete-${photo.id}` || pendingAction === `primary-${photo.id}`) && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                <Loader2 className="h-5 w-5 animate-spin text-white" />
-              </div>
-            )}
-          </div>
-        ))}
+              {/* Loading overlay for this specific photo */}
+              {(pendingAction === `delete-${photo.id}` || pendingAction === `primary-${photo.id}`) && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                  <Loader2 className="h-5 w-5 animate-spin text-white" />
+                </div>
+              )}
+            </div>
+          )
+        })}
 
         {/* Upload button (dashed border square in the thumbnails grid) */}
         {canManage && (
