@@ -162,10 +162,10 @@ export async function createTreatment(data: {
 
     if (error) return { error: error.message }
 
-    // Notify all members who can view animals
+    // Notify admins & managers only
     const animalName = treatment.animals?.nom || 'Animal'
     notifyAdminsWithPermission({
-      permission: 'view_animals',
+      permission: 'manage_health',
       type: 'treatment_new',
       title: `Nouveau traitement : ${data.name.trim()}`,
       body: `${animalName} — ${data.description?.trim() || data.name.trim()}`,
