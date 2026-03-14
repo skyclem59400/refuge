@@ -3,6 +3,7 @@
 import { useState, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import Image from 'next/image'
 import { Camera, Loader2, User, MapPin, PawPrint } from 'lucide-react'
 import { createIntervention } from '@/lib/actions/interventions'
 import { CommuneAutocomplete } from '@/components/ui/commune-autocomplete'
@@ -66,7 +67,7 @@ export function InterventionForm() {
     reader.readAsDataURL(file)
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
     if (!callerName.trim()) {
@@ -126,10 +127,11 @@ export function InterventionForm() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium mb-1">
+            <label htmlFor="intervention-caller-name" className="block text-sm font-medium mb-1">
               Nom <span className="text-error">*</span>
             </label>
             <input
+              id="intervention-caller-name"
               type="text"
               value={callerName}
               onChange={(e) => setCallerName(e.target.value)}
@@ -139,8 +141,9 @@ export function InterventionForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Telephone</label>
+            <label htmlFor="intervention-caller-phone" className="block text-sm font-medium mb-1">Telephone</label>
             <input
+              id="intervention-caller-phone"
               type="tel"
               value={callerPhone}
               onChange={(e) => setCallerPhone(e.target.value)}
@@ -150,8 +153,9 @@ export function InterventionForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
+            <label htmlFor="intervention-caller-email" className="block text-sm font-medium mb-1">Email</label>
             <input
+              id="intervention-caller-email"
               type="email"
               value={callerEmail}
               onChange={(e) => setCallerEmail(e.target.value)}
@@ -171,8 +175,9 @@ export function InterventionForm() {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Numero</label>
+            <label htmlFor="intervention-street-number" className="block text-sm font-medium mb-1">Numero</label>
             <input
+              id="intervention-street-number"
               type="text"
               value={streetNumber}
               onChange={(e) => setStreetNumber(e.target.value)}
@@ -182,10 +187,11 @@ export function InterventionForm() {
           </div>
 
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium mb-1">
+            <label htmlFor="intervention-street" className="block text-sm font-medium mb-1">
               Rue <span className="text-error">*</span>
             </label>
             <input
+              id="intervention-street"
               type="text"
               value={street}
               onChange={(e) => setStreet(e.target.value)}
@@ -197,13 +203,13 @@ export function InterventionForm() {
           <div className="sm:col-span-3">
             <label className="block text-sm font-medium mb-1">
               Commune <span className="text-error">*</span>
+              <CommuneAutocomplete
+                value={city}
+                onChange={setCity}
+                placeholder="Rechercher une commune..."
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
             </label>
-            <CommuneAutocomplete
-              value={city}
-              onChange={setCity}
-              placeholder="Rechercher une commune..."
-              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
           </div>
         </div>
       </div>
@@ -217,11 +223,11 @@ export function InterventionForm() {
 
         {/* Photo */}
         <div>
-          <label className="block text-sm font-medium mb-2">Photo</label>
+          <label htmlFor="intervention-photo" className="block text-sm font-medium mb-2">Photo</label>
           <div className="flex items-center gap-4">
             {photoPreview ? (
               <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-border">
-                <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                <Image src={photoPreview} alt="Preview" width={96} height={96} className="w-full h-full object-cover" unoptimized />
                 <button
                   type="button"
                   onClick={() => {
@@ -245,6 +251,7 @@ export function InterventionForm() {
               </button>
             )}
             <input
+              id="intervention-photo"
               ref={fileRef}
               type="file"
               accept="image/*"
@@ -258,10 +265,11 @@ export function InterventionForm() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Species */}
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label htmlFor="intervention-species" className="block text-sm font-medium mb-1">
               Espece <span className="text-error">*</span>
             </label>
             <select
+              id="intervention-species"
               value={species}
               onChange={(e) => {
                 setSpecies(e.target.value as AnimalSpecies)
@@ -276,10 +284,11 @@ export function InterventionForm() {
 
           {/* Sex */}
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label htmlFor="intervention-sex" className="block text-sm font-medium mb-1">
               Sexe <span className="text-error">*</span>
             </label>
             <select
+              id="intervention-sex"
               value={sex}
               onChange={(e) => setSex(e.target.value as AnimalSex)}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -292,8 +301,9 @@ export function InterventionForm() {
 
           {/* Breed */}
           <div>
-            <label className="block text-sm font-medium mb-1">Race</label>
+            <label htmlFor="intervention-breed" className="block text-sm font-medium mb-1">Race</label>
             <select
+              id="intervention-breed"
               value={breed}
               onChange={(e) => setBreed(e.target.value)}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -307,8 +317,9 @@ export function InterventionForm() {
 
           {/* Origin */}
           <div>
-            <label className="block text-sm font-medium mb-1">Origine</label>
+            <label htmlFor="intervention-origin" className="block text-sm font-medium mb-1">Origine</label>
             <select
+              id="intervention-origin"
               value={originType}
               onChange={(e) => setOriginType(e.target.value as AnimalOrigin)}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -321,10 +332,11 @@ export function InterventionForm() {
 
           {/* Animal name (optional) */}
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium mb-1">
+            <label htmlFor="intervention-animal-name" className="block text-sm font-medium mb-1">
               Nom de l&apos;animal <span className="text-muted text-xs">(optionnel)</span>
             </label>
             <input
+              id="intervention-animal-name"
               type="text"
               value={animalName}
               onChange={(e) => setAnimalName(e.target.value)}
@@ -336,10 +348,11 @@ export function InterventionForm() {
 
         {/* Notes */}
         <div>
-          <label className="block text-sm font-medium mb-1">
+          <label htmlFor="intervention-notes" className="block text-sm font-medium mb-1">
             Notes / Circonstances <span className="text-muted text-xs">(optionnel)</span>
           </label>
           <textarea
+            id="intervention-notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}

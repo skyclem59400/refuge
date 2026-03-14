@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     }
 
     const compositionId = body.postType
-    const inputProps = {
+    const inputProps: Record<string, unknown> = {
       postType: body.postType,
       animalName: body.animalName,
       animalSpecies: body.animalSpecies,
@@ -48,14 +48,12 @@ export async function POST(request: Request) {
       content: body.content,
       establishmentName: body.establishmentName,
       establishmentPhone: body.establishmentPhone || '',
-    } satisfies VideoProps
-
-    const propsRecord = inputProps as unknown as Record<string, unknown>
+    }
 
     const composition = await selectComposition({
       serveUrl,
       id: compositionId,
-      inputProps: propsRecord,
+      inputProps,
     })
 
     const outputPath = path.join(os.tmpdir(), `remotion-${crypto.randomUUID()}.mp4`)
@@ -65,7 +63,7 @@ export async function POST(request: Request) {
       serveUrl,
       codec: 'h264',
       outputLocation: outputPath,
-      inputProps: propsRecord,
+      inputProps,
       browserExecutable: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     })
 

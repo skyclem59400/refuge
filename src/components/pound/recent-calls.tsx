@@ -25,7 +25,7 @@ function formatDuration(seconds: number): string {
   return `${m}min${s > 0 ? ` ${s}s` : ''}`
 }
 
-export function RecentCalls({ onSelect }: RecentCallsProps) {
+export function RecentCalls({ onSelect }: Readonly<RecentCallsProps>) {
   const [calls, setCalls] = useState<RingoverCall[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isExpanded, setIsExpanded] = useState(false)

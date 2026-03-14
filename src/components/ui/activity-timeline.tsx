@@ -163,7 +163,7 @@ function renderDetails(details: Record<string, unknown>): React.ReactElement {
   )
 }
 
-export function ActivityTimeline({ logs, userNames }: ActivityTimelineProps) {
+export function ActivityTimeline({ logs, userNames }: Readonly<ActivityTimelineProps>) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   function toggleExpanded(id: string) {

@@ -8,7 +8,7 @@ interface MemberAvatarProps {
   size?: number
 }
 
-export function MemberAvatar({ src, name, size = 32 }: MemberAvatarProps) {
+export function MemberAvatar({ src, name, size = 32 }: Readonly<MemberAvatarProps>) {
   const [hasError, setHasError] = useState(false)
   const initial = (name || '?')[0].toUpperCase()
 

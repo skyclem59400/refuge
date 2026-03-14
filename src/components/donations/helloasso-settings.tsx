@@ -16,7 +16,7 @@ interface HelloAssoSettingsProps {
   canManage: boolean
 }
 
-export function HelloAssoSettings({ connection, canManage }: HelloAssoSettingsProps) {
+export function HelloAssoSettings({ connection, canManage }: Readonly<HelloAssoSettingsProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<string | null>(null)
@@ -126,7 +126,7 @@ export function HelloAssoSettings({ connection, canManage }: HelloAssoSettingsPr
       </div>
 
       {/* Connected state */}
-      {connection?.is_active ? (
+      {connection?.is_active && (
         <div className="space-y-4">
           {/* Connection info */}
           <div className="flex items-center gap-4 text-sm">
@@ -141,7 +141,7 @@ export function HelloAssoSettings({ connection, canManage }: HelloAssoSettingsPr
           </div>
 
           {/* Sync error */}
-          {connection.sync_error && (
+          {!!connection.sync_error && (
             <div className="flex items-center gap-2 p-3 rounded-lg text-sm bg-error/10 text-error">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{connection.sync_error}</span>
@@ -174,14 +174,17 @@ export function HelloAssoSettings({ connection, canManage }: HelloAssoSettingsPr
             </div>
           )}
         </div>
-      ) : canManage ? (
-        /* Not connected - show form */
+      )}
+
+      {/* Not connected - show form */}
+      {!connection?.is_active && canManage && (
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+            <label htmlFor="helloasso-client-id" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
               Client ID *
             </label>
             <input
+              id="helloasso-client-id"
               type="text"
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
@@ -191,10 +194,11 @@ export function HelloAssoSettings({ connection, canManage }: HelloAssoSettingsPr
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+            <label htmlFor="helloasso-client-secret" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
               Client Secret *
             </label>
             <input
+              id="helloasso-client-secret"
               type="password"
               value={clientSecret}
               onChange={(e) => setClientSecret(e.target.value)}
@@ -204,10 +208,11 @@ export function HelloAssoSettings({ connection, canManage }: HelloAssoSettingsPr
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+            <label htmlFor="helloasso-organization-slug" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
               Slug de l&apos;organisation *
             </label>
             <input
+              id="helloasso-organization-slug"
               type="text"
               value={organizationSlug}
               onChange={(e) => setOrganizationSlug(e.target.value)}
@@ -229,8 +234,10 @@ export function HelloAssoSettings({ connection, canManage }: HelloAssoSettingsPr
             </button>
           </div>
         </div>
-      ) : (
-        /* Not connected and can't manage */
+      )}
+
+      {/* Not connected and can't manage */}
+      {!connection?.is_active && !canManage && (
         <p className="text-sm text-muted">
           HelloAsso n&apos;est pas configure. Contactez un administrateur pour activer la synchronisation.
         </p>

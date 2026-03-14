@@ -4,7 +4,7 @@ interface MusicLayerProps {
   url: string
 }
 
-export function MusicLayer({ url }: MusicLayerProps) {
+export function MusicLayer({ url }: Readonly<MusicLayerProps>) {
   const frame = useCurrentFrame()
   const { durationInFrames } = useVideoConfig()
 

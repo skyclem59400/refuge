@@ -52,7 +52,7 @@ export function VideoControls({
   postType,
   isGeneratingText,
   onRegenerateText,
-}: VideoControlsProps) {
+}: Readonly<VideoControlsProps>) {
   const [showHintInput, setShowHintInput] = useState(false)
   const [hint, setHint] = useState('')
   const [showMusicBrowser, setShowMusicBrowser] = useState(false)
@@ -114,7 +114,7 @@ export function VideoControls({
     searchMusic({ mood: moodId })
   }
 
-  function handleMusicSearch(e: React.FormEvent) {
+  function handleMusicSearch(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!musicSearch.trim()) return
     setActiveMood(null)

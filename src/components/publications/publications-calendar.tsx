@@ -21,7 +21,15 @@ const FRENCH_MONTHS = [
 const FRENCH_DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
 function getSpeciesEmoji(species: string): string {
-  return species === 'cat' ? '🐱' : species === 'dog' ? '🐶' : '🐾'
+  if (species === 'cat') return '🐱'
+  if (species === 'dog') return '🐶'
+  return '🐾'
+}
+
+function getDayTextClass(isToday: boolean, isCurrentMonth: boolean): string {
+  if (isToday) return 'text-primary font-bold'
+  if (isCurrentMonth) return 'text-text'
+  return 'text-muted'
 }
 
 function getDaysInMonth(year: number, month: number): number {
@@ -34,7 +42,7 @@ function getFirstDayOfMonth(year: number, month: number): number {
   return day === 0 ? 6 : day - 1
 }
 
-export function PublicationsCalendar({ posts }: PublicationsCalendarProps) {
+export function PublicationsCalendar({ posts }: Readonly<PublicationsCalendarProps>) {
   const today = new Date()
   const [currentYear, setCurrentYear] = useState(today.getFullYear())
   const [currentMonth, setCurrentMonth] = useState(today.getMonth())
@@ -138,20 +146,20 @@ export function PublicationsCalendar({ posts }: PublicationsCalendarProps) {
 
       {/* Days grid */}
       <div className="grid grid-cols-7 gap-px">
-        {cells.map((cell, idx) => {
+        {cells.map((cell) => {
           const dateKey = `${cell.year}-${String(cell.month + 1).padStart(2, '0')}-${String(cell.day).padStart(2, '0')}`
           const dayPosts = postsByDate.get(dateKey) || []
           const todayClass = isToday(cell)
 
           return (
             <div
-              key={idx}
+              key={dateKey}
               className={`min-h-[80px] p-1 border border-border/50 rounded-lg ${
                 cell.isCurrentMonth ? 'bg-surface' : 'bg-surface-hover/50 opacity-50'
               } ${todayClass ? 'ring-2 ring-primary/50' : ''}`}
             >
               <div className={`text-xs font-medium mb-1 ${
-                todayClass ? 'text-primary font-bold' : cell.isCurrentMonth ? 'text-text' : 'text-muted'
+                getDayTextClass(todayClass, cell.isCurrentMonth)
               }`}>
                 {cell.day}
               </div>

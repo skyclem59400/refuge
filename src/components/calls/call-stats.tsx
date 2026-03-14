@@ -4,11 +4,11 @@ import { Phone, PhoneCall, Clock, PhoneIncoming } from 'lucide-react'
 import { formatCallDuration } from '@/lib/sda-utils'
 
 interface CallStatsProps {
-  stats: {
-    total: number
-    inProgress: number
-    avgDuration: number
-    callbackNeeded: number
+  readonly stats: {
+    readonly total: number
+    readonly inProgress: number
+    readonly avgDuration: number
+    readonly callbackNeeded: number
   }
 }
 

@@ -6,7 +6,7 @@ interface TitleOverlayProps {
   startFrame?: number
 }
 
-export function TitleOverlay({ text, color, startFrame = 15 }: TitleOverlayProps) {
+export function TitleOverlay({ text, color, startFrame = 15 }: Readonly<TitleOverlayProps>) {
   const frame = useCurrentFrame()
 
   const opacity = interpolate(frame, [startFrame, startFrame + 15], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
@@ -57,7 +57,7 @@ interface ContentOverlayProps {
   startFrame?: number
 }
 
-export function ContentOverlay({ text, startFrame = 120 }: ContentOverlayProps) {
+export function ContentOverlay({ text, startFrame = 120 }: Readonly<ContentOverlayProps>) {
   const frame = useCurrentFrame()
 
   const opacity = interpolate(frame, [startFrame, startFrame + 20], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
@@ -109,7 +109,7 @@ interface CtaOverlayProps {
   startFrame?: number
 }
 
-export function CtaOverlay({ text, subtext, color, startFrame = 200 }: CtaOverlayProps) {
+export function CtaOverlay({ text, subtext, color, startFrame = 200 }: Readonly<CtaOverlayProps>) {
   const frame = useCurrentFrame()
 
   const opacity = interpolate(frame, [startFrame, startFrame + 15], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })

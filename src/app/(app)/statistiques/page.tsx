@@ -8,7 +8,7 @@ import { StatsCards } from '@/components/dashboard/stats-cards'
 import { RevenueChart } from '@/components/dashboard/revenue-chart'
 import { TypeBadge } from '@/components/documents/status-badge'
 import Link from 'next/link'
-import { BarChart3, TrendingUp, FileText } from 'lucide-react'
+import { BarChart3, TrendingUp } from 'lucide-react'
 
 const STATUS_COLORS: Record<string, string> = {
   pound: '#f59e0b',
@@ -94,8 +94,8 @@ export default async function StatistiquesPage() {
       caEnAttente,
       totalClients: totalClients || 0,
     }
-    recentDocs = (rawRecentDocs as typeof recentDocs) || []
-    invoicesByMonth = (rawInvoicesByMonth as typeof invoicesByMonth) || []
+    recentDocs = rawRecentDocs || []
+    invoicesByMonth = rawInvoicesByMonth || []
   }
 
   // Stats by status

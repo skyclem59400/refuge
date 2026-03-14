@@ -8,10 +8,10 @@ import { MemberAvatar } from '@/components/ui/member-avatar'
 import type { EstablishmentMember, PermissionGroup } from '@/lib/types/database'
 
 interface MembersListProps {
-  members: EstablishmentMember[]
-  groups: PermissionGroup[]
-  currentUserId: string
-  isOwner: boolean
+  readonly members: EstablishmentMember[]
+  readonly groups: PermissionGroup[]
+  readonly currentUserId: string
+  readonly isOwner: boolean
 }
 
 function GroupDropdown({
@@ -20,18 +20,18 @@ function GroupDropdown({
   onAssign,
   onRemove,
   disabled,
-}: {
+}: Readonly<{
   member: EstablishmentMember
   allGroups: PermissionGroup[]
   onAssign: (memberId: string, groupId: string) => void
   onRemove: (memberId: string, groupId: string) => void
   disabled: boolean
-}) {
+}>) {
   const [isOpen, setIsOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    const handleClickOutside = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setIsOpen(false)
       }
@@ -86,6 +86,30 @@ function GroupDropdown({
   )
 }
 
+function addGroupToMember(
+  members: EstablishmentMember[],
+  memberId: string,
+  group: PermissionGroup
+): EstablishmentMember[] {
+  return members.map(m =>
+    m.id === memberId
+      ? { ...m, groups: [...(m.groups || []), group] }
+      : m
+  )
+}
+
+function removeGroupFromMember(
+  members: EstablishmentMember[],
+  memberId: string,
+  groupId: string
+): EstablishmentMember[] {
+  return members.map(m =>
+    m.id === memberId
+      ? { ...m, groups: (m.groups || []).filter(g => g.id !== groupId) }
+      : m
+  )
+}
+
 export function MembersList({ members, groups, currentUserId, isOwner }: MembersListProps) {
   const [list, setList] = useState(members)
   const [isPending, startTransition] = useTransition()
@@ -93,77 +117,68 @@ export function MembersList({ members, groups, currentUserId, isOwner }: Members
 
   useEffect(() => { setList(members) }, [members])
 
-  function handleAssignGroup(memberId: string, groupId: string) {
-    // Optimistic update
+  const assignGroupAction = async (memberId: string, groupId: string) => {
+    const result = await assignMemberToGroup(memberId, groupId)
+    if (result.error) {
+      toast.error(result.error)
+      setList(prev => removeGroupFromMember(prev, memberId, groupId))
+    } else {
+      toast.success('Groupe assigne')
+    }
+  }
+
+  const handleAssignGroup = (memberId: string, groupId: string) => {
     const group = groups.find(g => g.id === groupId)
     if (group) {
-      setList(prev => prev.map(m =>
-        m.id === memberId
-          ? { ...m, groups: [...(m.groups || []), group] }
-          : m
-      ))
+      setList(prev => addGroupToMember(prev, memberId, group))
     }
-
-    startTransition(async () => {
-      const result = await assignMemberToGroup(memberId, groupId)
-      if (result.error) {
-        toast.error(result.error)
-        // Revert
-        setList(prev => prev.map(m =>
-          m.id === memberId
-            ? { ...m, groups: (m.groups || []).filter(g => g.id !== groupId) }
-            : m
-        ))
-      } else {
-        toast.success('Groupe assigne')
-      }
-    })
+    startTransition(() => assignGroupAction(memberId, groupId))
   }
 
-  function handleRemoveGroup(memberId: string, groupId: string) {
-    // Optimistic update
-    setList(prev => prev.map(m =>
-      m.id === memberId
-        ? { ...m, groups: (m.groups || []).filter(g => g.id !== groupId) }
-        : m
-    ))
-
-    startTransition(async () => {
-      const result = await removeMemberFromGroup(memberId, groupId)
-      if (result.error) {
-        toast.error(result.error)
-        router.refresh()
-      } else {
-        toast.success('Groupe retire')
-      }
-    })
+  const removeGroupAction = async (memberId: string, groupId: string) => {
+    const result = await removeMemberFromGroup(memberId, groupId)
+    if (result.error) {
+      toast.error(result.error)
+      router.refresh()
+    } else {
+      toast.success('Groupe retire')
+    }
   }
 
-  function handleRemoveMember(memberId: string) {
+  const handleRemoveGroup = (memberId: string, groupId: string) => {
+    setList(prev => removeGroupFromMember(prev, memberId, groupId))
+    startTransition(() => removeGroupAction(memberId, groupId))
+  }
+
+  const removeMemberAction = async (memberId: string) => {
+    const result = await removeMember(memberId)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      setList(prev => prev.filter(m => m.id !== memberId))
+      toast.success('Membre supprime')
+      router.refresh()
+    }
+  }
+
+  const handleRemoveMember = (memberId: string) => {
     if (!confirm('Supprimer ce membre ?')) return
-    startTransition(async () => {
-      const result = await removeMember(memberId)
-      if (result.error) {
-        toast.error(result.error)
-      } else {
-        setList(prev => prev.filter(m => m.id !== memberId))
-        toast.success('Membre supprime')
-        router.refresh()
-      }
-    })
+    startTransition(() => removeMemberAction(memberId))
   }
 
-  function handleResetPassword(memberId: string, pseudo: string) {
+  const resetPasswordAction = async (memberId: string) => {
+    const result = await resetPseudoPassword(memberId)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success('Mot de passe reinitialise')
+      router.refresh()
+    }
+  }
+
+  const handleResetPassword = (memberId: string, pseudo: string) => {
     if (!confirm(`Reinitialiser le mot de passe de "${pseudo}" ? L'utilisateur devra en creer un nouveau.`)) return
-    startTransition(async () => {
-      const result = await resetPseudoPassword(memberId)
-      if (result.error) {
-        toast.error(result.error)
-      } else {
-        toast.success('Mot de passe reinitialise')
-        router.refresh()
-      }
-    })
+    startTransition(() => resetPasswordAction(memberId))
   }
 
   if (list.length === 0) {
@@ -190,21 +205,21 @@ export function MembersList({ members, groups, currentUserId, isOwner }: Members
                 <p className="text-sm font-medium truncate">
                   {member.full_name || member.pseudo || member.email || member.user_id.slice(0, 8)}
                   {isCurrentUser && <span className="text-muted text-xs ml-1">(vous)</span>}
-                  {member.is_pseudo_user && (
-                    <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-medium
-                      ${member.role_type === 'salarie'
-                        ? 'bg-blue-500/15 text-blue-400'
-                        : 'bg-green-500/15 text-green-400'
-                      }`}>
-                      {member.role_type === 'salarie' ? 'Salarie' : 'Benevole'}
+                  {member.is_pseudo_user && member.role_type === 'salarie' && (
+                    <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-blue-500/15 text-blue-400">
+                      Salarie
+                    </span>
+                  )}
+                  {member.is_pseudo_user && member.role_type !== 'salarie' && (
+                    <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-green-500/15 text-green-400">
+                      Benevole
                     </span>
                   )}
                 </p>
                 <p className="text-xs text-muted">
-                  {member.is_pseudo_user
-                    ? (member.password_set ? 'Mot de passe defini' : 'En attente du mot de passe')
-                    : (member.email && member.full_name ? member.email : '')
-                  }
+                  {member.is_pseudo_user && member.password_set && 'Mot de passe defini'}
+                  {member.is_pseudo_user && !member.password_set && 'En attente du mot de passe'}
+                  {!member.is_pseudo_user && member.email && member.full_name && member.email}
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">

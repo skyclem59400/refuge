@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Filter, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { Filter, ChevronDown, ChevronUp } from 'lucide-react'
 
 export interface TimelineFilters {
   showSchedules: boolean
@@ -21,7 +21,7 @@ export function TimelineFiltersComponent({
   allUsers,
   filters,
   onFiltersChange,
-}: TimelineFiltersProps) {
+}: Readonly<TimelineFiltersProps>) {
   const [isExpanded, setIsExpanded] = useState(false)
 
   const toggleSchedules = () => {

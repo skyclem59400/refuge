@@ -11,7 +11,7 @@ interface PublicationsStatsProps {
   }
 }
 
-export function PublicationsStats({ stats }: PublicationsStatsProps) {
+export function PublicationsStats({ stats }: Readonly<PublicationsStatsProps>) {
   const items = [
     { label: 'Brouillons', value: stats.drafts, Icon: FileText, color: 'text-muted' },
     { label: 'Programmes', value: stats.scheduled, Icon: Clock, color: 'text-info' },

@@ -47,10 +47,11 @@ export function PasswordForm() {
       <h2 className="text-lg font-bold">Mot de passe</h2>
 
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+        <label htmlFor="password-current" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
           Mot de passe actuel
         </label>
         <input
+          id="password-current"
           type="password"
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
@@ -63,10 +64,11 @@ export function PasswordForm() {
       </div>
 
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+        <label htmlFor="password-new" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
           Nouveau mot de passe
         </label>
         <input
+          id="password-new"
           type="password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
@@ -80,10 +82,11 @@ export function PasswordForm() {
       </div>
 
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+        <label htmlFor="password-confirm" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
           Confirmer le nouveau mot de passe
         </label>
         <input
+          id="password-confirm"
           type="password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}

@@ -5,7 +5,7 @@ import { formatPhoneFr } from '@/lib/sda-utils'
 import type { RingoverTopCaller } from '@/lib/types/database'
 
 interface TopCallersProps {
-  callers: RingoverTopCaller[]
+  readonly callers: RingoverTopCaller[]
 }
 
 export function TopCallers({ callers }: TopCallersProps) {

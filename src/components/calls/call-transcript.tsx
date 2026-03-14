@@ -6,8 +6,8 @@ import { formatCallDuration } from '@/lib/sda-utils'
 import type { CallTranscript } from '@/lib/types/database'
 
 interface CallTranscriptProps {
-  initialTranscripts: CallTranscript[]
-  callId: string
+  readonly initialTranscripts: CallTranscript[]
+  readonly callId: string
 }
 
 export function CallTranscriptView({ initialTranscripts, callId }: CallTranscriptProps) {

@@ -6,7 +6,7 @@ import { ContentOverlay, CtaOverlay } from '../components/text-overlay'
 import { MusicLayer } from '../components/music-layer'
 import { POST_TYPE_COLORS, type VideoProps } from '../types'
 
-export function OtherVideo({ photoUrls, content, establishmentName, logoUrl, videoText, musicUrl }: VideoProps) {
+export function OtherVideo({ photoUrls, content, establishmentName, logoUrl, videoText, musicUrl }: Readonly<VideoProps>) {
   const colors = POST_TYPE_COLORS.other
 
   return (

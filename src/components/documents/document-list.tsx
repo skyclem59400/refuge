@@ -16,9 +16,9 @@ function isEditable(doc: Document): boolean {
 }
 
 interface DocumentListProps {
-  initialData: Document[]
-  canEdit: boolean
-  establishmentId: string
+  readonly initialData: Document[]
+  readonly canEdit: boolean
+  readonly establishmentId: string
 }
 
 export function DocumentList({ initialData, canEdit, establishmentId }: DocumentListProps) {
@@ -30,7 +30,7 @@ export function DocumentList({ initialData, canEdit, establishmentId }: Document
   const [isPending, startTransition] = useTransition()
   const supabase = createClient()
 
-  async function applyFilters(type: string, status: string) {
+  const applyFilters = async (type: string, status: string) => {
     let query = supabase
       .from('documents')
       .select('*')
@@ -48,30 +48,32 @@ export function DocumentList({ initialData, canEdit, establishmentId }: Document
     if (data) setDocuments(data as Document[])
   }
 
-  function handleTypeChange(value: string) {
+  const handleTypeChange = (value: string) => {
     setTypeFilter(value)
     applyFilters(value, statusFilter)
   }
 
-  function handleStatusChange(value: string) {
+  const handleStatusChange = (value: string) => {
     setStatusFilter(value)
     applyFilters(typeFilter, value)
   }
 
-  function handleDelete(id: string, numero: string) {
-    if (!confirm(`Supprimer le document ${numero} ?`)) return
-    startTransition(async () => {
-      const result = await deleteDocument(id)
-      if (result.error) {
-        toast.error(result.error)
-      } else {
-        toast.success(`Document ${numero} supprime`)
-        setDocuments((prev) => prev.filter((d) => d.id !== id))
-      }
-    })
+  const deleteDocumentAction = async (id: string, numero: string) => {
+    const result = await deleteDocument(id)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success(`Document ${numero} supprime`)
+      setDocuments((prev) => prev.filter((d) => d.id !== id))
+    }
   }
 
-  function handleConvert(id: string) {
+  const handleDelete = (id: string, numero: string) => {
+    if (!confirm(`Supprimer le document ${numero} ?`)) return
+    startTransition(() => deleteDocumentAction(id, numero))
+  }
+
+  const handleConvert = (id: string) => {
     if (!confirm('Convertir ce devis en facture ?')) return
     startTransition(async () => {
       const result = await convertDevisToFacture(id)
@@ -84,7 +86,7 @@ export function DocumentList({ initialData, canEdit, establishmentId }: Document
     })
   }
 
-  function handleStatusUpdate(id: string, status: DocumentStatus) {
+  const handleStatusUpdate = (id: string, status: DocumentStatus) => {
     startTransition(async () => {
       const result = await updateDocumentStatus(id, status)
       if ('error' in result && result.error) {
@@ -100,7 +102,7 @@ export function DocumentList({ initialData, canEdit, establishmentId }: Document
     })
   }
 
-  function handleCancelWithAvoir(id: string, numero: string) {
+  const handleCancelWithAvoir = (id: string, numero: string) => {
     if (!confirm(`Annuler la facture ${numero} ? Un avoir sera automatiquement genere.`)) return
     startTransition(async () => {
       const result = await cancelFactureWithAvoir(id)
@@ -113,7 +115,7 @@ export function DocumentList({ initialData, canEdit, establishmentId }: Document
     })
   }
 
-  function handleValidate(id: string) {
+  const handleValidate = (id: string) => {
     if (!confirm('Valider cette facture ? Elle ne pourra plus etre modifiee.')) return
     handleStatusUpdate(id, 'validated')
   }
@@ -179,9 +181,10 @@ export function DocumentList({ initialData, canEdit, establishmentId }: Document
                   <td className="px-4 py-3 text-right font-semibold">{formatCurrency(doc.total)}</td>
                   <td className="px-4 py-3">
                     {/* Read-only statuses or no edit permission */}
-                    {(!canEdit || doc.status === 'converted' || doc.type === 'avoir' || doc.status === 'cancelled') ? (
+                    {(!canEdit || doc.status === 'converted' || doc.type === 'avoir' || doc.status === 'cancelled') && (
                       <StatusBadge status={doc.status} />
-                    ) : doc.type === 'facture' ? (
+                    )}
+                    {canEdit && doc.status !== 'converted' && doc.type !== 'avoir' && doc.status !== 'cancelled' && doc.type === 'facture' && (
                       <select
                         value={doc.status}
                         onChange={(e) => handleStatusUpdate(doc.id, e.target.value as DocumentStatus)}
@@ -193,7 +196,8 @@ export function DocumentList({ initialData, canEdit, establishmentId }: Document
                         <option value="paid">Payee</option>
                         <option value="cancelled">Annulee</option>
                       </select>
-                    ) : (
+                    )}
+                    {canEdit && doc.status !== 'converted' && doc.type !== 'avoir' && doc.status !== 'cancelled' && doc.type !== 'facture' && (
                       <select
                         value={doc.status}
                         onChange={(e) => handleStatusUpdate(doc.id, e.target.value as DocumentStatus)}

@@ -7,11 +7,11 @@ import type { Donation } from '@/lib/types/database'
 
 export default async function NewDonationPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ edit?: string }>
-}) {
+}>) {
   const params = await searchParams
-  const ctx = await getEstablishmentContext()
+  await getEstablishmentContext()
 
   let donation: Donation | undefined
   if (params.edit) {

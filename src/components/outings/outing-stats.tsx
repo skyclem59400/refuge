@@ -65,10 +65,15 @@ export function OutingStats({
   avgDuration,
   tigTotal = 0,
   userNames,
-}: OutingStatsProps) {
-  const [granularity, setGranularity] = useState<Granularity>('week')
+}: Readonly<OutingStatsProps>) {
+  const [granularity, setGranularity] = useState<Granularity>('day')
 
-  const trendData = granularity === 'day' ? (dailyTrend || []) : granularity === 'month' ? (monthlyTrend || []) : (weeklyTrend || [])
+  const trendDataMap: Record<Granularity, TrendPoint[]> = {
+    day: dailyTrend || [],
+    week: weeklyTrend || [],
+    month: monthlyTrend || [],
+  }
+  const trendData = trendDataMap[granularity]
   const maxCount = trendData.length > 0 ? Math.max(...trendData.map((t) => t.count), 1) : 1
 
   return (
@@ -152,61 +157,62 @@ export function OutingStats({
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Per person */}
-        <div className="bg-surface rounded-xl border border-border p-4">
-          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-            <Users className="w-4 h-4 text-primary" />
-            Sorties par personne
-          </h3>
-          {perPerson.length === 0 ? (
-            <p className="text-muted text-sm text-center py-4">Aucune donnee</p>
-          ) : (
-            <div className="space-y-3">
-              {perPerson.map((person, index) => {
-                const name = userNames[person.userId] || 'Inconnu'
-                const maxPersonCount = perPerson[0].count
-                return (
-                  <div key={person.userId} className="flex items-center gap-3">
-                    <div className="w-6 text-center shrink-0">
-                      {index === 0 ? (
-                        <Trophy className="w-4 h-4 text-yellow-500 mx-auto" />
-                      ) : (
-                        <span className="text-xs text-muted font-medium">{index + 1}</span>
-                      )}
+      {/* Per person */}
+      <div className="bg-surface rounded-xl border border-border p-4">
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+          <Users className="w-4 h-4 text-primary" />
+          Sorties par personne
+        </h3>
+        {perPerson.length === 0 ? (
+          <p className="text-muted text-sm text-center py-4">Aucune donnee</p>
+        ) : (
+          <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+            {perPerson.map((person, index) => {
+              const name = userNames[person.userId] || 'Inconnu'
+              const maxPersonCount = perPerson[0].count
+              return (
+                <div key={person.userId} className="flex items-center gap-3">
+                  <div className="w-6 text-center shrink-0">
+                    {index === 0 ? (
+                      <Trophy className="w-4 h-4 text-yellow-500 mx-auto" />
+                    ) : (
+                      <span className="text-xs text-muted font-medium">{index + 1}</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium truncate">{name}</span>
+                      <span className="text-xs text-muted shrink-0 ml-2">
+                        {person.count} sortie{person.count > 1 ? 's' : ''} · {formatOutingDuration(person.totalMinutes)} · moy. {formatOutingDuration(person.avgMinutes)}
+                      </span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium truncate">{name}</span>
-                        <span className="text-xs text-muted shrink-0 ml-2">
-                          {person.count} sortie{person.count > 1 ? 's' : ''} · {formatOutingDuration(person.totalMinutes)} · moy. {formatOutingDuration(person.avgMinutes)}
-                        </span>
-                      </div>
-                      <div className="h-2 bg-border rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full transition-all"
-                          style={{ width: `${(person.count / maxPersonCount) * 100}%` }}
-                        />
-                      </div>
+                    <div className="h-2 bg-border rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all"
+                        style={{ width: `${(person.count / maxPersonCount) * 100}%` }}
+                      />
                     </div>
                   </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
-        {/* Per animal — top + bottom */}
+      {/* Dogs: most walked + least walked — side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Most walked */}
         <div className="bg-surface rounded-xl border border-border p-4">
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-            <PawPrint className="w-4 h-4 text-primary" />
+            <Trophy className="w-4 h-4 text-yellow-500" />
             Chiens les plus sortis
           </h3>
-          {perAnimal.length === 0 ? (
+          {perAnimal.filter(a => a.count > 0).length === 0 ? (
             <p className="text-muted text-sm text-center py-4">Aucune donnee</p>
           ) : (
-            <div className="space-y-3">
-              {perAnimal.slice(0, 10).map((animal, index) => {
+            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+              {perAnimal.filter(a => a.count > 0).slice(0, 10).map((animal, index) => {
                 const photo = getAnimalPhoto(animal)
                 const maxAnimalCount = perAnimal[0].count
                 return (
@@ -245,42 +251,50 @@ export function OutingStats({
               })}
             </div>
           )}
+        </div>
 
-          {/* Bottom 5 — least walked */}
-          {perAnimal.length > 5 && (
-            <>
-              <h3 className="text-sm font-semibold mt-6 mb-4 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-warning" />
-                Chiens les moins sortis
-              </h3>
-              <div className="space-y-3">
-                {perAnimal.slice(-5).reverse().map((animal) => {
+        {/* Least walked / never walked */}
+        <div className="bg-surface rounded-xl border border-warning/30 p-4">
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-warning" />
+            Chiens les moins sortis
+            {perAnimal.filter(a => a.count === 0).length > 0 && (
+              <span className="text-xs font-normal text-warning ml-auto">
+                {perAnimal.filter(a => a.count === 0).length} jamais sorti{perAnimal.filter(a => a.count === 0).length > 1 ? 's' : ''}
+              </span>
+            )}
+          </h3>
+          {(() => {
+            const leastWalked = [...perAnimal].sort((a, b) => a.count - b.count || a.totalMinutes - b.totalMinutes)
+            const toShow = leastWalked.filter(a => a.count <= (leastWalked[Math.min(9, leastWalked.length - 1)]?.count ?? 0) || a.count === 0)
+              .slice(0, 15)
+            return toShow.length === 0 ? (
+              <p className="text-muted text-sm text-center py-4">Tous les chiens ont ete sortis</p>
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {toShow.map((animal) => {
                   const photo = getAnimalPhoto(animal)
+                  const isNeverWalked = animal.count === 0
                   return (
-                    <div key={animal.animalId} className="flex items-center gap-3">
-                      <div className="w-6 shrink-0" />
+                    <div key={animal.animalId} className={`flex items-center gap-3 py-1.5 px-2 rounded-lg ${isNeverWalked ? 'bg-warning/5' : ''}`}>
                       {photo ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={photo} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
+                        <img src={photo} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
                       ) : (
-                        <div className="w-7 h-7 rounded-full bg-muted/20 flex items-center justify-center shrink-0">
-                          <PawPrint className="w-3.5 h-3.5 text-muted" />
+                        <div className="w-8 h-8 rounded-full bg-muted/20 flex items-center justify-center shrink-0">
+                          <PawPrint className="w-4 h-4 text-muted" />
                         </div>
                       )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium truncate">{animal.name}</span>
-                          <span className="text-xs text-warning shrink-0 ml-2">
-                            {animal.count} sortie{animal.count > 1 ? 's' : ''}
-                          </span>
-                        </div>
-                      </div>
+                      <span className="text-sm font-medium truncate flex-1">{animal.name}</span>
+                      <span className={`text-xs font-semibold shrink-0 ml-2 ${isNeverWalked ? 'text-red-500' : 'text-warning'}`}>
+                        {isNeverWalked ? 'Jamais sorti' : `${animal.count} sortie${animal.count > 1 ? 's' : ''}`}
+                      </span>
                     </div>
                   )
                 })}
               </div>
-            </>
-          )}
+            )
+          })()}
         </div>
       </div>
     </div>

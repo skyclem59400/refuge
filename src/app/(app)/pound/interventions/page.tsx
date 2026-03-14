@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { Plus, ClipboardList, Phone, MapPin, PawPrint, Settings } from 'lucide-react'
+import Image from 'next/image'
+import { Plus, ClipboardList, Phone, MapPin, PawPrint } from 'lucide-react'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { getInterventions } from '@/lib/actions/interventions'
 import { getRingoverConnection } from '@/lib/actions/ringover'
@@ -25,7 +26,8 @@ type InterventionWithAnimal = {
 
 export default async function InterventionsPage() {
   const ctx = await getEstablishmentContext()
-  const permissions = ctx!.permissions
+  if (!ctx) throw new Error('Establishment context required')
+  const permissions = ctx.permissions
   const canCreate = permissions.canManageMovements
   const canManageEstablishment = permissions.canManageEstablishment
 
@@ -148,7 +150,7 @@ export default async function InterventionsPage() {
                           <Link href={`/animals/${animal.id}`} className="flex items-center gap-2 group">
                             <div className="w-8 h-8 rounded-lg bg-muted/10 overflow-hidden shrink-0 flex items-center justify-center">
                               {photoUrl ? (
-                                <img src={photoUrl} alt={animal.name} className="w-full h-full object-cover" />
+                                <Image src={photoUrl} alt={animal.name} width={32} height={32} className="w-full h-full object-cover" />
                               ) : (
                                 <PawPrint className="w-4 h-4 text-muted" />
                               )}

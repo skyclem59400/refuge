@@ -11,12 +11,13 @@ import type { Donation } from '@/lib/types/database'
 
 export default async function DonationsPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ year?: string }>
-}) {
+}>) {
   const params = await searchParams
   const ctx = await getEstablishmentContext()
-  const canManage = ctx!.permissions.canManageDonations
+  if (!ctx) throw new Error('Establishment context required')
+  const canManage = ctx.permissions.canManageDonations
 
   const selectedYear = params.year ? parseInt(params.year) : new Date().getFullYear()
 

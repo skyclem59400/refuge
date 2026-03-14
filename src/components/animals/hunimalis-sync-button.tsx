@@ -8,7 +8,7 @@ interface SyncButtonProps {
   lastSyncedAt?: string | null
 }
 
-export function HunimalisSyncButton({ lastSyncedAt }: SyncButtonProps) {
+export function HunimalisSyncButton({ lastSyncedAt }: Readonly<SyncButtonProps>) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ success?: boolean; synced?: number; details?: string; error?: string } | null>(null)
 

@@ -19,7 +19,7 @@ interface ScheduleFormProps {
   onClose?: () => void
 }
 
-export function ScheduleForm({ members, userNames, onClose }: ScheduleFormProps) {
+export function ScheduleForm({ members, userNames, onClose }: Readonly<ScheduleFormProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [selectedUserId, setSelectedUserId] = useState('')
@@ -28,7 +28,7 @@ export function ScheduleForm({ members, userNames, onClose }: ScheduleFormProps)
   const [endTime, setEndTime] = useState('17:00')
   const [notes, setNotes] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     if (!selectedUserId || !date || !startTime || !endTime) {
@@ -76,10 +76,11 @@ export function ScheduleForm({ members, userNames, onClose }: ScheduleFormProps)
 
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">
+          <label htmlFor="schedule-person" className="block text-xs font-medium text-muted mb-1">
             Personne *
           </label>
           <select
+            id="schedule-person"
             value={selectedUserId}
             onChange={(e) => setSelectedUserId(e.target.value)}
             required
@@ -96,10 +97,11 @@ export function ScheduleForm({ members, userNames, onClose }: ScheduleFormProps)
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">
+          <label htmlFor="schedule-date" className="block text-xs font-medium text-muted mb-1">
             Date *
           </label>
           <input
+            id="schedule-date"
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
@@ -111,10 +113,11 @@ export function ScheduleForm({ members, userNames, onClose }: ScheduleFormProps)
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-muted mb-1">
+            <label htmlFor="schedule-start-time" className="block text-xs font-medium text-muted mb-1">
               Heure debut *
             </label>
             <input
+              id="schedule-start-time"
               type="time"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
@@ -124,10 +127,11 @@ export function ScheduleForm({ members, userNames, onClose }: ScheduleFormProps)
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-muted mb-1">
+            <label htmlFor="schedule-end-time" className="block text-xs font-medium text-muted mb-1">
               Heure fin *
             </label>
             <input
+              id="schedule-end-time"
               type="time"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
@@ -139,10 +143,11 @@ export function ScheduleForm({ members, userNames, onClose }: ScheduleFormProps)
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">
+          <label htmlFor="schedule-notes" className="block text-xs font-medium text-muted mb-1">
             Notes (optionnel)
           </label>
           <textarea
+            id="schedule-notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}

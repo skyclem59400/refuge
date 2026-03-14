@@ -2,11 +2,11 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
-interface Props {
+interface AnimalsByStatusChartProps {
   data: { name: string; value: number; color: string }[]
 }
 
-function CustomTooltip({ active, payload }: { active?: boolean; payload?: { name: string; value: number; payload: { color: string } }[] }) {
+function CustomTooltip({ active, payload }: Readonly<{ active?: boolean; payload?: { name: string; value: number; payload: { color: string } }[] }>) {
   if (!active || !payload?.length) return null
   const entry = payload[0]
   return (
@@ -20,7 +20,7 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: { name
   )
 }
 
-export function AnimalsByStatusChart({ data }: Props) {
+export function AnimalsByStatusChart({ data }: Readonly<AnimalsByStatusChartProps>) {
   if (data.length === 0) {
     return <div className="flex items-center justify-center h-[300px] text-muted text-sm">Aucune donnee</div>
   }
@@ -39,8 +39,8 @@ export function AnimalsByStatusChart({ data }: Props) {
             dataKey="value"
             nameKey="name"
           >
-            {data.map((entry, index) => (
-              <Cell key={index} fill={entry.color} />
+            {data.map((entry) => (
+              <Cell key={entry.name} fill={entry.color} />
             ))}
           </Pie>
           <Tooltip content={<CustomTooltip />} />

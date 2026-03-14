@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Scale } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
@@ -11,7 +12,8 @@ type AnimalWithPhotos = Animal & { animal_photos: AnimalPhoto[] }
 
 export default async function RequisitionsPage() {
   const ctx = await getEstablishmentContext()
-  const estabId = ctx!.establishment.id
+  if (!ctx) throw new Error('Establishment context required')
+  const estabId = ctx.establishment.id
   const admin = createAdminClient()
 
   const { data: rawAnimals } = await admin
@@ -67,10 +69,11 @@ export default async function RequisitionsPage() {
                         <Link href={`/animals/${a.id}`} className="flex items-center gap-3 group">
                           <div className="w-10 h-10 rounded-lg bg-muted/10 overflow-hidden shrink-0 flex items-center justify-center">
                             {photoUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
+                              <Image
                                 src={photoUrl}
                                 alt={a.name}
+                                width={40}
+                                height={40}
                                 className="w-full h-full object-cover"
                               />
                             ) : (

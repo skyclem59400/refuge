@@ -9,7 +9,7 @@ import { TranscribeButton } from '@/components/calls/accueil/transcribe-button'
 import type { RingoverCallbackItem } from '@/lib/types/database'
 
 interface CallbackListProps {
-  callbacks: RingoverCallbackItem[]
+  readonly callbacks: RingoverCallbackItem[]
 }
 
 function timeAgo(dateStr: string): string {
@@ -27,26 +27,30 @@ export function CallbackList({ callbacks: initial }: CallbackListProps) {
   const [callbacks, setCallbacks] = useState(initial)
   const [isPending, startTransition] = useTransition()
 
-  function handleMarkDone(id: string) {
-    startTransition(async () => {
-      const result = await markRingoverCallback(id)
-      if (result.error) toast.error(result.error)
-      else {
-        toast.success('Rappel effectue')
-        setCallbacks((prev) => prev.filter((c) => c.id !== id))
-      }
-    })
+  const markDoneAction = async (id: string) => {
+    const result = await markRingoverCallback(id)
+    if (result.error) toast.error(result.error)
+    else {
+      toast.success('Rappel effectue')
+      setCallbacks((prev) => prev.filter((c) => c.id !== id))
+    }
   }
 
-  function handleDismiss(id: string) {
-    startTransition(async () => {
-      const result = await dismissRingoverCallback(id)
-      if (result.error) toast.error(result.error)
-      else setCallbacks((prev) => prev.filter((c) => c.id !== id))
-    })
+  const handleMarkDone = (id: string) => {
+    startTransition(() => markDoneAction(id))
   }
 
-  function handleTranscribed(id: string, data: { transcript: string; summary: string | null; sentiment: string | null }) {
+  const dismissAction = async (id: string) => {
+    const result = await dismissRingoverCallback(id)
+    if (result.error) toast.error(result.error)
+    else setCallbacks((prev) => prev.filter((c) => c.id !== id))
+  }
+
+  const handleDismiss = (id: string) => {
+    startTransition(() => dismissAction(id))
+  }
+
+  const handleTranscribed = (id: string, data: { transcript: string; summary: string | null; sentiment: string | null }) => {
     setCallbacks((prev) =>
       prev.map((c) =>
         c.id === id

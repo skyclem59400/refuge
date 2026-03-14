@@ -5,7 +5,7 @@ import { formatDurationHuman, getAnswerRateColor, getWaitTimeColor } from '@/lib
 import type { RingoverDashboardStats } from '@/lib/types/database'
 
 interface AccueilStatsProps {
-  stats: RingoverDashboardStats
+  readonly stats: RingoverDashboardStats
 }
 
 export function AccueilStats({ stats }: AccueilStatsProps) {

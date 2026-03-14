@@ -29,7 +29,7 @@ export function TimelineEventBlock({
   onDelete,
   onEdit,
   onDragStart,
-}: TimelineEventBlockProps) {
+}: Readonly<TimelineEventBlockProps>) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
 
@@ -37,7 +37,6 @@ export function TimelineEventBlock({
   const height = calculateHeightPercent(event.start_time, event.end_time, totalHours)
 
   const isSchedule = event.type === 'schedule'
-  const data = event.data as StaffSchedule | Appointment
 
   const getAppointmentColors = (type: string) => {
     switch (type) {
@@ -61,7 +60,7 @@ export function TimelineEventBlock({
 
   const colors = isSchedule
     ? { bg: 'bg-primary/10 border-primary/30', text: 'text-primary' }
-    : getAppointmentColors(event.data.type)
+    : getAppointmentColors((event.data as Appointment).type)
 
   const bgColor = colors.bg
   const textColor = colors.text
@@ -73,7 +72,7 @@ export function TimelineEventBlock({
     try {
       await onDelete(event.id, event.type)
       toast.success('Supprimé avec succès')
-    } catch (error) {
+    } catch {
       toast.error('Erreur lors de la suppression')
     } finally {
       setIsDeleting(false)
@@ -82,6 +81,8 @@ export function TimelineEventBlock({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       draggable={canManage}
       onDragStart={(e) => {
         if (canManage && onDragStart) {
@@ -92,6 +93,12 @@ export function TimelineEventBlock({
       onClick={(e) => {
         // Don't trigger edit when clicking delete button
         if (!(e.target as HTMLElement).closest('button')) {
+          onEdit?.(event)
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
           onEdit?.(event)
         }
       }}
@@ -113,18 +120,18 @@ export function TimelineEventBlock({
             <>
               <User className="w-3 h-3 shrink-0" />
               <span className="truncate font-medium">
-                {userNames[(data as StaffSchedule).user_id] || 'Inconnu'}
+                {userNames[(event.data as StaffSchedule).user_id] || 'Inconnu'}
               </span>
             </>
           ) : (
             <>
-              {event.data.type === 'adoption' ? (
+              {(event.data as Appointment).type === 'adoption' ? (
                 <Heart className="w-3 h-3 shrink-0" />
               ) : (
                 <Stethoscope className="w-3 h-3 shrink-0" />
               )}
               <span className="truncate font-medium">
-                {(data as Appointment).client_name}
+                {(event.data as Appointment).client_name}
               </span>
             </>
           )}
@@ -152,36 +159,42 @@ export function TimelineEventBlock({
         <div className="absolute z-50 left-0 top-full mt-1 bg-surface border border-border rounded-lg shadow-lg p-3 min-w-[200px] text-sm text-text">
           {isSchedule ? (
             <>
-              <p className="font-semibold">{userNames[(data as StaffSchedule).user_id] || 'Inconnu'}</p>
+              <p className="font-semibold">{userNames[(event.data as StaffSchedule).user_id] || 'Inconnu'}</p>
               <p className="text-xs text-muted mt-1">
                 {event.start_time} - {event.end_time}
               </p>
-              {(data as StaffSchedule).notes && (
-                <p className="text-xs mt-2 text-muted">{(data as StaffSchedule).notes}</p>
+              {(event.data as StaffSchedule).notes && (
+                <p className="text-xs mt-2 text-muted">{(event.data as StaffSchedule).notes}</p>
               )}
             </>
           ) : (
             <>
-              <p className="font-semibold">{(data as Appointment).client_name}</p>
+              <p className="font-semibold">{(event.data as Appointment).client_name}</p>
               <p className="text-xs text-muted mt-1">
-                {event.data.type === 'adoption' ? 'Adoption' : 'Vétérinaire'}
+                {(event.data as Appointment).type === 'adoption' ? 'Adoption' : 'Vétérinaire'}
               </p>
-              {(data as Appointment).assigned_user_id && userNames[(data as Appointment).assigned_user_id!] && (
-                <p className="text-xs text-muted">
-                  Collaborateur : {userNames[(data as Appointment).assigned_user_id!]}
-                </p>
-              )}
-              {(data as Appointment).animal_id && animalNames[(data as Appointment).animal_id!] && (
-                <p className="text-xs text-muted">
-                  Animal : {animalNames[(data as Appointment).animal_id!]}
-                </p>
-              )}
+              {(() => {
+                const assignedId = (event.data as Appointment).assigned_user_id
+                return assignedId && userNames[assignedId] ? (
+                  <p className="text-xs text-muted">
+                    Collaborateur : {userNames[assignedId]}
+                  </p>
+                ) : null
+              })()}
+              {(() => {
+                const animalId = (event.data as Appointment).animal_id
+                return animalId && animalNames[animalId] ? (
+                  <p className="text-xs text-muted">
+                    Animal : {animalNames[animalId]}
+                  </p>
+                ) : null
+              })()}
               <p className="text-xs mt-1">
                 {event.start_time} - {event.end_time}
               </p>
-              {(data as Appointment).client_phone && (
+              {(event.data as Appointment).client_phone && (
                 <p className="text-xs mt-1 text-muted">
-                  Tél : {(data as Appointment).client_phone}
+                  Tél : {(event.data as Appointment).client_phone}
                 </p>
               )}
             </>

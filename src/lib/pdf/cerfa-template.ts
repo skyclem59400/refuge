@@ -47,42 +47,57 @@ function buildCachetSvg(company: CompanyInfo): string {
   </svg>`
 }
 
-function amountToWords(amount: number): string {
-  const units = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf',
-    'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf']
-  const tens = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', 'soixante', 'quatre-vingt', 'quatre-vingt']
+const FRENCH_UNITS = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf',
+  'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf']
+const FRENCH_TENS = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', 'soixante', 'quatre-vingt', 'quatre-vingt']
 
+function convertTens(n: number): string {
+  const t = Math.floor(n / 10)
+  const u = n % 10
+
+  // Special French rules for 70s and 90s (soixante-dix, quatre-vingt-dix)
+  if (t === 7 || t === 9) {
+    const separator = (u === 1 && t === 7) ? ' et ' : '-'
+    return FRENCH_TENS[t] + separator + FRENCH_UNITS[10 + u]
+  }
+
+  // quatre-vingts (with trailing 's' only when exact)
+  if (t === 8 && u === 0) return 'quatre-vingts'
+
+  let separator = ''
+  if (u === 1 && t <= 6) separator = ' et '
+  else if (u > 0) separator = '-'
+  return FRENCH_TENS[t] + separator + FRENCH_UNITS[u]
+}
+
+function convertHundreds(n: number): string {
+  const h = Math.floor(n / 100)
+  const rest = n % 100
+  const prefix = h === 1 ? 'cent' : FRENCH_UNITS[h] + ' cent' + (rest === 0 ? 's' : '')
+  return prefix + (rest > 0 ? ' ' + convertNumber(rest) : '')
+}
+
+function convertThousands(n: number): string {
+  const th = Math.floor(n / 1000)
+  const rest = n % 1000
+  const prefix = th === 1 ? 'mille' : convertNumber(th) + ' mille'
+  return prefix + (rest > 0 ? ' ' + convertNumber(rest) : '')
+}
+
+function convertNumber(n: number): string {
+  if (n === 0) return ''
+  if (n < 20) return FRENCH_UNITS[n]
+  if (n < 100) return convertTens(n)
+  if (n < 1000) return convertHundreds(n)
+  if (n < 1000000) return convertThousands(n)
+  return n.toString()
+}
+
+function amountToWords(amount: number): string {
   if (amount === 0) return 'zero'
 
   const euros = Math.floor(amount)
   const cents = Math.round((amount - euros) * 100)
-
-  function convertNumber(n: number): string {
-    if (n === 0) return ''
-    if (n < 20) return units[n]
-    if (n < 100) {
-      const t = Math.floor(n / 10)
-      const u = n % 10
-      if (t === 7 || t === 9) {
-        return tens[t] + (u === 1 && t === 7 ? ' et ' : '-') + units[10 + u]
-      }
-      if (t === 8 && u === 0) return 'quatre-vingts'
-      return tens[t] + (u === 1 && t <= 6 ? ' et ' : u > 0 ? '-' : '') + units[u]
-    }
-    if (n < 1000) {
-      const h = Math.floor(n / 100)
-      const rest = n % 100
-      const prefix = h === 1 ? 'cent' : units[h] + ' cent' + (rest === 0 ? 's' : '')
-      return prefix + (rest > 0 ? ' ' + convertNumber(rest) : '')
-    }
-    if (n < 1000000) {
-      const th = Math.floor(n / 1000)
-      const rest = n % 1000
-      const prefix = th === 1 ? 'mille' : convertNumber(th) + ' mille'
-      return prefix + (rest > 0 ? ' ' + convertNumber(rest) : '')
-    }
-    return n.toString()
-  }
 
   let result = convertNumber(euros) + ' euro' + (euros > 1 ? 's' : '')
   if (cents > 0) {
@@ -107,45 +122,227 @@ function getNatureLabel(nature: string): string {
   return nature === 'numeraire' ? 'Num\u00e9raire' : 'Nature (don en nature)'
 }
 
-export function buildCerfaHtml(donation: Donation, companyInfo?: CompanyInfo, logoBase64?: string): string {
-  const company = companyInfo || {
-    name: 'Mon Etablissement',
-    description: '',
-    email: '',
-    phone: '',
-    website: '',
-    iban: '',
-    bic: '',
-    address: '',
-    legal_name: '',
-  }
+function buildHeaderSection(donation: Donation): string {
+  const cerfaNumberHtml = donation.cerfa_number
+    ? `<div class="cerfa-number">N&deg; ${donation.cerfa_number}</div>`
+    : ''
 
-  const dateFormatted = new Date(donation.date).toLocaleDateString('fr-FR', {
+  return `<!-- Header -->
+    <div class="header">
+      <div class="header-title">Re&ccedil;u au titre des dons</div>
+      <div class="header-subtitle">
+        Articles 200, 238 bis et 978 du Code G&eacute;n&eacute;ral des Imp&ocirc;ts (CGI)
+      </div>
+      <div class="header-ref">Cerfa n&deg; 11580*04</div>
+      ${cerfaNumberHtml}
+    </div>`
+}
+
+function buildOrganisationSection(company: CompanyInfo, logoBase64?: string): string {
+  const logoHtml = logoBase64
+    ? `<img src="${logoBase64}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; float: left; margin-right: 10px;" />`
+    : ''
+
+  const legalNameHtml = company.legal_name
+    ? `
+          <div class="field">
+            <div class="field-label">D&eacute;nomination l&eacute;gale</div>
+            <div class="field-value">${company.legal_name}</div>
+          </div>`
+    : ''
+
+  const emailHtml = company.email
+    ? `
+          <div class="field">
+            <div class="field-label">Email</div>
+            <div class="field-value">${company.email}</div>
+          </div>`
+    : ''
+
+  const phoneHtml = company.phone
+    ? `
+          <div class="field">
+            <div class="field-label">T&eacute;l&eacute;phone</div>
+            <div class="field-value">${company.phone}</div>
+          </div>`
+    : ''
+
+  return `<!-- Organisation section -->
+    <div class="section">
+      <div class="section-title">1. Organisme b&eacute;n&eacute;ficiaire du don</div>
+      <div class="section-row">
+        <div class="section-col">
+          ${logoHtml}
+          <div class="field">
+            <div class="field-label">Nom ou d&eacute;nomination</div>
+            <div class="field-value name">${company.name}</div>
+          </div>
+          ${legalNameHtml}
+          <div class="field">
+            <div class="field-label">Adresse</div>
+            <div class="field-value">${company.address || 'Non renseign&eacute;e'}</div>
+          </div>
+        </div>
+        <div class="section-col">
+          <div class="field">
+            <div class="field-label">Objet / Activit&eacute;</div>
+            <div class="field-value">${company.description || 'Protection animale'}</div>
+          </div>
+          ${emailHtml}
+          ${phoneHtml}
+        </div>
+      </div>
+    </div>`
+}
+
+function buildDonorSection(donation: Donation): string {
+  const cityLineHtml = donation.donor_postal_code || donation.donor_city
+    ? `<br>${donation.donor_postal_code || ''} ${donation.donor_city || ''}`
+    : ''
+
+  const donorEmailHtml = donation.donor_email
+    ? `
+          <div class="field">
+            <div class="field-label">Email</div>
+            <div class="field-value">${donation.donor_email}</div>
+          </div>`
+    : ''
+
+  const donorPhoneHtml = donation.donor_phone
+    ? `
+          <div class="field">
+            <div class="field-label">T&eacute;l&eacute;phone</div>
+            <div class="field-value">${donation.donor_phone}</div>
+          </div>`
+    : ''
+
+  return `<!-- Donor section -->
+    <div class="section">
+      <div class="section-title">2. Donateur</div>
+      <div class="section-row">
+        <div class="section-col">
+          <div class="field">
+            <div class="field-label">Nom et pr&eacute;nom / Raison sociale</div>
+            <div class="field-value name">${donation.donor_name}</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Adresse</div>
+            <div class="field-value">
+              ${donation.donor_address || ''}
+              ${cityLineHtml}
+            </div>
+          </div>
+        </div>
+        <div class="section-col">
+          ${donorEmailHtml}
+          ${donorPhoneHtml}
+        </div>
+      </div>
+    </div>`
+}
+
+function buildAmountSection(donation: Donation, amountWords: string): string {
+  return `<!-- Amount box -->
+    <div class="amount-box">
+      <div class="amount-label">Montant du don</div>
+      <div class="amount-value">${Number(donation.amount).toFixed(2)} &euro;</div>
+      <div class="amount-words">${amountWords}</div>
+    </div>`
+}
+
+function buildDonationDetailsSection(donation: Donation, dateFormatted: string): string {
+  const numeraireChecked = donation.nature === 'numeraire'
+  const natureChecked = donation.nature === 'nature'
+
+  return `<!-- Donation details -->
+    <div class="section">
+      <div class="section-title">3. Caract&eacute;ristiques du don</div>
+      <div class="section-row">
+        <div class="section-col">
+          <div class="field">
+            <div class="field-label">Date du versement</div>
+            <div class="field-value">${dateFormatted}</div>
+          </div>
+          <div class="field" style="margin-top: 4px;">
+            <div class="field-label">Nature du don</div>
+            <div class="checkbox-group">
+              <div class="checkbox-item">
+                <span class="checkbox ${numeraireChecked ? 'checked' : ''}">${numeraireChecked ? '&check;' : ''}</span>
+                Num&eacute;raire
+              </div>
+              <div class="checkbox-item">
+                <span class="checkbox ${natureChecked ? 'checked' : ''}">${natureChecked ? '&check;' : ''}</span>
+                Autres (don en nature)
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="section-col">
+          <div class="field">
+            <div class="field-label">Mode de versement</div>
+            <div class="field-value">${getPaymentMethodLabel(donation.payment_method)}</div>
+          </div>
+        </div>
+      </div>
+    </div>`
+}
+
+function buildLegalSection(): string {
+  return `<!-- Legal attestation -->
+    <div class="legal">
+      <div class="legal-title">Attestation de l'organisme</div>
+      <p>
+        L'organisme b&eacute;n&eacute;ficiaire certifie sur l'honneur que les dons et versements qu'il
+        re&ccedil;oit ouvrent droit &agrave; la r&eacute;duction d'imp&ocirc;t pr&eacute;vue &agrave;
+        l'article <strong>200 du CGI</strong> (pour les particuliers) ou &agrave; l'article
+        <strong>238 bis du CGI</strong> (pour les entreprises).
+      </p>
+      <p style="margin-top: 6px;">
+        Le donateur peut b&eacute;n&eacute;ficier d'une r&eacute;duction d'imp&ocirc;t sur le revenu
+        &eacute;gale &agrave; <strong>66%</strong> du montant du don, dans la limite de
+        <strong>20%</strong> du revenu imposable. Pour les entreprises, la r&eacute;duction est de
+        <strong>60%</strong> dans la limite de 20 000 &euro; ou 0,5% du chiffre d'affaires HT.
+      </p>
+    </div>`
+}
+
+function buildSignatureSection(company: CompanyInfo, generatedDate: string): string {
+  return `<!-- Signature section -->
+    <div class="signature-section">
+      <div class="signature-left">
+        <div class="field">
+          <div class="field-label">Date d'&eacute;tablissement du re&ccedil;u</div>
+          <div class="field-value">${generatedDate}</div>
+        </div>
+        <div class="cachet-wrapper">${buildCachetSvg(company)}</div>
+      </div>
+      <div class="signature-right">
+        <img src="${SIGNATURE_BASE64}" class="signature-img" alt="Signature" />
+        <div class="signature-label">Signature du responsable</div>
+      </div>
+    </div>`
+}
+
+function buildFooterSection(company: CompanyInfo): string {
+  const legalNameSuffix = company.legal_name ? ` &ndash; ${company.legal_name}` : ''
+
+  return `<!-- Footer -->
+    <div class="footer">
+      <p>${company.name}${legalNameSuffix}</p>
+      <p>${company.address || ''} | ${company.email || ''} | ${company.phone || ''}</p>
+    </div>`
+}
+
+function formatFrenchDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('fr-FR', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   })
+}
 
-  const generatedDate = donation.cerfa_generated_at
-    ? new Date(donation.cerfa_generated_at).toLocaleDateString('fr-FR', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      })
-    : new Date().toLocaleDateString('fr-FR', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      })
-
-  const amountWords = amountToWords(Number(donation.amount))
-
-  return `<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <title>Re&ccedil;u fiscal - ${donation.cerfa_number || 'CERFA'}</title>
-  <style>
+function buildCssStyles(): string {
+  return `<style>
     @page { size: A4; margin: 10mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -364,169 +561,58 @@ export function buildCerfaHtml(donation: Donation, companyInfo?: CompanyInfo, lo
       font-size: 8px;
       color: #94a3b8;
     }
-  </style>
+  </style>`
+}
+
+export function buildCerfaHtml(donation: Donation, companyInfo?: CompanyInfo, logoBase64?: string): string {
+  const company = companyInfo || {
+    name: 'Mon Etablissement',
+    description: '',
+    email: '',
+    phone: '',
+    website: '',
+    iban: '',
+    bic: '',
+    address: '',
+    legal_name: '',
+  }
+
+  const dateFormatted = formatFrenchDate(donation.date)
+
+  const generatedDate = donation.cerfa_generated_at
+    ? formatFrenchDate(donation.cerfa_generated_at)
+    : new Date().toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+
+  const amountWords = amountToWords(Number(donation.amount))
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Re&ccedil;u fiscal - ${donation.cerfa_number || 'CERFA'}</title>
+  ${buildCssStyles()}
 </head>
 <body>
   <div class="page">
-    <!-- Header -->
-    <div class="header">
-      <div class="header-title">Re&ccedil;u au titre des dons</div>
-      <div class="header-subtitle">
-        Articles 200, 238 bis et 978 du Code G&eacute;n&eacute;ral des Imp&ocirc;ts (CGI)
-      </div>
-      <div class="header-ref">Cerfa n&deg; 11580*04</div>
-      ${donation.cerfa_number ? `<div class="cerfa-number">N&deg; ${donation.cerfa_number}</div>` : ''}
-    </div>
+    ${buildHeaderSection(donation)}
 
-    <!-- Organisation section -->
-    <div class="section">
-      <div class="section-title">1. Organisme b&eacute;n&eacute;ficiaire du don</div>
-      <div class="section-row">
-        <div class="section-col">
-          ${logoBase64 ? `<img src="${logoBase64}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; float: left; margin-right: 10px;" />` : ''}
-          <div class="field">
-            <div class="field-label">Nom ou d&eacute;nomination</div>
-            <div class="field-value name">${company.name}</div>
-          </div>
-          ${company.legal_name ? `
-          <div class="field">
-            <div class="field-label">D&eacute;nomination l&eacute;gale</div>
-            <div class="field-value">${company.legal_name}</div>
-          </div>` : ''}
-          <div class="field">
-            <div class="field-label">Adresse</div>
-            <div class="field-value">${company.address || 'Non renseign&eacute;e'}</div>
-          </div>
-        </div>
-        <div class="section-col">
-          <div class="field">
-            <div class="field-label">Objet / Activit&eacute;</div>
-            <div class="field-value">${company.description || 'Protection animale'}</div>
-          </div>
-          ${company.email ? `
-          <div class="field">
-            <div class="field-label">Email</div>
-            <div class="field-value">${company.email}</div>
-          </div>` : ''}
-          ${company.phone ? `
-          <div class="field">
-            <div class="field-label">T&eacute;l&eacute;phone</div>
-            <div class="field-value">${company.phone}</div>
-          </div>` : ''}
-        </div>
-      </div>
-    </div>
+    ${buildOrganisationSection(company, logoBase64)}
 
-    <!-- Donor section -->
-    <div class="section">
-      <div class="section-title">2. Donateur</div>
-      <div class="section-row">
-        <div class="section-col">
-          <div class="field">
-            <div class="field-label">Nom et pr&eacute;nom / Raison sociale</div>
-            <div class="field-value name">${donation.donor_name}</div>
-          </div>
-          <div class="field">
-            <div class="field-label">Adresse</div>
-            <div class="field-value">
-              ${donation.donor_address || ''}
-              ${donation.donor_postal_code || donation.donor_city
-                ? `<br>${donation.donor_postal_code || ''} ${donation.donor_city || ''}`
-                : ''}
-            </div>
-          </div>
-        </div>
-        <div class="section-col">
-          ${donation.donor_email ? `
-          <div class="field">
-            <div class="field-label">Email</div>
-            <div class="field-value">${donation.donor_email}</div>
-          </div>` : ''}
-          ${donation.donor_phone ? `
-          <div class="field">
-            <div class="field-label">T&eacute;l&eacute;phone</div>
-            <div class="field-value">${donation.donor_phone}</div>
-          </div>` : ''}
-        </div>
-      </div>
-    </div>
+    ${buildDonorSection(donation)}
 
-    <!-- Amount box -->
-    <div class="amount-box">
-      <div class="amount-label">Montant du don</div>
-      <div class="amount-value">${Number(donation.amount).toFixed(2)} &euro;</div>
-      <div class="amount-words">${amountWords}</div>
-    </div>
+    ${buildAmountSection(donation, amountWords)}
 
-    <!-- Donation details -->
-    <div class="section">
-      <div class="section-title">3. Caract&eacute;ristiques du don</div>
-      <div class="section-row">
-        <div class="section-col">
-          <div class="field">
-            <div class="field-label">Date du versement</div>
-            <div class="field-value">${dateFormatted}</div>
-          </div>
-          <div class="field" style="margin-top: 4px;">
-            <div class="field-label">Nature du don</div>
-            <div class="checkbox-group">
-              <div class="checkbox-item">
-                <span class="checkbox ${donation.nature === 'numeraire' ? 'checked' : ''}">${donation.nature === 'numeraire' ? '&check;' : ''}</span>
-                Num&eacute;raire
-              </div>
-              <div class="checkbox-item">
-                <span class="checkbox ${donation.nature === 'nature' ? 'checked' : ''}">${donation.nature === 'nature' ? '&check;' : ''}</span>
-                Autres (don en nature)
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="section-col">
-          <div class="field">
-            <div class="field-label">Mode de versement</div>
-            <div class="field-value">${getPaymentMethodLabel(donation.payment_method)}</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    ${buildDonationDetailsSection(donation, dateFormatted)}
 
-    <!-- Legal attestation -->
-    <div class="legal">
-      <div class="legal-title">Attestation de l'organisme</div>
-      <p>
-        L'organisme b&eacute;n&eacute;ficiaire certifie sur l'honneur que les dons et versements qu'il
-        re&ccedil;oit ouvrent droit &agrave; la r&eacute;duction d'imp&ocirc;t pr&eacute;vue &agrave;
-        l'article <strong>200 du CGI</strong> (pour les particuliers) ou &agrave; l'article
-        <strong>238 bis du CGI</strong> (pour les entreprises).
-      </p>
-      <p style="margin-top: 6px;">
-        Le donateur peut b&eacute;n&eacute;ficier d'une r&eacute;duction d'imp&ocirc;t sur le revenu
-        &eacute;gale &agrave; <strong>66%</strong> du montant du don, dans la limite de
-        <strong>20%</strong> du revenu imposable. Pour les entreprises, la r&eacute;duction est de
-        <strong>60%</strong> dans la limite de 20 000 &euro; ou 0,5% du chiffre d'affaires HT.
-      </p>
-    </div>
+    ${buildLegalSection()}
 
-    <!-- Signature section -->
-    <div class="signature-section">
-      <div class="signature-left">
-        <div class="field">
-          <div class="field-label">Date d'&eacute;tablissement du re&ccedil;u</div>
-          <div class="field-value">${generatedDate}</div>
-        </div>
-        <div class="cachet-wrapper">${buildCachetSvg(company)}</div>
-      </div>
-      <div class="signature-right">
-        <img src="${SIGNATURE_BASE64}" class="signature-img" alt="Signature" />
-        <div class="signature-label">Signature du responsable</div>
-      </div>
-    </div>
+    ${buildSignatureSection(company, generatedDate)}
 
-    <!-- Footer -->
-    <div class="footer">
-      <p>${company.name}${company.legal_name ? ` &ndash; ${company.legal_name}` : ''}</p>
-      <p>${company.address || ''} | ${company.email || ''} | ${company.phone || ''}</p>
-    </div>
+    ${buildFooterSection(company)}
   </div>
 </body>
 </html>`

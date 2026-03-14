@@ -7,7 +7,6 @@ import type {
   SocialPostType,
   SocialPlatform,
   SocialPostStatus,
-  MetaConnection,
 } from '@/lib/types/database'
 import { logActivity } from '@/lib/actions/activity-log'
 

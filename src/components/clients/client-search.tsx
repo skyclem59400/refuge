@@ -5,9 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 import type { Client } from '@/lib/types/database'
 
 interface ClientSearchProps {
-  onSelect: (client: Client | null) => void
-  selected: Client | null
-  establishmentId: string
+  readonly onSelect: (client: Client | null) => void
+  readonly selected: Client | null
+  readonly establishmentId: string
 }
 
 export function ClientSearch({ onSelect, selected, establishmentId }: ClientSearchProps) {

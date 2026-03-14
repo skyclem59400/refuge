@@ -15,9 +15,9 @@ import {
 import type { CallLogWithCategory, CallCategory } from '@/lib/types/database'
 
 interface CallListProps {
-  initialCalls: CallLogWithCategory[]
-  categories: CallCategory[]
-  establishmentId: string
+  readonly initialCalls: CallLogWithCategory[]
+  readonly categories: CallCategory[]
+  readonly establishmentId: string
 }
 
 function formatDateFr(dateStr: string): string {
@@ -28,6 +28,30 @@ function formatDateFr(dateStr: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function attachCategory(call: CallLogWithCategory, categoryMap: Map<string, CallCategory>): CallLogWithCategory {
+  call.category = call.category_id
+    ? categoryMap.get(call.category_id) || null
+    : null
+  return call
+}
+
+function applyRealtimeEvent(
+  payload: { eventType: string; new: unknown; old: unknown },
+  categoryMap: Map<string, CallCategory>,
+  setCalls: React.Dispatch<React.SetStateAction<CallLogWithCategory[]>>
+) {
+  if (payload.eventType === 'INSERT') {
+    const newCall = attachCategory(payload.new as CallLogWithCategory, categoryMap)
+    setCalls((prev) => [newCall, ...prev])
+  } else if (payload.eventType === 'UPDATE') {
+    const updated = attachCategory(payload.new as CallLogWithCategory, categoryMap)
+    setCalls((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
+  } else if (payload.eventType === 'DELETE') {
+    const deletedId = (payload.old as { id: string }).id
+    setCalls((prev) => prev.filter((c) => c.id !== deletedId))
+  }
 }
 
 export function CallList({ initialCalls, categories, establishmentId }: CallListProps) {
@@ -56,35 +80,7 @@ export function CallList({ initialCalls, categories, establishmentId }: CallList
           table: 'call_logs',
           filter: `establishment_id=eq.${establishmentId}`,
         },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newCall = payload.new as CallLogWithCategory
-            // Attach category if available
-            if (newCall.category_id) {
-              newCall.category = categoryMap.get(newCall.category_id) || null
-            } else {
-              newCall.category = null
-            }
-            setCalls((prev) => [newCall, ...prev])
-          } else if (payload.eventType === 'UPDATE') {
-            setCalls((prev) =>
-              prev.map((c) => {
-                if (c.id === (payload.new as CallLogWithCategory).id) {
-                  const updated = payload.new as CallLogWithCategory
-                  if (updated.category_id) {
-                    updated.category = categoryMap.get(updated.category_id) || null
-                  } else {
-                    updated.category = null
-                  }
-                  return updated
-                }
-                return c
-              })
-            )
-          } else if (payload.eventType === 'DELETE') {
-            setCalls((prev) => prev.filter((c) => c.id !== (payload.old as { id: string }).id))
-          }
-        }
+        (payload) => applyRealtimeEvent(payload, categoryMap, setCalls)
       )
       .subscribe()
 

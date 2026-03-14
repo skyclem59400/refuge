@@ -11,13 +11,13 @@ import type { Establishment } from '@/lib/types/database'
 const SUPER_ADMIN_EMAIL = 'clement.scailteux@gmail.com'
 
 interface EstablishmentSwitcherProps {
-  establishments: Establishment[]
-  currentEstablishment: Establishment
-  collapsed?: boolean
-  userEmail?: string
+  readonly establishments: Establishment[]
+  readonly currentEstablishment: Establishment
+  readonly collapsed?: boolean
+  readonly userEmail?: string
 }
 
-function EstablishmentLogo({ establishment, size = 32 }: { establishment: Establishment; size?: number }) {
+function EstablishmentLogo({ establishment, size = 32 }: Readonly<{ establishment: Establishment; size?: number }>) {
   if (establishment.logo_url) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
@@ -110,7 +110,7 @@ export function EstablishmentSwitcher({ establishments, currentEstablishment, co
 
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => { setIsOpen(false); setIsCreating(false) }} />
+          <div className="fixed inset-0 z-40" role="presentation" onClick={() => { setIsOpen(false); setIsCreating(false) }} onKeyDown={(e) => { if (e.key === 'Escape') { setIsOpen(false); setIsCreating(false) } }} />
           <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-lg shadow-xl z-50 py-1 animate-fade-up">
             {establishments.map((estab) => (
               <button

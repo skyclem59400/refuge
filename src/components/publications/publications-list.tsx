@@ -35,7 +35,19 @@ interface PublicationsListProps {
 }
 
 function getSpeciesEmoji(species: string): string {
-  return species === 'cat' ? '🐱' : species === 'dog' ? '🐶' : '🐾'
+  if (species === 'cat') return '🐱'
+  if (species === 'dog') return '🐶'
+  return '🐾'
+}
+
+function getPostDateLabel(post: PostWithAnimal): string {
+  if (post.status === 'published' && post.published_at) {
+    return `Publie le ${formatDateFr(post.published_at)}`
+  }
+  if (post.scheduled_at) {
+    return `Programme le ${formatDateFr(post.scheduled_at)}`
+  }
+  return `Cree le ${formatDateFr(post.created_at)}`
 }
 
 function formatDateFr(dateStr: string): string {
@@ -48,7 +60,7 @@ function formatDateFr(dateStr: string): string {
   })
 }
 
-function PlatformIcons({ platform }: { platform: string }) {
+function PlatformIcons({ platform }: Readonly<{ platform: string }>) {
   return (
     <div className="flex items-center gap-1">
       {(platform === 'facebook' || platform === 'both') && (
@@ -61,7 +73,7 @@ function PlatformIcons({ platform }: { platform: string }) {
   )
 }
 
-export function PublicationsList({ posts, canManage, hasMetaConnection }: PublicationsListProps) {
+export function PublicationsList({ posts, canManage, hasMetaConnection }: Readonly<PublicationsListProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<string | null>(null)
@@ -178,11 +190,7 @@ export function PublicationsList({ posts, canManage, hasMetaConnection }: Public
 
                 {/* Date */}
                 <div className="text-xs text-muted">
-                  {post.status === 'published' && post.published_at
-                    ? `Publie le ${formatDateFr(post.published_at)}`
-                    : post.scheduled_at
-                      ? `Programme le ${formatDateFr(post.scheduled_at)}`
-                      : `Cree le ${formatDateFr(post.created_at)}`}
+                  {getPostDateLabel(post)}
                 </div>
 
                 {/* Content preview */}

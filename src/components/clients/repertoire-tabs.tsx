@@ -6,10 +6,10 @@ import { TeamMemberList } from './team-member-list'
 import type { Client, EstablishmentMember } from '@/lib/types/database'
 
 interface RepertoireTabsProps {
-  clients: Client[]
-  members: EstablishmentMember[]
-  canEdit: boolean
-  establishmentId: string
+  readonly clients: Client[]
+  readonly members: EstablishmentMember[]
+  readonly canEdit: boolean
+  readonly establishmentId: string
 }
 
 export function RepertoireTabs({ clients, members, canEdit, establishmentId }: RepertoireTabsProps) {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/components/theme-provider'
 
@@ -212,8 +213,7 @@ export default function LoginPage() {
         <div className="bg-surface rounded-2xl p-8 glow border border-border">
           {/* Logo */}
           <div className="text-center mb-8">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Optimus" className="w-20 h-20 mx-auto mb-4" />
+            <Image src="/logo.png" alt="Optimus" width={80} height={80} className="mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-primary-light">Optimus</h1>
             <p className="text-muted text-sm mt-1">Gestion intelligente</p>
           </div>
@@ -320,10 +320,11 @@ export default function LoginPage() {
 
               <form onSubmit={handleAdminSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+                  <label htmlFor="admin-email" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                     Email
                   </label>
                   <input
+                    id="admin-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -335,10 +336,11 @@ export default function LoginPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+                  <label htmlFor="admin-password" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                     Mot de passe
                   </label>
                   <input
+                    id="admin-password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -387,10 +389,11 @@ export default function LoginPage() {
               {pseudoStep === 'pseudo' && (
                 <form onSubmit={handlePseudoLookup} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+                    <label htmlFor="pseudo-input" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                       Votre prenom (pseudo)
                     </label>
                     <input
+                      id="pseudo-input"
                       type="text"
                       value={pseudo}
                       onChange={(e) => setPseudo(e.target.value)}
@@ -422,10 +425,11 @@ export default function LoginPage() {
                     Bienvenue <strong>{pseudo}</strong> ! Creez votre mot de passe pour la premiere connexion.
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+                    <label htmlFor="new-password" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                       Mot de passe
                     </label>
                     <input
+                      id="new-password"
                       type="password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
@@ -438,10 +442,11 @@ export default function LoginPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+                    <label htmlFor="confirm-password" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                       Confirmer le mot de passe
                     </label>
                     <input
+                      id="confirm-password"
                       type="password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
@@ -472,10 +477,11 @@ export default function LoginPage() {
                     Connexion en tant que <strong className="text-text">{pseudo}</strong>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+                    <label htmlFor="pseudo-password" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                       Mot de passe
                     </label>
                     <input
+                      id="pseudo-password"
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}

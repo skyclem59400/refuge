@@ -17,7 +17,7 @@ interface Movement {
   date: string
 }
 
-interface Props {
+interface MonthlyTrendsChartProps {
   movements: Movement[]
 }
 
@@ -33,7 +33,7 @@ const MOVEMENT_LABELS: Record<string, string> = {
   transferts: 'Transferts refuge',
 }
 
-function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number; dataKey: string; color: string }[]; label?: string }) {
+function CustomTooltip({ active, payload, label }: Readonly<{ active?: boolean; payload?: { value: number; dataKey: string; color: string }[]; label?: string }>) {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-surface border border-border rounded-lg p-3 shadow-lg">
@@ -49,7 +49,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
-export function MonthlyTrendsChart({ movements }: Props) {
+export function MonthlyTrendsChart({ movements }: Readonly<MonthlyTrendsChartProps>) {
   const chartData = useMemo(() => {
     const now = new Date()
     const months: Record<string, { adoptions: number; entrees: number; transferts: number }> = {}

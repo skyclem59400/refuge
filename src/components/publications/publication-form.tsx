@@ -39,10 +39,18 @@ const PLATFORM_OPTIONS: { value: SocialPlatform; label: string; Icon: typeof Fac
 ]
 
 function getSpeciesEmoji(species: string): string {
-  return species === 'cat' ? '🐱' : species === 'dog' ? '🐶' : '🐾'
+  if (species === 'cat') return '🐱'
+  if (species === 'dog') return '🐶'
+  return '🐾'
 }
 
-export function PublicationForm({ animals, establishmentName, establishmentPhone, establishmentLogoUrl, hasMetaConnection, post }: PublicationFormProps) {
+function getSpeciesLabel(species: string): string {
+  if (species === 'dog') return 'Chien'
+  if (species === 'cat') return 'Chat'
+  return species
+}
+
+export function PublicationForm({ animals, establishmentName, establishmentPhone, establishmentLogoUrl, hasMetaConnection, post }: Readonly<PublicationFormProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -201,7 +209,8 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
           break
         }
         if (result.data) {
-          setPhotoUrls((prev) => [...prev, result.data!.url])
+          const uploadedUrl = result.data.url
+          setPhotoUrls((prev) => [...prev, uploadedUrl])
         }
       }
     } finally {
@@ -422,13 +431,13 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
           photo_urls: photoUrls,
           video_url: videoUrl,
         })
-        if (createResult.error) {
-          toast.error(createResult.error)
+        if (createResult.error || !createResult.data) {
+          toast.error(createResult.error ?? 'Erreur lors de la creation')
           return
         }
         // Publish the created post
         const { publishPostNow } = await import('@/lib/actions/social-posts')
-        const publishResult = await publishPostNow(createResult.data!.id)
+        const publishResult = await publishPostNow(createResult.data.id)
         if (publishResult.error) {
           toast.error(publishResult.error)
           return
@@ -472,7 +481,7 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold">{selected.name}</p>
-                <p className="text-xs text-muted">{selected.species === 'dog' ? 'Chien' : selected.species === 'cat' ? 'Chat' : selected.species}</p>
+                <p className="text-xs text-muted">{getSpeciesLabel(selected.species)}</p>
               </div>
               <Check className="w-4 h-4 text-primary" />
             </div>
@@ -536,7 +545,7 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">{animal.name}</p>
                       <p className="text-xs text-muted">
-                        {animal.species === 'dog' ? 'Chien' : animal.species === 'cat' ? 'Chat' : animal.species}
+                        {getSpeciesLabel(animal.species)}
                       </p>
                     </div>
                     {animalId === animal.id && <Check className="w-4 h-4 text-primary flex-shrink-0" />}
@@ -619,10 +628,11 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
         {platform === 'both' ? (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+              <label htmlFor="pub-content-general" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                 Contenu general
               </label>
               <textarea
+                id="pub-content-general"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 rows={4}
@@ -631,11 +641,12 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+              <label htmlFor="pub-content-facebook" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                 <Facebook className="w-3 h-3 inline mr-1 text-blue-500" />
                 Contenu Facebook (optionnel)
               </label>
               <textarea
+                id="pub-content-facebook"
                 value={contentFacebook}
                 onChange={(e) => setContentFacebook(e.target.value)}
                 rows={3}
@@ -644,11 +655,12 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+              <label htmlFor="pub-content-instagram" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                 <Instagram className="w-3 h-3 inline mr-1 text-pink-500" />
                 Contenu Instagram (optionnel)
               </label>
               <textarea
+                id="pub-content-instagram"
                 value={contentInstagram}
                 onChange={(e) => setContentInstagram(e.target.value)}
                 rows={3}
@@ -659,10 +671,11 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
           </div>
         ) : (
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+            <label htmlFor="pub-content" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
               Contenu
             </label>
             <textarea
+              id="pub-content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={6}
@@ -800,10 +813,11 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
         {scheduleEnabled && (
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+              <label htmlFor="pub-schedule-date" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                 Date
               </label>
               <input
+                id="pub-schedule-date"
                 type="date"
                 value={scheduleDate}
                 min={today}
@@ -812,10 +826,11 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+              <label htmlFor="pub-schedule-time" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                 Heure
               </label>
               <input
+                id="pub-schedule-time"
                 type="time"
                 value={scheduleTime}
                 onChange={(e) => setScheduleTime(e.target.value)}

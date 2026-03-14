@@ -8,8 +8,8 @@ import { MemberAvatar } from '@/components/ui/member-avatar'
 import type { UnassignedUser, PermissionGroup } from '@/lib/types/database'
 
 interface InviteMemberSearchProps {
-  users: UnassignedUser[]
-  groups: PermissionGroup[]
+  readonly users: UnassignedUser[]
+  readonly groups: PermissionGroup[]
 }
 
 export function InviteMemberSearch({ users: initialUsers, groups }: InviteMemberSearchProps) {
@@ -46,7 +46,7 @@ export function InviteMemberSearch({ users: initialUsers, groups }: InviteMember
   }, [query, users])
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    const handleClickOutside = (e: MouseEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setIsOpen(false)
       }
@@ -55,19 +55,19 @@ export function InviteMemberSearch({ users: initialUsers, groups }: InviteMember
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  function handleSelect(user: UnassignedUser) {
+  const handleSelect = (user: UnassignedUser) => {
     setSelected(user)
     setQuery('')
     setIsOpen(false)
   }
 
-  function handleClear() {
+  const handleClear = () => {
     setSelected(null)
     const membreGroup = groups.find(g => g.name === 'Membre' && !g.is_system)
     setSelectedGroupIds(membreGroup ? new Set([membreGroup.id]) : new Set())
   }
 
-  function toggleGroup(groupId: string) {
+  const toggleGroup = (groupId: string) => {
     setSelectedGroupIds(prev => {
       const next = new Set(prev)
       if (next.has(groupId)) {
@@ -79,19 +79,22 @@ export function InviteMemberSearch({ users: initialUsers, groups }: InviteMember
     })
   }
 
-  function handleAdd() {
+  const addMemberAction = async () => {
     if (!selected) return
-    startTransition(async () => {
-      const result = await addMemberById(selected.id, Array.from(selectedGroupIds))
-      if (result.error) {
-        toast.error(result.error)
-      } else {
-        toast.success('Membre ajoute avec succes')
-        setUsers(prev => prev.filter(u => u.id !== selected.id))
-        handleClear()
-        router.refresh()
-      }
-    })
+    const result = await addMemberById(selected.id, Array.from(selectedGroupIds))
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success('Membre ajoute avec succes')
+      setUsers(prev => prev.filter(u => u.id !== selected.id))
+      handleClear()
+      router.refresh()
+    }
+  }
+
+  const handleAdd = () => {
+    if (!selected) return
+    startTransition(() => addMemberAction())
   }
 
   if (selected) {

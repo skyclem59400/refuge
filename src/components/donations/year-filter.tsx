@@ -7,7 +7,7 @@ interface YearFilterProps {
   yearOptions: number[]
 }
 
-export function YearFilter({ selectedYear, yearOptions }: YearFilterProps) {
+export function YearFilter({ selectedYear, yearOptions }: Readonly<YearFilterProps>) {
   const router = useRouter()
 
   return (

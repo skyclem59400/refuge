@@ -39,7 +39,7 @@ const movementSuccessMessages: Record<MovementType, string> = {
   euthanasia: 'Euthanasie enregistree',
 }
 
-export function MovementForm({ animalId, currentStatus, onClose }: MovementFormProps) {
+export function MovementForm({ animalId, currentStatus, onClose }: Readonly<MovementFormProps>) {
   const availableMovements = movementsByStatus[currentStatus] || []
 
   const [type, setType] = useState<MovementType | ''>('')
@@ -56,7 +56,7 @@ export function MovementForm({ animalId, currentStatus, onClose }: MovementFormP
   const isDeathOrEuthanasia = type === 'death' || type === 'euthanasia'
   const isTransferOut = type === 'transfer_out'
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
     if (!type) {
@@ -98,8 +98,9 @@ export function MovementForm({ animalId, currentStatus, onClose }: MovementFormP
       {/* Type + Date */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={labelClass}>Type de mouvement *</label>
+          <label htmlFor="movement-type" className={labelClass}>Type de mouvement *</label>
           <select
+            id="movement-type"
             value={type}
             onChange={(e) => setType(e.target.value as MovementType)}
             required
@@ -113,8 +114,9 @@ export function MovementForm({ animalId, currentStatus, onClose }: MovementFormP
         </div>
 
         <div>
-          <label className={labelClass}>Date *</label>
+          <label htmlFor="movement-date" className={labelClass}>Date *</label>
           <input
+            id="movement-date"
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
@@ -139,8 +141,9 @@ export function MovementForm({ animalId, currentStatus, onClose }: MovementFormP
       {/* Person name + Contact */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={labelClass}>Personne liee</label>
+          <label htmlFor="movement-person-name" className={labelClass}>Personne liee</label>
           <input
+            id="movement-person-name"
             type="text"
             value={personName}
             onChange={(e) => setPersonName(e.target.value)}
@@ -150,8 +153,9 @@ export function MovementForm({ animalId, currentStatus, onClose }: MovementFormP
         </div>
 
         <div>
-          <label className={labelClass}>Contact</label>
+          <label htmlFor="movement-person-contact" className={labelClass}>Contact</label>
           <input
+            id="movement-person-contact"
             type="text"
             value={personContact}
             onChange={(e) => setPersonContact(e.target.value)}
@@ -164,8 +168,9 @@ export function MovementForm({ animalId, currentStatus, onClose }: MovementFormP
       {/* Destination (only for transfer_out) */}
       {isTransferOut && (
         <div>
-          <label className={labelClass}>Destination</label>
+          <label htmlFor="movement-destination" className={labelClass}>Destination</label>
           <input
+            id="movement-destination"
             type="text"
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
@@ -177,8 +182,9 @@ export function MovementForm({ animalId, currentStatus, onClose }: MovementFormP
 
       {/* I-CAD status */}
       <div>
-        <label className={labelClass}>Declaration I-CAD</label>
+        <label htmlFor="movement-icad-status" className={labelClass}>Declaration I-CAD</label>
         <select
+          id="movement-icad-status"
           value={icadStatus}
           onChange={(e) => setIcadStatus(e.target.value as IcadStatus)}
           className={inputClass}
@@ -191,8 +197,9 @@ export function MovementForm({ animalId, currentStatus, onClose }: MovementFormP
 
       {/* Notes */}
       <div>
-        <label className={labelClass}>Notes</label>
+        <label htmlFor="movement-notes" className={labelClass}>Notes</label>
         <textarea
+          id="movement-notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Notes complementaires..."

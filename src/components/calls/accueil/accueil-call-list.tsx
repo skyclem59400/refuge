@@ -10,14 +10,14 @@ import { TranscribeButton } from '@/components/calls/accueil/transcribe-button'
 import type { RingoverCallRecord } from '@/lib/types/database'
 
 interface AccueilCallListProps {
-  initialCalls: RingoverCallRecord[]
-  establishmentId: string
-  filter: 'no-audio' | 'with-audio'
-  title: string
-  icon: 'phone' | 'headphones'
+  readonly initialCalls: RingoverCallRecord[]
+  readonly establishmentId: string
+  readonly filter: 'no-audio' | 'with-audio'
+  readonly title: string
+  readonly icon: 'phone' | 'headphones'
 }
 
-function StatusIcon({ status }: { status: string }) {
+function StatusIcon({ status }: Readonly<{ status: string }>) {
   switch (status) {
     case 'ANSWERED': return <PhoneIncoming className="w-4 h-4 text-green-500" />
     case 'MISSED': return <PhoneMissed className="w-4 h-4 text-red-500" />
@@ -45,27 +45,29 @@ export function AccueilCallList({ initialCalls, establishmentId, filter, title, 
 
   useEffect(() => { setAllCalls(initialCalls) }, [initialCalls])
 
+  const handleRealtimePayload = (payload: { eventType: string; new: unknown; old: unknown }) => {
+    if (payload.eventType === 'INSERT') {
+      setAllCalls((prev) => [payload.new as RingoverCallRecord, ...prev].slice(0, 200))
+    } else if (payload.eventType === 'UPDATE') {
+      setAllCalls((prev) => prev.map((c) => c.id === (payload.new as RingoverCallRecord).id ? (payload.new as RingoverCallRecord) : c))
+    }
+  }
+
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
       .channel(`ringover-calls-${filter}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ringover_calls', filter: `establishment_id=eq.${establishmentId}` }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setAllCalls((prev) => [payload.new as RingoverCallRecord, ...prev].slice(0, 200))
-        } else if (payload.eventType === 'UPDATE') {
-          setAllCalls((prev) => prev.map((c) => c.id === (payload.new as RingoverCallRecord).id ? (payload.new as RingoverCallRecord) : c))
-        }
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ringover_calls', filter: `establishment_id=eq.${establishmentId}` }, handleRealtimePayload)
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [establishmentId, filter])
 
-  function handleTranscribed(callId: string, data: {
+  const handleTranscribed = (callId: string, data: {
     transcript: string
     summary: string | null
     sentiment: string | null
     actionItems: { text: string; completed: boolean }[]
-  }) {
+  }) => {
     setAllCalls((prev) =>
       prev.map((c) =>
         c.id === callId
@@ -82,11 +84,11 @@ export function AccueilCallList({ initialCalls, establishmentId, filter, title, 
     )
   }
 
-  async function handleFetchRecording(callId: string) {
+  const handleFetchRecording = async (callId: string) => {
     setFetchingRecording(callId)
     try {
       const result = await fetchRecordingUrl(callId)
-      if (result.data?.recording_url) {
+      if ('data' in result && result.data?.recording_url) {
         const url = result.data.recording_url
         setAllCalls((prev) =>
           prev.map((c) => {
@@ -149,7 +151,10 @@ export function AccueilCallList({ initialCalls, establishmentId, filter, title, 
             <div key={call.id}>
               <div
                 className={`p-3 transition-colors ${hasContent ? 'cursor-pointer hover:bg-surface-hover/50' : ''}`}
+                role={hasContent ? 'button' : undefined}
+                tabIndex={hasContent ? 0 : undefined}
                 onClick={() => hasContent && setExpandedId(isExpanded ? null : call.id)}
+                onKeyDown={(e) => { if (hasContent && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setExpandedId(isExpanded ? null : call.id) } }}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">

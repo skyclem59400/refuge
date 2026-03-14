@@ -6,8 +6,8 @@ import { Activity, Search } from 'lucide-react'
 import type { ActivityLog } from '@/lib/types/database'
 
 interface ActivityLogListProps {
-  logs: ActivityLog[]
-  userNames: Record<string, string>
+  readonly logs: ActivityLog[]
+  readonly userNames: Record<string, string>
 }
 
 const ACTION_VERBS: Record<string, string> = {
@@ -213,7 +213,7 @@ export function ActivityLogList({ logs, userNames }: ActivityLogListProps) {
   const [userFilter, setUserFilter] = useState<string>('all')
   const [visibleCount, setVisibleCount] = useState(50)
 
-  const entityTypes = useMemo(() => [...new Set(logs.map((l) => l.entity_type))].sort(), [logs])
+  const entityTypes = useMemo(() => [...new Set(logs.map((l) => l.entity_type))].sort((a, b) => a.localeCompare(b)), [logs])
 
   // All members for the user filter (sorted alphabetically)
   const allUsers = useMemo(() => {

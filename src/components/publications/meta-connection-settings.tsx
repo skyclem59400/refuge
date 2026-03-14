@@ -11,7 +11,7 @@ interface MetaConnectionSettingsProps {
   connection: MetaConnection | null
 }
 
-export function MetaConnectionSettings({ connection }: MetaConnectionSettingsProps) {
+export function MetaConnectionSettings({ connection }: Readonly<MetaConnectionSettingsProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -185,10 +185,11 @@ export function MetaConnectionSettings({ connection }: MetaConnectionSettingsPro
         <h3 className="font-semibold">Configuration</h3>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+          <label htmlFor="meta-page-id" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
             Page ID *
           </label>
           <input
+            id="meta-page-id"
             type="text"
             value={pageId}
             onChange={(e) => setPageId(e.target.value)}
@@ -198,10 +199,11 @@ export function MetaConnectionSettings({ connection }: MetaConnectionSettingsPro
         </div>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+          <label htmlFor="meta-page-name" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
             Nom de la page *
           </label>
           <input
+            id="meta-page-name"
             type="text"
             value={pageName}
             onChange={(e) => setPageName(e.target.value)}
@@ -211,10 +213,11 @@ export function MetaConnectionSettings({ connection }: MetaConnectionSettingsPro
         </div>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+          <label htmlFor="meta-access-token" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
             Access Token *
           </label>
           <input
+            id="meta-access-token"
             type="password"
             value={accessToken}
             onChange={(e) => setAccessToken(e.target.value)}
@@ -224,10 +227,11 @@ export function MetaConnectionSettings({ connection }: MetaConnectionSettingsPro
         </div>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+          <label htmlFor="meta-ig-account-id" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
             Instagram Business Account ID (optionnel)
           </label>
           <input
+            id="meta-ig-account-id"
             type="text"
             value={igAccountId}
             onChange={(e) => setIgAccountId(e.target.value)}

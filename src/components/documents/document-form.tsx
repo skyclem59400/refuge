@@ -40,10 +40,110 @@ function getInitialLineItems(doc?: Document): LineItem[] {
   return items
 }
 
+function applyLineItemFieldUpdate(item: LineItem, field: keyof LineItem, value: string | number): void {
+  if (field === 'description') {
+    item.description = value as string
+    return
+  }
+  if (field === 'quantity') {
+    item.quantity = typeof value === 'string' ? parseInt(value) || 0 : value
+  } else if (field === 'unit_price') {
+    item.unit_price = typeof value === 'string' ? parseFloat(value) || 0 : value
+  }
+  item.total = item.quantity * item.unit_price
+}
+
+function DocumentPreview({ type, selectedClient, lineItems, total, notes }: Readonly<{
+  type: DocumentType
+  selectedClient: Client | null
+  lineItems: LineItem[]
+  total: number
+  notes: string
+}>) {
+  return (
+    <div className="bg-surface rounded-xl border border-border p-6">
+      <h3 className="font-semibold mb-4 text-muted text-xs uppercase tracking-wider">Apercu</h3>
+
+      <div className="bg-white rounded-xl p-6 text-gray-800 text-sm">
+        <div className="mb-4 pb-3 border-b-2 border-indigo-500">
+          <div className="flex justify-between items-end">
+            <div>
+              <h4 className="font-bold text-indigo-600 text-base">Mon Etablissement</h4>
+              <p className="text-xs text-gray-500">Apercu du document</p>
+            </div>
+            <span className={`px-3 py-1 rounded text-xs font-bold text-white ${
+              type === 'facture' ? 'bg-green-500' : 'bg-amber-500'
+            }`}>
+              {type === 'facture' ? 'FACTURE' : 'DEVIS'}
+            </span>
+          </div>
+        </div>
+
+        {selectedClient && (
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <p className="font-semibold text-sm">{selectedClient.name}</p>
+            {selectedClient.email && <p className="text-xs text-gray-500">{selectedClient.email}</p>}
+            {selectedClient.address && (
+              <p className="text-xs text-gray-500">
+                {selectedClient.address}, {selectedClient.postal_code} {selectedClient.city}
+              </p>
+            )}
+          </div>
+        )}
+
+        <table className="w-full text-xs mb-4">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left py-2">Description</th>
+              <th className="text-right py-2">Qte</th>
+              <th className="text-right py-2">P.U.</th>
+              <th className="text-right py-2">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lineItems.map((item, i) => (
+              <tr key={i} className="border-b border-gray-100">
+                <td className="py-2">{item.description || 'Sans description'}</td>
+                <td className="text-right py-2">{item.quantity}</td>
+                <td className="text-right py-2">{item.unit_price.toFixed(2)} &euro;</td>
+                <td className="text-right py-2 font-semibold">{item.total.toFixed(2)} &euro;</td>
+              </tr>
+            ))}
+            {lineItems.length === 0 && (
+              <tr>
+                <td colSpan={4} className="py-4 text-center text-gray-400 text-xs">
+                  Aucune prestation
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+
+        <div className="text-right p-3 bg-indigo-50 rounded-lg">
+          <p className="text-xs text-gray-500 mb-1">TVA non applicable - Art. 293 B du CGI</p>
+          <p className="text-lg font-bold text-indigo-600">Total: {total.toFixed(2)} &euro;</p>
+        </div>
+
+        {notes && (
+          <div className="mt-3 p-2 bg-amber-50 rounded text-xs text-amber-800">
+            {notes}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function getSubmitLabel(isPending: boolean, isEditing: boolean, type: DocumentType): string {
+  if (isPending) return isEditing ? 'Enregistrement...' : 'Creation...'
+  if (isEditing) return 'Enregistrer les modifications'
+  return type === 'facture' ? 'Creer la facture' : 'Creer le devis'
+}
+
 interface DocumentFormProps {
-  document?: Document
-  initialClient?: Client | null
-  establishmentId: string
+  readonly document?: Document
+  readonly initialClient?: Client | null
+  readonly establishmentId: string
 }
 
 export function DocumentForm({ document: doc, initialClient, establishmentId }: DocumentFormProps) {
@@ -79,15 +179,7 @@ export function DocumentForm({ document: doc, initialClient, establishmentId }: 
     setLineItems(prev => {
       const updated = [...prev]
       const item = { ...updated[index] }
-      if (field === 'description') {
-        item.description = value as string
-      } else if (field === 'quantity') {
-        item.quantity = typeof value === 'string' ? parseInt(value) || 0 : value
-        item.total = item.quantity * item.unit_price
-      } else if (field === 'unit_price') {
-        item.unit_price = typeof value === 'string' ? parseFloat(value) || 0 : value
-        item.total = item.quantity * item.unit_price
-      }
+      applyLineItemFieldUpdate(item, field, value)
       updated[index] = item
       return updated
     })
@@ -129,14 +221,14 @@ export function DocumentForm({ document: doc, initialClient, establishmentId }: 
 
       if (result.error) {
         toast.error(result.error)
-      } else {
-        toast.success(
-          isEditing
-            ? `Document ${doc!.numero} mis a jour`
-            : `${type === 'facture' ? 'Facture' : 'Devis'} ${result.data!.numero} cree`
-        )
-        router.push('/documents')
+        return
       }
+
+      const successMessage = isEditing
+        ? `Document ${doc!.numero} mis a jour`
+        : `${type === 'facture' ? 'Facture' : 'Devis'} ${result.data!.numero} cree`
+      toast.success(successMessage)
+      router.push('/documents')
     })
   }
 
@@ -317,87 +409,11 @@ export function DocumentForm({ document: doc, initialClient, establishmentId }: 
             disabled:opacity-50 disabled:cursor-not-allowed
             shadow-lg shadow-primary/25"
         >
-          {isPending
-            ? (isEditing ? 'Enregistrement...' : 'Creation...')
-            : (isEditing ? 'Enregistrer les modifications' : `Creer le ${type === 'facture' ? 'la facture' : 'devis'}`)}
+          {getSubmitLabel(isPending, isEditing, type)}
         </button>
       </form>
 
-      {/* Preview */}
-      <div className="bg-surface rounded-xl border border-border p-6">
-        <h3 className="font-semibold mb-4 text-muted text-xs uppercase tracking-wider">Apercu</h3>
-
-        <div className="bg-white rounded-xl p-6 text-gray-800 text-sm">
-          {/* Preview header */}
-          <div className="mb-4 pb-3 border-b-2 border-indigo-500">
-            <div className="flex justify-between items-end">
-              <div>
-                <h4 className="font-bold text-indigo-600 text-base">Mon Etablissement</h4>
-                <p className="text-xs text-gray-500">Apercu du document</p>
-              </div>
-              <span className={`px-3 py-1 rounded text-xs font-bold text-white ${
-                type === 'facture' ? 'bg-green-500' : 'bg-amber-500'
-              }`}>
-                {type === 'facture' ? 'FACTURE' : 'DEVIS'}
-              </span>
-            </div>
-          </div>
-
-          {/* Client info */}
-          {selectedClient && (
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <p className="font-semibold text-sm">{selectedClient.name}</p>
-              {selectedClient.email && <p className="text-xs text-gray-500">{selectedClient.email}</p>}
-              {selectedClient.address && (
-                <p className="text-xs text-gray-500">
-                  {selectedClient.address}, {selectedClient.postal_code} {selectedClient.city}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Items */}
-          <table className="w-full text-xs mb-4">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-2">Description</th>
-                <th className="text-right py-2">Qte</th>
-                <th className="text-right py-2">P.U.</th>
-                <th className="text-right py-2">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lineItems.map((item, i) => (
-                <tr key={i} className="border-b border-gray-100">
-                  <td className="py-2">{item.description || 'Sans description'}</td>
-                  <td className="text-right py-2">{item.quantity}</td>
-                  <td className="text-right py-2">{item.unit_price.toFixed(2)} &euro;</td>
-                  <td className="text-right py-2 font-semibold">{item.total.toFixed(2)} &euro;</td>
-                </tr>
-              ))}
-              {lineItems.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="py-4 text-center text-gray-400 text-xs">
-                    Aucune prestation
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-
-          {/* Total */}
-          <div className="text-right p-3 bg-indigo-50 rounded-lg">
-            <p className="text-xs text-gray-500 mb-1">TVA non applicable - Art. 293 B du CGI</p>
-            <p className="text-lg font-bold text-indigo-600">Total: {total.toFixed(2)} &euro;</p>
-          </div>
-
-          {notes && (
-            <div className="mt-3 p-2 bg-amber-50 rounded text-xs text-amber-800">
-              {notes}
-            </div>
-          )}
-        </div>
-      </div>
+      <DocumentPreview type={type} selectedClient={selectedClient} lineItems={lineItems} total={total} notes={notes} />
     </div>
   )
 }

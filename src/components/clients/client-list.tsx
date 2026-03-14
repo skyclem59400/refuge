@@ -9,9 +9,9 @@ import { getCategoryLabel, getCategoryColor, ALL_CONTACT_CATEGORIES } from '@/li
 import type { Client, ContactCategory } from '@/lib/types/database'
 
 interface ClientListProps {
-  initialData: Client[]
-  canEdit: boolean
-  establishmentId: string
+  readonly initialData: Client[]
+  readonly canEdit: boolean
+  readonly establishmentId: string
 }
 
 export function ClientList({ initialData, canEdit, establishmentId }: ClientListProps) {
@@ -23,7 +23,7 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
   const [isPending, startTransition] = useTransition()
   const supabase = createClient()
 
-  async function handleSearch(query: string) {
+  const handleSearch = async (query: string) => {
     setSearch(query)
     if (query.length < 2) {
       setClients(initialData)
@@ -40,17 +40,19 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
     if (data) setClients(data as Client[])
   }
 
-  function handleDelete(id: string, name: string) {
+  const deleteClientHandler = async (id: string, name: string) => {
+    const result = await deleteClientAction(id)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success(`Contact "${name}" supprime`)
+      setClients((prev) => prev.filter((c) => c.id !== id))
+    }
+  }
+
+  const handleDelete = (id: string, name: string) => {
     if (!confirm(`Supprimer le contact "${name}" ?`)) return
-    startTransition(async () => {
-      const result = await deleteClientAction(id)
-      if (result.error) {
-        toast.error(result.error)
-      } else {
-        toast.success(`Contact "${name}" supprime`)
-        setClients((prev) => prev.filter((c) => c.id !== id))
-      }
-    })
+    startTransition(() => deleteClientHandler(id, name))
   }
 
   const displayed = categoryFilter

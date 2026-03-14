@@ -3,8 +3,8 @@
 import type { CallLogWithCategory, CallCategory } from '@/lib/types/database'
 
 interface CategoryChartProps {
-  calls: CallLogWithCategory[]
-  categories: CallCategory[]
+  readonly calls: CallLogWithCategory[]
+  readonly categories: CallCategory[]
 }
 
 export function CategoryChart({ calls, categories }: CategoryChartProps) {

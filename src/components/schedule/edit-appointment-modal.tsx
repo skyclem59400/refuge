@@ -22,7 +22,7 @@ export function EditAppointmentModal({
   userNames,
   onClose,
   onSuccess,
-}: EditAppointmentModalProps) {
+}: Readonly<EditAppointmentModalProps>) {
   const [isPending, startTransition] = useTransition()
   const [type, setType] = useState(appointment.type)
   const [customType, setCustomType] = useState(
@@ -42,7 +42,7 @@ export function EditAppointmentModal({
   const [notes, setNotes] = useState(appointment.notes || '')
   const [status, setStatus] = useState<AppointmentStatus>(appointment.status)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     if (!animalId || !assignedUserId || !date || !startTime || !endTime) {
@@ -96,10 +96,10 @@ export function EditAppointmentModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Type */}
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label id="appointment-type-label" className="block text-sm font-medium mb-2">
               Type de rendez-vous <span className="text-error">*</span>
             </label>
-            <div className="flex flex-wrap gap-2 mb-2">
+            <div className="flex flex-wrap gap-2 mb-2" role="group" aria-labelledby="appointment-type-label">
               <button
                 type="button"
                 onClick={() => {
@@ -145,6 +145,7 @@ export function EditAppointmentModal({
             </div>
             {showCustomType && (
               <input
+                id="appointment-type"
                 type="text"
                 value={customType}
                 onChange={(e) => {

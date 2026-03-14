@@ -12,7 +12,7 @@ interface VideoPreviewProps {
   isRendering: boolean
 }
 
-export function VideoPreview({ videoProps, onRender, isRendering }: VideoPreviewProps) {
+export function VideoPreview({ videoProps, onRender, isRendering }: Readonly<VideoPreviewProps>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Component = COMPOSITION_MAP[videoProps.postType] as React.ComponentType<any>
 

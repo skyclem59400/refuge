@@ -19,7 +19,7 @@ const paymentMethods: { value: DonationPaymentMethod; label: string }[] = [
   { value: 'autre', label: 'Autre' },
 ]
 
-export function DonationForm({ donation }: DonationFormProps) {
+export function DonationForm({ donation }: Readonly<DonationFormProps>) {
   const isEdit = !!donation
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -91,8 +91,9 @@ export function DonationForm({ donation }: DonationFormProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <label className={labelClass}>Nom / Raison sociale *</label>
+            <label htmlFor="donation-donor-name" className={labelClass}>Nom / Raison sociale *</label>
             <input
+              id="donation-donor-name"
               type="text"
               value={donorName}
               onChange={(e) => setDonorName(e.target.value)}
@@ -103,8 +104,9 @@ export function DonationForm({ donation }: DonationFormProps) {
           </div>
 
           <div>
-            <label className={labelClass}>Email</label>
+            <label htmlFor="donation-donor-email" className={labelClass}>Email</label>
             <input
+              id="donation-donor-email"
               type="email"
               value={donorEmail}
               onChange={(e) => setDonorEmail(e.target.value)}
@@ -114,8 +116,9 @@ export function DonationForm({ donation }: DonationFormProps) {
           </div>
 
           <div>
-            <label className={labelClass}>Telephone</label>
+            <label htmlFor="donation-donor-phone" className={labelClass}>Telephone</label>
             <input
+              id="donation-donor-phone"
               type="tel"
               value={donorPhone}
               onChange={(e) => setDonorPhone(e.target.value)}
@@ -125,8 +128,9 @@ export function DonationForm({ donation }: DonationFormProps) {
           </div>
 
           <div className="md:col-span-2">
-            <label className={labelClass}>Adresse</label>
+            <label htmlFor="donation-donor-address" className={labelClass}>Adresse</label>
             <input
+              id="donation-donor-address"
               type="text"
               value={donorAddress}
               onChange={(e) => setDonorAddress(e.target.value)}
@@ -136,8 +140,9 @@ export function DonationForm({ donation }: DonationFormProps) {
           </div>
 
           <div>
-            <label className={labelClass}>Code postal</label>
+            <label htmlFor="donation-donor-postal-code" className={labelClass}>Code postal</label>
             <input
+              id="donation-donor-postal-code"
               type="text"
               value={donorPostalCode}
               onChange={(e) => setDonorPostalCode(e.target.value)}
@@ -147,8 +152,9 @@ export function DonationForm({ donation }: DonationFormProps) {
           </div>
 
           <div>
-            <label className={labelClass}>Ville</label>
+            <label htmlFor="donation-donor-city" className={labelClass}>Ville</label>
             <input
+              id="donation-donor-city"
               type="text"
               value={donorCity}
               onChange={(e) => setDonorCity(e.target.value)}
@@ -167,8 +173,9 @@ export function DonationForm({ donation }: DonationFormProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className={labelClass}>Montant (EUR) *</label>
+            <label htmlFor="donation-amount" className={labelClass}>Montant (EUR) *</label>
             <input
+              id="donation-amount"
               type="number"
               step="0.01"
               min="0.01"
@@ -181,8 +188,9 @@ export function DonationForm({ donation }: DonationFormProps) {
           </div>
 
           <div>
-            <label className={labelClass}>Date du don *</label>
+            <label htmlFor="donation-date" className={labelClass}>Date du don *</label>
             <input
+              id="donation-date"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
@@ -192,8 +200,9 @@ export function DonationForm({ donation }: DonationFormProps) {
           </div>
 
           <div>
-            <label className={labelClass}>Mode de paiement</label>
+            <label htmlFor="donation-payment-method" className={labelClass}>Mode de paiement</label>
             <select
+              id="donation-payment-method"
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value as DonationPaymentMethod)}
               className={inputClass}
@@ -205,8 +214,9 @@ export function DonationForm({ donation }: DonationFormProps) {
           </div>
 
           <div>
-            <label className={labelClass}>Nature du don</label>
+            <label htmlFor="donation-nature" className={labelClass}>Nature du don</label>
             <select
+              id="donation-nature"
               value={nature}
               onChange={(e) => setNature(e.target.value as DonationNature)}
               className={inputClass}
@@ -217,8 +227,9 @@ export function DonationForm({ donation }: DonationFormProps) {
           </div>
 
           <div className="md:col-span-2">
-            <label className={labelClass}>Notes</label>
+            <label htmlFor="donation-notes" className={labelClass}>Notes</label>
             <textarea
+              id="donation-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Notes complementaires..."
@@ -243,7 +254,9 @@ export function DonationForm({ donation }: DonationFormProps) {
           disabled={isPending}
           className="gradient-primary hover:opacity-90 transition-opacity text-white px-6 py-2 rounded-lg font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isPending ? 'Enregistrement...' : isEdit ? 'Modifier le don' : 'Enregistrer le don'}
+          {isPending && 'Enregistrement...'}
+          {!isPending && isEdit && 'Modifier le don'}
+          {!isPending && !isEdit && 'Enregistrer le don'}
         </button>
       </div>
     </form>

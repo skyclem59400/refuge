@@ -6,6 +6,12 @@ import { requireEstablishment, requirePermission } from '@/lib/establishment/per
 import type { Document, DocumentType, DocumentStatus, LineItem } from '@/lib/types/database'
 import { logActivity } from '@/lib/actions/activity-log'
 
+function documentTypeLabel(type: string): string {
+  if (type === 'facture') return 'Facture'
+  if (type === 'devis') return 'Devis'
+  return 'Avoir'
+}
+
 export async function getDocument(id: string) {
   try {
     const { establishmentId } = await requireEstablishment()
@@ -87,7 +93,7 @@ export async function createDocument(data: {
       action: 'create',
       entityType: 'document',
       entityId: doc.id,
-      entityName: `${data.type === 'facture' ? 'Facture' : data.type === 'devis' ? 'Devis' : 'Avoir'} ${numero}`,
+      entityName: `${documentTypeLabel(data.type)} ${numero}`,
       details: { type: data.type, numero, client: data.client_name, total: data.total },
     })
     return { data: doc }
@@ -158,7 +164,7 @@ export async function updateDocument(id: string, data: {
       action: 'update',
       entityType: 'document',
       entityId: id,
-      entityName: doc.numero ? `${existing.type === 'facture' ? 'Facture' : existing.type === 'devis' ? 'Devis' : 'Avoir'} ${doc.numero}` : undefined,
+      entityName: doc.numero ? `${documentTypeLabel(existing.type)} ${doc.numero}` : undefined,
       details: { client: data.client_name, total: data.total },
     })
     return { data: doc }
@@ -203,7 +209,7 @@ export async function deleteDocument(id: string) {
       action: 'delete',
       entityType: 'document',
       entityId: id,
-      entityName: docInfo ? `${docInfo.type === 'facture' ? 'Facture' : docInfo.type === 'devis' ? 'Devis' : 'Avoir'} ${docInfo.numero}` : undefined,
+      entityName: docInfo ? `${documentTypeLabel(docInfo.type)} ${docInfo.numero}` : undefined,
       details: docInfo ? { type: docInfo.type, client: docInfo.client_name, total: docInfo.total } : undefined,
     })
     revalidatePath('/documents')
@@ -415,7 +421,7 @@ export async function updateDocumentStatus(id: string, status: DocumentStatus) {
       action: 'update',
       entityType: 'document',
       entityId: id,
-      entityName: doc.numero ? `${doc.type === 'facture' ? 'Facture' : doc.type === 'devis' ? 'Devis' : 'Avoir'} ${doc.numero}` : undefined,
+      entityName: doc.numero ? `${documentTypeLabel(doc.type)} ${doc.numero}` : undefined,
       details: { statut: status },
     })
     return { success: true }

@@ -12,7 +12,7 @@ interface AvatarUploadProps {
   userEmail: string
 }
 
-export function AvatarUpload({ userId, currentAvatarUrl, userEmail }: AvatarUploadProps) {
+export function AvatarUpload({ userId, currentAvatarUrl, userEmail }: Readonly<AvatarUploadProps>) {
   const [preview, setPreview] = useState<string | null>(currentAvatarUrl)
   const [isPending, startTransition] = useTransition()
   const fileRef = useRef<HTMLInputElement>(null)

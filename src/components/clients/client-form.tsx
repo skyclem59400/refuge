@@ -40,7 +40,7 @@ export function ClientForm({ client }: ClientFormProps) {
         address: address || null,
         postal_code: postalCode || null,
         city: city || null,
-        type: (type || null) as ContactCategory | null,
+        type: type || null,
         notes: notes || null,
       }
 

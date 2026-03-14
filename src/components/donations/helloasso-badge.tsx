@@ -6,7 +6,7 @@ interface HelloAssoBadgeProps {
   source: DonationSource
 }
 
-export function HelloAssoBadge({ source }: HelloAssoBadgeProps) {
+export function HelloAssoBadge({ source }: Readonly<HelloAssoBadgeProps>) {
   if (source === 'helloasso') {
     return (
       <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-success/15 text-success">

@@ -31,7 +31,7 @@ interface HealthRecordFormProps {
   onClose?: () => void
 }
 
-export function HealthRecordForm({ animalId, record, onClose }: HealthRecordFormProps) {
+export function HealthRecordForm({ animalId, record, onClose }: Readonly<HealthRecordFormProps>) {
   const isEditing = !!record
 
   const [type, setType] = useState<HealthRecordType>(record?.type || 'vaccination')
@@ -45,7 +45,7 @@ export function HealthRecordForm({ animalId, record, onClose }: HealthRecordForm
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
     if (!description.trim()) {
@@ -102,8 +102,9 @@ export function HealthRecordForm({ animalId, record, onClose }: HealthRecordForm
       {/* Row 1: Type + Date */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={labelClass}>Type *</label>
+          <label htmlFor="health-type" className={labelClass}>Type *</label>
           <select
+            id="health-type"
             value={type}
             onChange={(e) => setType(e.target.value as HealthRecordType)}
             className={inputClass}
@@ -116,8 +117,9 @@ export function HealthRecordForm({ animalId, record, onClose }: HealthRecordForm
         </div>
 
         <div>
-          <label className={labelClass}>Date *</label>
+          <label htmlFor="health-date" className={labelClass}>Date *</label>
           <input
+            id="health-date"
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
@@ -129,8 +131,9 @@ export function HealthRecordForm({ animalId, record, onClose }: HealthRecordForm
 
       {/* Row 2: Description (full width) */}
       <div>
-        <label className={labelClass}>Description *</label>
+        <label htmlFor="health-description" className={labelClass}>Description *</label>
         <textarea
+          id="health-description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Decrivez l'acte de sante realise..."
@@ -143,8 +146,9 @@ export function HealthRecordForm({ animalId, record, onClose }: HealthRecordForm
       {/* Row 3: Veterinaire + Cout */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={labelClass}>Veterinaire</label>
+          <label htmlFor="health-veterinarian" className={labelClass}>Veterinaire</label>
           <input
+            id="health-veterinarian"
             type="text"
             value={veterinarian}
             onChange={(e) => setVeterinarian(e.target.value)}
@@ -154,8 +158,9 @@ export function HealthRecordForm({ animalId, record, onClose }: HealthRecordForm
         </div>
 
         <div>
-          <label className={labelClass}>Cout (EUR)</label>
+          <label htmlFor="health-cost" className={labelClass}>Cout (EUR)</label>
           <input
+            id="health-cost"
             type="number"
             step="0.01"
             min="0"
@@ -169,8 +174,9 @@ export function HealthRecordForm({ animalId, record, onClose }: HealthRecordForm
 
       {/* Row 4: Prochain rappel (full width) */}
       <div>
-        <label className={labelClass}>Prochain rappel</label>
+        <label htmlFor="health-next-due-date" className={labelClass}>Prochain rappel</label>
         <input
+          id="health-next-due-date"
           type="date"
           value={nextDueDate}
           onChange={(e) => setNextDueDate(e.target.value)}
@@ -180,8 +186,9 @@ export function HealthRecordForm({ animalId, record, onClose }: HealthRecordForm
 
       {/* Row 5: Notes (full width) */}
       <div>
-        <label className={labelClass}>Notes</label>
+        <label htmlFor="health-notes" className={labelClass}>Notes</label>
         <textarea
+          id="health-notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Notes complementaires..."
@@ -206,11 +213,11 @@ export function HealthRecordForm({ animalId, record, onClose }: HealthRecordForm
           disabled={isPending}
           className="gradient-primary hover:opacity-90 transition-opacity text-white px-4 py-2 rounded-lg font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isPending
-            ? 'Enregistrement...'
-            : isEditing
-              ? 'Modifier'
-              : 'Enregistrer'}
+          {(() => {
+            if (isPending) return 'Enregistrement...'
+            if (isEditing) return 'Modifier'
+            return 'Enregistrer'
+          })()}
         </button>
       </div>
     </form>

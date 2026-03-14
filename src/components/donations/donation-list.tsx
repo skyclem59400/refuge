@@ -28,7 +28,7 @@ const paymentMethodLabels: Record<string, string> = {
   autre: 'Autre',
 }
 
-export function DonationList({ donations, canManage }: DonationListProps) {
+export function DonationList({ donations, canManage }: Readonly<DonationListProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<string | null>(null)
@@ -58,7 +58,7 @@ export function DonationList({ donations, canManage }: DonationListProps) {
     return sortDir === 'desc' ? sorted.reverse() : sorted
   }, [donations, sortKey, sortDir])
 
-  function SortIcon({ column }: { column: SortKey }) {
+  function SortIcon({ column }: Readonly<{ column: SortKey }>) {
     if (sortKey !== column) return <ArrowUpDown className="w-3.5 h-3.5 text-muted/40" />
     return sortDir === 'asc'
       ? <ArrowUp className="w-3.5 h-3.5" />
@@ -175,7 +175,7 @@ export function DonationList({ donations, canManage }: DonationListProps) {
 
                 {/* CERFA */}
                 <td className="px-4 py-3">
-                  {donation.cerfa_generated && donation.cerfa_number ? (
+                  {donation.cerfa_generated && donation.cerfa_number && (
                     <div className="flex items-center gap-2">
                       <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-success/15 text-success">
                         {donation.cerfa_number}
@@ -190,7 +190,8 @@ export function DonationList({ donations, canManage }: DonationListProps) {
                         <Download className="w-4 h-4" />
                       </a>
                     </div>
-                  ) : canManage ? (
+                  )}
+                  {!(donation.cerfa_generated && donation.cerfa_number) && canManage && (
                     <button
                       onClick={() => handleGenerateCerfa(donation.id)}
                       disabled={isPending && pendingAction === donation.id + '-cerfa'}
@@ -199,7 +200,8 @@ export function DonationList({ donations, canManage }: DonationListProps) {
                       <FileText className="w-3 h-3" />
                       {pendingAction === donation.id + '-cerfa' ? 'Generation...' : 'Generer CERFA'}
                     </button>
-                  ) : (
+                  )}
+                  {!(donation.cerfa_generated && donation.cerfa_number) && !canManage && (
                     <span className="text-muted/50">&mdash;</span>
                   )}
                 </td>

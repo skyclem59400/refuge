@@ -12,7 +12,7 @@ interface IcadActionButtonsProps {
   currentStatus: IcadDeclarationStatus
 }
 
-export function IcadActionButtons({ declarationId, currentStatus }: IcadActionButtonsProps) {
+export function IcadActionButtons({ declarationId, currentStatus }: Readonly<IcadActionButtonsProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 

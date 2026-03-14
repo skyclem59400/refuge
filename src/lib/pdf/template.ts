@@ -1,5 +1,17 @@
 import type { Document, CompanyInfo, LineItem } from '@/lib/types/database'
 
+const DEFAULT_COMPANY: CompanyInfo = {
+  name: 'Mon Etablissement',
+  description: '',
+  email: '',
+  phone: '',
+  website: '',
+  iban: '',
+  bic: '',
+  address: '',
+  legal_name: '',
+}
+
 function getLineItems(doc: Document): LineItem[] {
   if (doc.line_items && doc.line_items.length > 0) {
     return doc.line_items
@@ -25,20 +37,56 @@ function getLineItems(doc: Document): LineItem[] {
   return items
 }
 
-export function buildPdfHtml(doc: Document, companyInfo?: CompanyInfo, logoBase64?: string): string {
-  const company = companyInfo || {
-    name: 'Mon Etablissement',
-    description: '',
-    email: '',
-    phone: '',
-    website: '',
-    iban: '',
-    bic: '',
-    address: '',
-    legal_name: '',
-  }
+function getDocTypeLabel(type: string): string {
+  if (type === 'facture') return 'FACTURE'
+  if (type === 'avoir') return 'AVOIR'
+  return 'DEVIS'
+}
 
-  const docTypeLabel = doc.type === 'facture' ? 'FACTURE' : doc.type === 'avoir' ? 'AVOIR' : 'DEVIS'
+function buildClientInfoHtml(doc: Document): string {
+  const parts = [`<p class="name">${doc.client_name}</p>`]
+  if (doc.client_address) parts.push(`<p>${doc.client_address}</p>`)
+  if (doc.client_postal_code || doc.client_city) {
+    parts.push(`<p>${doc.client_postal_code || ''} ${doc.client_city || ''}</p>`)
+  }
+  if (doc.client_email) parts.push(`<p>${doc.client_email}</p>`)
+  return parts.join('\n      ')
+}
+
+function buildNotesHtml(doc: Document): string {
+  if (!doc.notes) return ''
+  return `
+  <div class="notes">
+    <div class="notes-title">Notes et conditions</div>
+    <p>${doc.notes.replace(/\n/g, '<br>')}</p>
+  </div>`
+}
+
+function buildPaymentHtml(doc: Document, company: CompanyInfo): string {
+  if (doc.type !== 'facture') return ''
+  const bicLine = ('bic' in company && company.bic) ? `<p>BIC : ${company.bic}</p>` : ''
+  return `
+  <div class="payment">
+    <div class="payment-title">Informations de paiement</div>
+    <p>IBAN : ${company.iban}</p>
+    ${bicLine}
+  </div>`
+}
+
+function buildFooterHtml(company: CompanyInfo): string {
+  const legalLine = ('legal_name' in company && company.legal_name) ? `<p>${company.legal_name}</p>` : ''
+  const websitePart = company.website ? ` | ${company.website}` : ''
+  return `
+  <div class="footer">
+    <p><strong>${company.name}</strong> &ndash; ${company.description}</p>
+    ${legalLine}
+    <p>${company.email} | ${company.phone}${websitePart}</p>
+  </div>`
+}
+
+export function buildPdfHtml(doc: Document, companyInfo?: CompanyInfo, logoBase64?: string): string {
+  const company = companyInfo || DEFAULT_COMPANY
+  const docTypeLabel = getDocTypeLabel(doc.type)
   const docTypeColor = doc.type === 'avoir' ? '#ef4444' : '#4f46e5'
   const dateFormatted = new Date(doc.date).toLocaleDateString('fr-FR', {
     day: 'numeric',
@@ -56,6 +104,10 @@ export function buildPdfHtml(doc: Document, companyInfo?: CompanyInfo, logoBase6
       <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: right; font-weight: 600;">${item.total.toFixed(2)} &euro;</td>
     </tr>`
   ).join('')
+
+  const logoHtml = logoBase64 ? `<img src="${logoBase64}" class="logo" alt="Logo" />` : ''
+  const addressHtml = company.address ? `<div class="company-desc">${company.address}</div>` : ''
+  const clientInfoHtml = buildClientInfoHtml(doc)
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -248,11 +300,11 @@ export function buildPdfHtml(doc: Document, companyInfo?: CompanyInfo, logoBase6
   <div class="content">
   <div class="header">
     <div class="header-left">
-      ${logoBase64 ? `<img src="${logoBase64}" class="logo" alt="Logo" />` : ''}
+      ${logoHtml}
       <div>
         <div class="company-name">${company.name}</div>
         <div class="company-desc">${company.description}</div>
-        ${company.address ? `<div class="company-desc">${company.address}</div>` : ''}
+        ${addressHtml}
       </div>
     </div>
     <div class="doc-badge">${docTypeLabel}</div>
@@ -266,10 +318,7 @@ export function buildPdfHtml(doc: Document, companyInfo?: CompanyInfo, logoBase6
     </div>
     <div class="info-block" style="text-align: right;">
       <h4>Client</h4>
-      <p class="name">${doc.client_name}</p>
-      ${doc.client_address ? `<p>${doc.client_address}</p>` : ''}
-      ${doc.client_postal_code || doc.client_city ? `<p>${doc.client_postal_code || ''} ${doc.client_city || ''}</p>` : ''}
-      ${doc.client_email ? `<p>${doc.client_email}</p>` : ''}
+      ${clientInfoHtml}
     </div>
   </div>
 
@@ -295,25 +344,11 @@ export function buildPdfHtml(doc: Document, companyInfo?: CompanyInfo, logoBase6
   </div>
   <div class="legal">TVA non applicable &ndash; Article 293 B du CGI</div>
 
-  ${doc.notes ? `
-  <div class="notes">
-    <div class="notes-title">Notes et conditions</div>
-    <p>${doc.notes.replace(/\n/g, '<br>')}</p>
-  </div>` : ''}
-
-  ${doc.type === 'facture' ? `
-  <div class="payment">
-    <div class="payment-title">Informations de paiement</div>
-    <p>IBAN : ${company.iban}</p>
-    ${'bic' in company && company.bic ? `<p>BIC : ${company.bic}</p>` : ''}
-  </div>` : ''}
+  ${buildNotesHtml(doc)}
+  ${buildPaymentHtml(doc, company)}
   </div>
 
-  <div class="footer">
-    <p><strong>${company.name}</strong> &ndash; ${company.description}</p>
-    ${'legal_name' in company && company.legal_name ? `<p>${company.legal_name}</p>` : ''}
-    <p>${company.email} | ${company.phone}${company.website ? ` | ${company.website}` : ''}</p>
-  </div>
+  ${buildFooterHtml(company)}
 </body>
 </html>`
 }

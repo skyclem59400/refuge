@@ -45,7 +45,7 @@ export function AssignmentStats({
   totalCompleted,
   completionRate,
   userNames,
-}: AssignmentStatsProps) {
+}: Readonly<AssignmentStatsProps>) {
   const sortedPerPerson = [...perPerson].sort((a, b) => b.rate - a.rate)
 
   return (

@@ -4,10 +4,10 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import type { RingoverDailyData } from '@/lib/types/database'
 
 interface DailyTrendChartProps {
-  data: RingoverDailyData[]
+  readonly data: RingoverDailyData[]
 }
 
-function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number; dataKey: string; color: string }[]; label?: string }) {
+function ChartTooltip({ active, payload, label }: Readonly<{ active?: boolean; payload?: { value: number; dataKey: string; color: string }[]; label?: string }>) {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-surface border border-border rounded-lg p-3 shadow-lg text-xs">

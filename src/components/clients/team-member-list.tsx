@@ -3,16 +3,7 @@
 import type { EstablishmentMember } from '@/lib/types/database'
 
 interface TeamMemberListProps {
-  members: EstablishmentMember[]
-}
-
-function getGroupLabel(member: EstablishmentMember): string {
-  if (!member.groups || member.groups.length === 0) return 'Aucun groupe'
-  return member.groups.map(g => g.name).join(', ')
-}
-
-function isAdmin(member: EstablishmentMember): boolean {
-  return (member.groups || []).some(g => g.is_system && g.name === 'Administrateur')
+  readonly members: EstablishmentMember[]
 }
 
 export function TeamMemberList({ members }: TeamMemberListProps) {

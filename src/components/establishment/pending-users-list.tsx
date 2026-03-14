@@ -8,8 +8,8 @@ import { MemberAvatar } from '@/components/ui/member-avatar'
 import type { UnassignedUser, PermissionGroup } from '@/lib/types/database'
 
 interface PendingUsersListProps {
-  users: UnassignedUser[]
-  groups: PermissionGroup[]
+  readonly users: UnassignedUser[]
+  readonly groups: PermissionGroup[]
 }
 
 export function PendingUsersList({ users, groups }: PendingUsersListProps) {
@@ -22,14 +22,14 @@ export function PendingUsersList({ users, groups }: PendingUsersListProps) {
   // Track selected groups per user
   const [selectedGroupsMap, setSelectedGroupsMap] = useState<Record<string, Set<string>>>({})
 
-  function getSelectedGroups(userId: string): Set<string> {
+  const getSelectedGroups = (userId: string): Set<string> => {
     if (selectedGroupsMap[userId]) return selectedGroupsMap[userId]
     // Default: select the "Membre" group
     const membreGroup = groups.find(g => g.name === 'Membre' && !g.is_system)
     return membreGroup ? new Set([membreGroup.id]) : new Set()
   }
 
-  function toggleGroup(userId: string, groupId: string) {
+  const toggleGroup = (userId: string, groupId: string) => {
     setSelectedGroupsMap(prev => {
       const current = getSelectedGroups(userId)
       const next = new Set(current)
@@ -42,18 +42,20 @@ export function PendingUsersList({ users, groups }: PendingUsersListProps) {
     })
   }
 
-  function handleAdd(userId: string) {
+  const addPendingUserAction = async (userId: string, groupIds: string[]) => {
+    const result = await addPendingUser(userId, groupIds)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success('Membre ajoute avec succes')
+      setList(prev => prev.filter(u => u.id !== userId))
+      router.refresh()
+    }
+  }
+
+  const handleAdd = (userId: string) => {
     const groupIds = Array.from(getSelectedGroups(userId))
-    startTransition(async () => {
-      const result = await addPendingUser(userId, groupIds)
-      if (result.error) {
-        toast.error(result.error)
-      } else {
-        toast.success('Membre ajoute avec succes')
-        setList(prev => prev.filter(u => u.id !== userId))
-        router.refresh()
-      }
-    })
+    startTransition(() => addPendingUserAction(userId, groupIds))
   }
 
   if (list.length === 0) {

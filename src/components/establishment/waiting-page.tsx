@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/components/theme-provider'
 
 interface WaitingPageProps {
-  userEmail: string
+  readonly userEmail: string
 }
 
 export function WaitingPage({ userEmail }: WaitingPageProps) {

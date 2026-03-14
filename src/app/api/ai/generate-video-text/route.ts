@@ -2,6 +2,19 @@ import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 
+// ── Types ──
+
+interface VideoTextRequest {
+  postType: string
+  animalName?: string
+  animalSpecies?: string
+  content: string
+  establishmentName: string
+  hint?: string
+}
+
+// ── Constants ──
+
 const POST_TYPE_LABELS: Record<string, string> = {
   adoption: 'adoption',
   search_owner: 'recherche de proprietaire',
@@ -9,6 +22,69 @@ const POST_TYPE_LABELS: Record<string, string> = {
   info: 'information',
   other: 'publication generale',
 }
+
+// ── Helpers ──
+
+function formatSpeciesLabel(species?: string): string {
+  if (species === 'dog') return 'chien'
+  if (species === 'cat') return 'chat'
+  return species || ''
+}
+
+function buildVideoTextPrompt(body: VideoTextRequest): string {
+  const typeLabel = POST_TYPE_LABELS[body.postType] || 'publication'
+  const animalLine = body.animalName
+    ? `- Animal : ${body.animalName}${body.animalSpecies ? ` (${formatSpeciesLabel(body.animalSpecies)})` : ''}`
+    : ''
+
+  let prompt = `Tu es un redacteur pour ${body.establishmentName}, un refuge animalier.
+Genere une SEULE phrase courte et percutante pour une video de reseau social (Instagram/Facebook).
+
+Contexte :
+- Type de publication : ${typeLabel}
+${animalLine ? `${animalLine}\n` : ''}- Texte original du post : "${body.content.slice(0, 500)}"
+
+Contraintes STRICTES :
+- Maximum 80 caracteres (espaces inclus)
+- UNE seule phrase, pas de saut de ligne
+- Ton emotionnel et engageant
+- Pas de hashtags, pas d'emojis
+- Pas de guillemets autour de la phrase
+- La phrase doit donner envie de regarder la video`
+
+  if (body.hint) {
+    prompt += `\n\nIndication supplementaire de l'utilisateur : "${body.hint}"`
+  }
+
+  return prompt
+}
+
+function extractVideoText(message: Anthropic.Message): string {
+  return message.content[0].type === 'text'
+    ? message.content[0].text.trim().replace(/(?:^["'])|(?:["']$)/g, '')
+    : ''
+}
+
+// ── Error Handling ──
+
+function handleVideoTextError(error: unknown): Response {
+  console.error('AI video text generation error:', error)
+  const errMsg = error instanceof Error ? error.message : String(error)
+
+  if (errMsg.includes('credit balance') || errMsg.includes('billing')) {
+    return Response.json(
+      { error: 'Solde API Anthropic insuffisant' },
+      { status: 402 }
+    )
+  }
+
+  return Response.json(
+    { error: 'Erreur lors de la generation du texte video' },
+    { status: 500 }
+  )
+}
+
+// ── Route Handler ──
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,36 +102,8 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Non autorise' }, { status: 401 })
     }
 
-    const { postType, animalName, animalSpecies, content, establishmentName, hint } = await request.json() as {
-      postType: string
-      animalName?: string
-      animalSpecies?: string
-      content: string
-      establishmentName: string
-      hint?: string
-    }
-
-    const typeLabel = POST_TYPE_LABELS[postType] || 'publication'
-
-    let prompt = `Tu es un redacteur pour ${establishmentName}, un refuge animalier.
-Genere une SEULE phrase courte et percutante pour une video de reseau social (Instagram/Facebook).
-
-Contexte :
-- Type de publication : ${typeLabel}
-${animalName ? `- Animal : ${animalName}${animalSpecies ? ` (${animalSpecies === 'dog' ? 'chien' : animalSpecies === 'cat' ? 'chat' : animalSpecies})` : ''}` : ''}
-- Texte original du post : "${content.slice(0, 500)}"
-
-Contraintes STRICTES :
-- Maximum 80 caracteres (espaces inclus)
-- UNE seule phrase, pas de saut de ligne
-- Ton emotionnel et engageant
-- Pas de hashtags, pas d'emojis
-- Pas de guillemets autour de la phrase
-- La phrase doit donner envie de regarder la video`
-
-    if (hint) {
-      prompt += `\n\nIndication supplementaire de l'utilisateur : "${hint}"`
-    }
+    const body = await request.json() as VideoTextRequest
+    const prompt = buildVideoTextPrompt(body)
 
     const anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
@@ -67,26 +115,9 @@ Contraintes STRICTES :
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const videoText = message.content[0].type === 'text'
-      ? message.content[0].text.trim().replace(/^["']|["']$/g, '')
-      : ''
-
+    const videoText = extractVideoText(message)
     return Response.json({ videoText })
   } catch (error: unknown) {
-    console.error('AI video text generation error:', error)
-
-    const errMsg = error instanceof Error ? error.message : String(error)
-
-    if (errMsg.includes('credit balance') || errMsg.includes('billing')) {
-      return Response.json(
-        { error: 'Solde API Anthropic insuffisant' },
-        { status: 402 }
-      )
-    }
-
-    return Response.json(
-      { error: 'Erreur lors de la generation du texte video' },
-      { status: 500 }
-    )
+    return handleVideoTextError(error)
   }
 }

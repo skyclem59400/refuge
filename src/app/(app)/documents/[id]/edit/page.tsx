@@ -5,6 +5,20 @@ import { getEstablishmentContext } from '@/lib/establishment/context'
 import { DocumentForm } from '@/components/documents/document-form'
 import type { Document, Client } from '@/lib/types/database'
 
+function getReadOnlyReason(doc: Document, canManageDocuments: boolean): string | null {
+  if (!canManageDocuments) return "Vous n'avez pas les droits pour modifier les documents."
+  if (doc.type === 'facture' && doc.status !== 'draft') return 'Une facture validee ne peut plus etre modifiee.'
+  if (doc.type === 'avoir') return 'Un avoir ne peut pas etre modifie.'
+  if (doc.status === 'converted') return 'Un devis converti ne peut plus etre modifie.'
+  return null
+}
+
+function getDocTypeLabel(type: string): string {
+  if (type === 'facture') return 'Facture'
+  if (type === 'avoir') return 'Avoir'
+  return 'Devis'
+}
+
 export default async function EditDocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const ctx = await getEstablishmentContext()
@@ -22,11 +36,7 @@ export default async function EditDocumentPage({ params }: { params: Promise<{ i
 
   const doc = document as Document
 
-  // Check editability
-  const isFactureNonDraft = doc.type === 'facture' && doc.status !== 'draft'
-  const isConverted = doc.status === 'converted'
-  const isAvoir = doc.type === 'avoir'
-  const isReadOnly = isFactureNonDraft || isConverted || isAvoir || !ctx!.permissions.canManageDocuments
+  const readOnlyReason = getReadOnlyReason(doc, ctx!.permissions.canManageDocuments)
 
   // Fetch linked client if exists
   let client: Client | null = null
@@ -48,21 +58,15 @@ export default async function EditDocumentPage({ params }: { params: Promise<{ i
         <div>
           <h1 className="text-2xl font-bold">Modifier {doc.numero}</h1>
           <p className="text-sm text-muted mt-1">
-            {doc.type === 'facture' ? 'Facture' : doc.type === 'avoir' ? 'Avoir' : 'Devis'}
+            {getDocTypeLabel(doc.type)}
           </p>
         </div>
       </div>
 
-      {isReadOnly ? (
+      {readOnlyReason ? (
         <div className="bg-warning/10 border border-warning/30 rounded-xl p-6 text-center">
           <p className="text-warning font-medium">
-            {!ctx!.permissions.canManageDocuments
-              ? "Vous n'avez pas les droits pour modifier les documents."
-              : isFactureNonDraft
-                ? 'Une facture validee ne peut plus etre modifiee.'
-                : isAvoir
-                  ? 'Un avoir ne peut pas etre modifie.'
-                  : 'Un devis converti ne peut plus etre modifie.'}
+            {readOnlyReason}
           </p>
           <Link href="/documents" className="text-sm text-primary hover:text-primary-light mt-3 inline-block">
             Retour a la liste

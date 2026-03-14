@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { X } from 'lucide-react'
 
 interface ScheduleDialogProps {
@@ -11,29 +11,46 @@ interface ScheduleDialogProps {
   isPending?: boolean
 }
 
-export function ScheduleDialog({ isOpen, onClose, onConfirm, initialDate, isPending }: ScheduleDialogProps) {
-  const [date, setDate] = useState('')
-  const [time, setTime] = useState('09:00')
-  const [error, setError] = useState('')
+function getInitialDate(initialDate?: string): string {
+  if (initialDate) {
+    return new Date(initialDate).toISOString().split('T')[0]
+  }
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  return tomorrow.toISOString().split('T')[0]
+}
 
-  useEffect(() => {
-    if (isOpen) {
-      if (initialDate) {
-        const d = new Date(initialDate)
-        setDate(d.toISOString().split('T')[0])
-        setTime(d.toTimeString().slice(0, 5))
-      } else {
-        // Default to tomorrow at 9:00
-        const tomorrow = new Date()
-        tomorrow.setDate(tomorrow.getDate() + 1)
-        setDate(tomorrow.toISOString().split('T')[0])
-        setTime('09:00')
-      }
-      setError('')
-    }
-  }, [isOpen, initialDate])
+function getInitialTime(initialDate?: string): string {
+  if (initialDate) {
+    return new Date(initialDate).toTimeString().slice(0, 5)
+  }
+  return '09:00'
+}
 
+export function ScheduleDialog({ isOpen, onClose, onConfirm, initialDate, isPending }: Readonly<ScheduleDialogProps>) {
   if (!isOpen) return null
+
+  return (
+    <ScheduleDialogContent
+      onClose={onClose}
+      onConfirm={onConfirm}
+      initialDate={initialDate}
+      isPending={isPending}
+    />
+  )
+}
+
+interface ScheduleDialogContentProps {
+  onClose: () => void
+  onConfirm: (scheduledAt: string) => void
+  initialDate?: string
+  isPending?: boolean
+}
+
+function ScheduleDialogContent({ onClose, onConfirm, initialDate, isPending }: Readonly<ScheduleDialogContentProps>) {
+  const [date, setDate] = useState(() => getInitialDate(initialDate))
+  const [time, setTime] = useState(() => getInitialTime(initialDate))
+  const [error, setError] = useState('')
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -57,10 +74,13 @@ export function ScheduleDialog({ isOpen, onClose, onConfirm, initialDate, isPend
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}>
       <div
+        role="dialog"
+        aria-modal="true"
         className="bg-surface rounded-xl border border-border p-6 w-full max-w-sm shadow-xl"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Programmer la publication</h3>
@@ -71,10 +91,11 @@ export function ScheduleDialog({ isOpen, onClose, onConfirm, initialDate, isPend
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+            <label htmlFor="schedule-dialog-date" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
               Date
             </label>
             <input
+              id="schedule-dialog-date"
               type="date"
               value={date}
               min={today}
@@ -84,10 +105,11 @@ export function ScheduleDialog({ isOpen, onClose, onConfirm, initialDate, isPend
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+            <label htmlFor="schedule-dialog-time" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
               Heure
             </label>
             <input
+              id="schedule-dialog-time"
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}

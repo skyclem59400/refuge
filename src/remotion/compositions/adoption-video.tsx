@@ -6,7 +6,7 @@ import { TitleOverlay, ContentOverlay, CtaOverlay } from '../components/text-ove
 import { MusicLayer } from '../components/music-layer'
 import { POST_TYPE_COLORS, type VideoProps } from '../types'
 
-export function AdoptionVideo({ animalName, photoUrls, content, establishmentName, establishmentPhone, logoUrl, videoText, musicUrl }: VideoProps) {
+export function AdoptionVideo({ animalName, photoUrls, content, establishmentName, establishmentPhone, logoUrl, videoText, musicUrl }: Readonly<VideoProps>) {
   const colors = POST_TYPE_COLORS.adoption
 
   return (

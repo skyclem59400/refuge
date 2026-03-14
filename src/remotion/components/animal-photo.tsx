@@ -6,7 +6,7 @@ interface AnimalPhotoProps {
   endFrame?: number
 }
 
-export function AnimalPhoto({ url, startFrame = 45, endFrame = 200 }: AnimalPhotoProps) {
+export function AnimalPhoto({ url, startFrame = 45, endFrame = 200 }: Readonly<AnimalPhotoProps>) {
   const frame = useCurrentFrame()
 
   const opacity = interpolate(frame, [startFrame, startFrame + 15], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })

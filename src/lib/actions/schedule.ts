@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/establishment/permissions'
 import { logActivity } from '@/lib/actions/activity-log'
-import type { StaffSchedule } from '@/lib/types/database'
 
 // ===========================================================================
 // READ OPERATIONS (use createAdminClient)

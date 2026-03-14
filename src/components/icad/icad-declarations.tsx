@@ -30,7 +30,7 @@ const declarationTypes: { value: IcadDeclarationType; label: string }[] = [
   { value: 'address_change', label: 'Changement adresse' },
 ]
 
-export function IcadDeclarations({ animalId, animalName, chipNumber, declarations, canManage }: IcadDeclarationsProps) {
+export function IcadDeclarations({ animalId, animalName, chipNumber, declarations, canManage }: Readonly<IcadDeclarationsProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [showNewForm, setShowNewForm] = useState(false)
@@ -119,8 +119,9 @@ export function IcadDeclarations({ animalId, animalName, chipNumber, declaration
         <div className="bg-surface rounded-xl border border-border p-4 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1">Type</label>
+              <label htmlFor="icad-declaration-type" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1">Type</label>
               <select
+                id="icad-declaration-type"
                 value={newType}
                 onChange={(e) => setNewType(e.target.value as IcadDeclarationType)}
                 className={inputClass}
@@ -131,8 +132,9 @@ export function IcadDeclarations({ animalId, animalName, chipNumber, declaration
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1">Notes</label>
+              <label htmlFor="icad-declaration-notes" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1">Notes</label>
               <input
+                id="icad-declaration-notes"
                 type="text"
                 value={newNotes}
                 onChange={(e) => setNewNotes(e.target.value)}

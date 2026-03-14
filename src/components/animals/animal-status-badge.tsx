@@ -4,7 +4,7 @@ interface AnimalStatusBadgeProps {
   status: string
 }
 
-export function AnimalStatusBadge({ status, overlay }: AnimalStatusBadgeProps & { overlay?: boolean }) {
+export function AnimalStatusBadge({ status, overlay }: Readonly<AnimalStatusBadgeProps & { overlay?: boolean }>) {
   const baseStyle = overlay
     ? getStatusColorOverlay(status)
     : getStatusColor(status)
@@ -20,7 +20,7 @@ interface SpeciesBadgeProps {
   species: string
 }
 
-export function SpeciesBadge({ species }: SpeciesBadgeProps) {
+export function SpeciesBadge({ species }: Readonly<SpeciesBadgeProps>) {
   const color = species === 'cat'
     ? 'bg-purple-500/15 text-purple-500'
     : 'bg-amber-500/15 text-amber-500'

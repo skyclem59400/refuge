@@ -17,8 +17,8 @@ import { CallTranscriptView } from './call-transcript'
 import type { CallLogWithCategory, CallTranscript } from '@/lib/types/database'
 
 interface CallDetailProps {
-  call: CallLogWithCategory
-  transcripts: CallTranscript[]
+  readonly call: CallLogWithCategory
+  readonly transcripts: CallTranscript[]
 }
 
 function formatDateFr(dateStr: string): string {

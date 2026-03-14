@@ -15,9 +15,9 @@ type PostWithAnimal = SocialPost & {
 
 export default async function PublicationsPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ view?: string; status?: string }>
-}) {
+}>) {
   const params = await searchParams
   const ctx = await getEstablishmentContext()
   const canManage = ctx?.permissions.canManagePosts ?? false
@@ -31,8 +31,8 @@ export default async function PublicationsPage({
     getMetaConnection().catch(() => ({ data: null as MetaConnection | null })),
   ])
 
-  const posts = (postsResult.data as PostWithAnimal[]) || []
-  const connection = (connectionResult as { data: MetaConnection | null }).data ?? null
+  const posts = (postsResult.data || []) as PostWithAnimal[]
+  const connection = ('data' in connectionResult ? connectionResult.data : null) as MetaConnection | null
   const hasMetaConnection = !!connection
 
   // Compute stats

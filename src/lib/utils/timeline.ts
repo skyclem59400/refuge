@@ -1,13 +1,26 @@
-export interface TimelineEvent {
+import type { StaffSchedule, Appointment } from '@/lib/types/database'
+
+interface TimelineScheduleEvent {
   id: string
   date: string
   start_time: string
   end_time: string
-  type: 'schedule' | 'appointment'
-  data: any // StaffSchedule | Appointment
+  type: 'schedule'
+  data: StaffSchedule
 }
 
-export interface PositionedEvent extends TimelineEvent {
+interface TimelineAppointmentEvent {
+  id: string
+  date: string
+  start_time: string
+  end_time: string
+  type: 'appointment'
+  data: Appointment
+}
+
+export type TimelineEvent = TimelineScheduleEvent | TimelineAppointmentEvent
+
+export type PositionedEvent = TimelineEvent & {
   top: number      // %
   height: number   // %
   left: number     // %
@@ -94,6 +107,60 @@ export function detectOverlaps(events: TimelineEvent[]): TimelineEvent[][] {
 }
 
 /**
+ * Create a full-width positioned event (no overlap)
+ */
+function positionSingleEvent(event: TimelineEvent): PositionedEvent {
+  return {
+    ...event,
+    top: 0,
+    height: 0,
+    left: 0,
+    width: 100,
+    column: 0,
+    totalColumns: 1,
+  }
+}
+
+/**
+ * Find the first available column index for an event in the column tracker
+ */
+function findAvailableColumn(columns: (TimelineEvent | null)[], event: TimelineEvent): number {
+  let columnIndex = 0
+  while (columnIndex < columns.length) {
+    const occupant = columns[columnIndex]
+    if (!occupant || timeToMinutes(occupant.end_time) <= timeToMinutes(event.start_time)) {
+      break
+    }
+    columnIndex++
+  }
+  return columnIndex
+}
+
+/**
+ * Position a group of overlapping events into columns
+ */
+function positionOverlappingGroup(group: TimelineEvent[]): PositionedEvent[] {
+  const columns: (TimelineEvent | null)[] = []
+  const result: PositionedEvent[] = []
+
+  for (const event of group) {
+    const columnIndex = findAvailableColumn(columns, event)
+    columns[columnIndex] = event
+    result.push({
+      ...event,
+      top: 0,
+      height: 0,
+      left: (columnIndex / columns.length) * 100,
+      width: 100 / columns.length,
+      column: columnIndex,
+      totalColumns: columns.length,
+    })
+  }
+
+  return result
+}
+
+/**
  * Assign column positions to overlapping events using greedy algorithm
  */
 export function assignColumns(events: TimelineEvent[]): PositionedEvent[] {
@@ -102,42 +169,9 @@ export function assignColumns(events: TimelineEvent[]): PositionedEvent[] {
 
   for (const group of overlappingGroups) {
     if (group.length === 1) {
-      // No overlap, full width
-      positioned.push({
-        ...group[0],
-        top: 0,
-        height: 0,
-        left: 0,
-        width: 100,
-        column: 0,
-        totalColumns: 1,
-      })
+      positioned.push(positionSingleEvent(group[0]))
     } else {
-      // Multiple overlaps, assign columns
-      const columns: (TimelineEvent | null)[] = []
-
-      for (const event of group) {
-        // Find first available column
-        let columnIndex = 0
-        while (columnIndex < columns.length) {
-          const occupant = columns[columnIndex]
-          if (!occupant || timeToMinutes(occupant.end_time) <= timeToMinutes(event.start_time)) {
-            break
-          }
-          columnIndex++
-        }
-
-        columns[columnIndex] = event
-        positioned.push({
-          ...event,
-          top: 0,
-          height: 0,
-          left: (columnIndex / columns.length) * 100,
-          width: 100 / columns.length,
-          column: columnIndex,
-          totalColumns: columns.length,
-        })
-      }
+      positioned.push(...positionOverlappingGroup(group))
     }
   }
 

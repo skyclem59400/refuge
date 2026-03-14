@@ -50,249 +50,316 @@ function sleep(ms: number) {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers for syncRingoverCalls
+// ---------------------------------------------------------------------------
+
+/** Extract URL from various shapes: string URL, object with .url/.link, nested .record_url */
+function extractUrl(data: unknown): string | null {
+  if (typeof data === 'string' && data.startsWith('http')) return data
+  if (typeof data === 'object' && data !== null) {
+    const obj = data as Record<string, unknown>
+    if (typeof obj.url === 'string') return obj.url
+    if (typeof obj.link === 'string') return obj.link
+    if (typeof obj.record_url === 'string') return obj.record_url
+  }
+  return null
+}
+
+/** Derive call status from Ringover v2 fields */
+function deriveCallStatus(call: Record<string, unknown>, direction: string): string {
+  const lastState = String(call.last_state || '').toUpperCase()
+
+  if (lastState.includes('VOICEMAIL')) return 'VOICEMAIL'
+  if (lastState === 'MISSED' || lastState === 'ABANDONED' || (!call.is_answered && direction === 'in')) return 'MISSED'
+  if (call.is_answered || lastState === 'ANSWERED') return 'ANSWERED'
+  if (direction === 'out') return 'OUT'
+
+  // Fallback to legacy fields
+  if (call.status) return String(call.status).toUpperCase()
+  return 'UNKNOWN'
+}
+
+/** Map a raw Ringover call to a DB record */
+function mapCallToRecord(call: Record<string, unknown>, establishmentId: string) {
+  const direction = call.direction === 'out' || call.direction === 'OUT' ? 'out' : 'in'
+  const status = deriveCallStatus(call, direction)
+  const lastState = String(call.last_state || '').toUpperCase()
+
+  const voicemailData = call.voicemail
+  const recordData = call.record
+  const voicemailUrl = extractUrl(voicemailData) || (typeof call.voicemail_url === 'string' ? call.voicemail_url : null)
+  const recordingUrl = extractUrl(recordData)
+    || (typeof call.record_url === 'string' ? call.record_url : null)
+    || (typeof call.record_link === 'string' ? call.record_link : null)
+    || (typeof call.recording_url === 'string' ? call.recording_url : null)
+
+  return {
+    establishment_id: establishmentId,
+    ringover_call_id: String(call.cdr_id || call.call_id || call.id),
+    direction,
+    status,
+    caller_number: String(call.from_number || call.caller_number || '') || null,
+    caller_name: String(call.from_name || call.caller_name || call.contact_name || '') || null,
+    callee_number: String(call.to_number || call.callee_number || '') || null,
+    callee_name: String(call.to_name || call.callee_name || '') || null,
+    agent_id: call.agent_id ? String(call.agent_id) : null,
+    agent_name: call.agent_name ? String(call.agent_name) : null,
+    start_time: String(call.start_time || call.start_date || ''),
+    end_time: (call.end_time || call.end_date) ? String(call.end_time || call.end_date) : null,
+    duration: Math.round(Number(call.total_duration || call.incall_duration || call.duration) || 0),
+    wait_time: Math.round(Number(call.queue_duration || call.wait_time || call.waiting_duration) || 0),
+    has_voicemail: !!(voicemailData || lastState.includes('VOICEMAIL')),
+    voicemail_url: voicemailUrl,
+    has_recording: !!recordData,
+    recording_url: recordingUrl,
+    tags: (call.tags as string[]) || [],
+    notes: (call.note || call.notes) ? String(call.note || call.notes) : null,
+    callback_needed: direction === 'in' && (status === 'MISSED' || status === 'VOICEMAIL'),
+    raw_data: call,
+    synced_at: new Date().toISOString(),
+  }
+}
+
+/** Log a successful auth test and optionally show the first call sample */
+function logAuthSuccess(label: string, testCalls: unknown[]): void {
+  console.log(`[Ringover Sync] Auth OK with "${label}".`, testCalls.length, 'calls')
+  if (testCalls.length > 0) {
+    console.log('[Ringover Sync] Sample call:', JSON.stringify(testCalls[0]).slice(0, 600))
+  }
+}
+
+/** Log a failed auth attempt */
+function logAuthFailure(label: string, status: number, body: string, keyPrefix: string): void {
+  console.log(`[Ringover Sync] Auth "${label}" failed:`, status, 'body:', body.slice(0, 500))
+  console.log(`[Ringover Sync] Key used (first 8 chars):`, keyPrefix + '...')
+}
+
+/** Try multiple auth formats against the Ringover API, return the working one */
+async function findWorkingAuth(apiKey: string): Promise<{ auth: string | null; lastStatus: number; lastBody: string }> {
+  const authFormats = [
+    { label: 'raw', value: apiKey },
+    { label: 'Bearer', value: `Bearer ${apiKey}` },
+  ]
+  let lastStatus = 0
+  let lastBody = ''
+
+  for (const fmt of authFormats) {
+    const testResp = await fetch(`${RINGOVER_API_BASE}/calls`, {
+      headers: { Authorization: fmt.value },
+    })
+
+    if (!testResp.ok) {
+      lastStatus = testResp.status
+      lastBody = await testResp.text().catch(() => '')
+      logAuthFailure(fmt.label, lastStatus, lastBody, fmt.value.slice(0, 8))
+      await sleep(600)
+      continue
+    }
+
+    const testData = await testResp.json()
+    const testCalls = testData?.call_list || testData?.calls || []
+    const callList = Array.isArray(testCalls) ? testCalls : []
+    logAuthSuccess(fmt.label, callList)
+    return { auth: fmt.value, lastStatus: 0, lastBody: '' }
+  }
+
+  return { auth: null, lastStatus, lastBody }
+}
+
+/** Filter calls by accueil number suffix match */
+function filterCallsByAccueilNumber(callList: Record<string, unknown>[], accueilNumber: string): Record<string, unknown>[] {
+  const accueilDigits = accueilNumber.replace(/[^0-9]/g, '')
+  const accueilSuffix = accueilDigits.length >= 9 ? accueilDigits.slice(-9) : accueilDigits
+
+  if (!accueilSuffix) return callList
+
+  return callList.filter((call) => {
+    const fromDigits = String(call.from_number || '').replace(/[^0-9]/g, '')
+    const toDigits = String(call.to_number || '').replace(/[^0-9]/g, '')
+    return fromDigits.endsWith(accueilSuffix) || toDigits.endsWith(accueilSuffix)
+  })
+}
+
+// ---------------------------------------------------------------------------
 // 1. syncRingoverCalls — full sync of calls from Ringover API
 // ---------------------------------------------------------------------------
+
+/** Compute the sync start date from cursor or default to 15 days ago */
+function computeSyncStartDate(syncCursor: string | null, now: Date): string {
+  if (syncCursor) return syncCursor
+  const fifteenDaysAgo = new Date(now)
+  fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15)
+  return fifteenDaysAgo.toISOString()
+}
+
+/** Fetch a page of calls from Ringover API */
+async function fetchCallsPage(
+  startDate: string,
+  endDate: string,
+  offset: number,
+  auth: string
+): Promise<{ callList: Record<string, unknown>[] | null; error?: string }> {
+  const params = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate,
+    limit_count: '500',
+    limit_offset: String(offset),
+  })
+  console.log('[Ringover Sync] Fetching offset', offset)
+
+  const response = await fetch(`${RINGOVER_API_BASE}/calls?${params}`, {
+    headers: { Authorization: auth },
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '')
+    console.error('[Ringover Sync] API error:', response.status, errorText)
+    return { callList: null, error: `Erreur API Ringover (${response.status})` }
+  }
+
+  const body = await response.json()
+  const callList = body?.call_list || body?.calls || []
+
+  if (!Array.isArray(callList) || callList.length === 0) {
+    if (offset === 0) console.log('[Ringover Sync] Empty response. Keys:', Object.keys(body))
+    return { callList: null }
+  }
+
+  if (offset === 0) console.log('[Ringover Sync] First call keys:', Object.keys(callList[0]))
+  return { callList }
+}
+
+/** Upsert a batch of call records and track the latest call time */
+async function upsertCallBatch(
+  supabase: ReturnType<typeof createAdminClient>,
+  records: ReturnType<typeof mapCallToRecord>[],
+  latestCallTime: string | null
+): Promise<{ latestCallTime: string | null; error?: string }> {
+  if (records.length === 0) return { latestCallTime }
+
+  const { error: upsertError } = await supabase
+    .from('ringover_calls')
+    .upsert(records, { onConflict: 'establishment_id,ringover_call_id' })
+
+  if (upsertError) {
+    console.error('[Ringover Sync] Upsert error:', upsertError.message)
+    return { latestCallTime, error: `Erreur lors de l'enregistrement : ${upsertError.message}` }
+  }
+
+  let updated = latestCallTime
+  for (const record of records) {
+    if (record.start_time && (!updated || record.start_time > updated)) {
+      updated = record.start_time
+    }
+  }
+  return { latestCallTime: updated }
+}
+
+/** Fetch the active Ringover connection for the given establishment */
+async function fetchActiveConnection(
+  supabase: ReturnType<typeof createAdminClient>,
+  establishmentId: string
+) {
+  const { data: conn, error: connError } = await supabase
+    .from('ringover_connections')
+    .select('*')
+    .eq('establishment_id', establishmentId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (connError) return { error: connError.message } as const
+  if (!conn) return { error: 'Aucune connexion Ringover active.' } as const
+  return { conn } as const
+}
+
+/** Build an error message when the Ringover API key is rejected */
+function buildAuthErrorMessage(lastStatus: number, lastBody: string): string {
+  return `Cle API Ringover rejetee (${lastStatus}). Verifiez que la cle est valide dans Ringover Dashboard > Developpeur > Cle API. ${lastBody.slice(0, 100)}`
+}
+
+/** Paginate through Ringover calls, upsert each batch, return totals */
+async function syncAllCallPages(
+  supabase: ReturnType<typeof createAdminClient>,
+  establishmentId: string,
+  startDate: string,
+  endDate: string,
+  auth: string,
+  accueilNumber: string
+): Promise<{ error?: string; totalCount: number; latestCallTime: string | null }> {
+  let offset = 0
+  let totalCount = 0
+  let latestCallTime: string | null = null
+  const PAGE_SIZE = 500
+  const MAX_OFFSET = 9000
+
+  while (true) {
+    const page = await fetchCallsPage(startDate, endDate, offset, auth)
+    if (page.error) return { error: page.error, totalCount, latestCallTime }
+    if (!page.callList) break
+
+    const filteredCalls = filterCallsByAccueilNumber(page.callList, accueilNumber)
+    const records = filteredCalls.map(call => mapCallToRecord(call, establishmentId))
+
+    const batchResult = await upsertCallBatch(supabase, records, latestCallTime)
+    if (batchResult.error) return { error: batchResult.error, totalCount, latestCallTime }
+
+    latestCallTime = batchResult.latestCallTime
+    totalCount += records.length
+
+    const isLastPage = page.callList.length < PAGE_SIZE
+    offset += PAGE_SIZE
+    const offsetLimitReached = offset >= MAX_OFFSET
+    if (isLastPage || offsetLimitReached) break
+    await sleep(600)
+  }
+
+  return { totalCount, latestCallTime }
+}
+
+/** Update the Ringover connection with the latest sync timestamp */
+async function updateSyncCursor(
+  supabase: ReturnType<typeof createAdminClient>,
+  connId: string,
+  now: Date,
+  latestCallTime: string | null
+) {
+  const updateData: Record<string, string> = {
+    last_sync_at: now.toISOString(),
+    updated_at: now.toISOString(),
+  }
+  if (latestCallTime) updateData.sync_cursor = latestCallTime
+
+  await supabase
+    .from('ringover_connections')
+    .update(updateData)
+    .eq('id', connId)
+}
 
 export async function syncRingoverCalls() {
   try {
     const { establishmentId } = await requirePermission('manage_establishment')
     const supabase = createAdminClient()
 
-    // Get active connection with accueil_number
-    const { data: conn, error: connError } = await supabase
-      .from('ringover_connections')
-      .select('*')
-      .eq('establishment_id', establishmentId)
-      .eq('is_active', true)
-      .maybeSingle()
+    const connResult = await fetchActiveConnection(supabase, establishmentId)
+    if ('error' in connResult) return { error: connResult.error }
+    const { conn } = connResult
 
-    if (connError) return { error: connError.message }
-    if (!conn) {
-      return { error: 'Aucune connexion Ringover active.' }
-    }
-
-    // Determine start date: from sync_cursor or 15 days ago
     const now = new Date()
-    let startDate: string
-    if (conn.sync_cursor) {
-      startDate = conn.sync_cursor
-    } else {
-      const fifteenDaysAgo = new Date(now)
-      fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15)
-      startDate = fifteenDaysAgo.toISOString()
-    }
+    const startDate = computeSyncStartDate(conn.sync_cursor, now)
     const endDate = now.toISOString()
-    const apiKey = conn.api_key.trim()
 
-    // ── Try multiple auth formats to find the working one ──
-    const authFormats = [
-      { label: 'raw', value: apiKey },
-      { label: 'Bearer', value: `Bearer ${apiKey}` },
-    ]
-    let workingAuth: string | null = null
-    let lastStatus = 0
-    let lastBody = ''
-
-    for (const fmt of authFormats) {
-      const testResp = await fetch(`${RINGOVER_API_BASE}/calls`, {
-        headers: { Authorization: fmt.value },
-      })
-      if (testResp.ok) {
-        workingAuth = fmt.value
-        const testData = await testResp.json()
-        const testCalls = testData?.call_list || testData?.calls || []
-        console.log(`[Ringover Sync] Auth OK with "${fmt.label}".`, Array.isArray(testCalls) ? testCalls.length : 0, 'calls')
-        if (Array.isArray(testCalls) && testCalls.length > 0) {
-          console.log('[Ringover Sync] Sample call:', JSON.stringify(testCalls[0]).slice(0, 600))
-        }
-        break
-      }
-      lastStatus = testResp.status
-      lastBody = await testResp.text().catch(() => '')
-      console.log(`[Ringover Sync] Auth "${fmt.label}" failed:`, testResp.status, 'body:', lastBody.slice(0, 500))
-      console.log(`[Ringover Sync] Key used (first 8 chars):`, fmt.value.slice(0, 8) + '...')
-      await sleep(600)
-    }
-
+    const { auth: workingAuth, lastStatus, lastBody } = await findWorkingAuth(conn.api_key.trim())
     if (!workingAuth) {
-      return {
-        error: `Cle API Ringover rejetee (${lastStatus}). Verifiez que la cle est valide dans Ringover Dashboard > Developpeur > Cle API. ${lastBody.slice(0, 100)}`,
-      }
+      return { error: buildAuthErrorMessage(lastStatus, lastBody) }
     }
 
-    let offset = 0
-    let totalCount = 0
-    let latestCallTime: string | null = null
+    const syncResult = await syncAllCallPages(supabase, establishmentId, startDate, endDate, workingAuth, conn.accueil_number || '')
+    if (syncResult.error) return { error: syncResult.error }
 
-    while (true) {
-      // Ringover API v2 GET /calls — query parameters
-      const params = new URLSearchParams({
-        start_date: startDate,
-        end_date: endDate,
-        limit_count: '500',
-        limit_offset: String(offset),
-      })
-
-      const url = `${RINGOVER_API_BASE}/calls?${params}`
-      console.log('[Ringover Sync] Fetching offset', offset)
-
-      const response = await fetch(url, {
-        headers: { Authorization: workingAuth },
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '')
-        console.error('[Ringover Sync] API error:', response.status, errorText)
-        return { error: `Erreur API Ringover (${response.status})` }
-      }
-
-      const body = await response.json()
-      const callList = body?.call_list || body?.calls || []
-
-      if (!Array.isArray(callList) || callList.length === 0) {
-        // Log response structure on first empty page for debugging
-        if (offset === 0) {
-          console.log('[Ringover Sync] Empty response. Keys:', Object.keys(body))
-        }
-        break
-      }
-
-      // Log first call structure for debugging
-      if (offset === 0 && callList.length > 0) {
-        console.log('[Ringover Sync] First call keys:', Object.keys(callList[0]))
-      }
-
-      // Filter to only calls involving the accueil number (client-side filter)
-      // If no accueil_number configured, keep all calls from the account
-      // Normalize to last 9 digits for robust matching (France: 0X XX XX XX XX = 9 digits after prefix)
-      const accueilDigits = (conn.accueil_number || '').replace(/[^0-9]/g, '')
-      const accueilSuffix = accueilDigits.length >= 9 ? accueilDigits.slice(-9) : accueilDigits
-      const filteredCalls = accueilSuffix
-        ? callList.filter((call: Record<string, unknown>) => {
-            const fromDigits = String(call.from_number || '').replace(/[^0-9]/g, '')
-            const toDigits = String(call.to_number || '').replace(/[^0-9]/g, '')
-            return fromDigits.endsWith(accueilSuffix) || toDigits.endsWith(accueilSuffix)
-          })
-        : callList
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const records = filteredCalls.map((call: any) => {
-        const direction = call.direction === 'out' || call.direction === 'OUT' ? 'out' : 'in'
-
-        // Derive status from Ringover v2 fields
-        // last_state: ANSWERED, MISSED, VOICEMAIL_ANSWERED, ABANDONED, etc.
-        // is_answered: boolean
-        let status = 'UNKNOWN'
-        const lastState = String(call.last_state || '').toUpperCase()
-        if (lastState.includes('VOICEMAIL')) {
-          status = 'VOICEMAIL'
-        } else if (lastState === 'MISSED' || lastState === 'ABANDONED' || (!call.is_answered && direction === 'in')) {
-          status = 'MISSED'
-        } else if (call.is_answered || lastState === 'ANSWERED') {
-          status = 'ANSWERED'
-        } else if (direction === 'out') {
-          status = 'OUT'
-        }
-        // Fallback to legacy fields
-        if (status === 'UNKNOWN' && call.status) {
-          status = String(call.status).toUpperCase()
-        }
-
-        const callStartTime = call.start_time || call.start_date
-        const voicemailData = call.voicemail
-        const recordData = call.record
-
-        // Extract URL from various shapes: string URL, object with .url/.link, nested .record_url
-        function extractUrl(data: unknown): string | null {
-          if (typeof data === 'string' && data.startsWith('http')) return data
-          if (typeof data === 'object' && data !== null) {
-            const obj = data as Record<string, unknown>
-            if (typeof obj.url === 'string') return obj.url
-            if (typeof obj.link === 'string') return obj.link
-            if (typeof obj.record_url === 'string') return obj.record_url
-          }
-          return null
-        }
-
-        const voicemailUrl = extractUrl(voicemailData) || call.voicemail_url || null
-        const recordingUrl = extractUrl(recordData)
-          || call.record_url || call.record_link || call.recording_url || null
-
-        return {
-          establishment_id: establishmentId,
-          ringover_call_id: String(call.cdr_id || call.call_id || call.id),
-          direction,
-          status,
-          caller_number: call.from_number || call.caller_number || null,
-          caller_name: call.from_name || call.caller_name || call.contact_name || null,
-          callee_number: call.to_number || call.callee_number || null,
-          callee_name: call.to_name || call.callee_name || null,
-          agent_id: call.agent_id ? String(call.agent_id) : null,
-          agent_name: call.agent_name || null,
-          start_time: callStartTime,
-          end_time: call.end_time || call.end_date || null,
-          duration: Math.round(Number(call.total_duration || call.incall_duration || call.duration) || 0),
-          wait_time: Math.round(Number(call.queue_duration || call.wait_time || call.waiting_duration) || 0),
-          has_voicemail: Boolean(voicemailData || lastState.includes('VOICEMAIL')),
-          voicemail_url: voicemailUrl,
-          has_recording: Boolean(recordData),
-          recording_url: recordingUrl,
-          tags: call.tags || [],
-          notes: call.note || call.notes || null,
-          callback_needed:
-            direction === 'in' && (status === 'MISSED' || status === 'VOICEMAIL'),
-          raw_data: call,
-          synced_at: new Date().toISOString(),
-        }
-      })
-
-      // Upsert batch (skip if no records after filtering)
-      if (records.length > 0) {
-        const { error: upsertError } = await supabase
-          .from('ringover_calls')
-          .upsert(records, { onConflict: 'establishment_id,ringover_call_id' })
-
-        if (upsertError) {
-          console.error('[Ringover Sync] Upsert error:', upsertError.message)
-          return { error: `Erreur lors de l'enregistrement : ${upsertError.message}` }
-        }
-
-        totalCount += records.length
-
-        // Track latest call time for cursor update
-        for (const record of records) {
-          if (record.start_time && (!latestCallTime || record.start_time > latestCallTime)) {
-            latestCallTime = record.start_time
-          }
-        }
-      }
-
-      // Break conditions
-      if (callList.length < 500) break
-      offset += 500
-      if (offset >= 9000) break
-
-      // Rate limit: 600ms between batches
-      await sleep(600)
-    }
-
-    // Update sync_cursor and last_sync_at on connection
-    const updateData: Record<string, string> = {
-      last_sync_at: now.toISOString(),
-      updated_at: now.toISOString(),
-    }
-    if (latestCallTime) {
-      updateData.sync_cursor = latestCallTime
-    }
-
-    await supabase
-      .from('ringover_connections')
-      .update(updateData)
-      .eq('id', conn.id)
+    await updateSyncCursor(supabase, conn.id, now, syncResult.latestCallTime)
 
     revalidatePath('/appels')
-
-    return { data: { synced: totalCount } }
+    return { data: { synced: syncResult.totalCount } }
   } catch (e) {
     return { error: (e as Error).message }
   }
@@ -770,6 +837,75 @@ export async function debugRecordingData() {
 // First checks raw_data, then falls back to Ringover API detail endpoint.
 // ---------------------------------------------------------------------------
 
+/** Extract recording and voicemail URLs from a call data object */
+function extractAudioUrls(data: Record<string, unknown>): { recordingUrl: string | null; voicemailUrl: string | null } {
+  const recordingUrl = extractUrl(data.record)
+    || (typeof data.record_url === 'string' ? data.record_url : null)
+    || (typeof data.record_link === 'string' ? data.record_link : null)
+    || (typeof data.recording_url === 'string' ? data.recording_url : null)
+  const voicemailUrl = extractUrl(data.voicemail)
+    || (typeof data.voicemail_url === 'string' ? data.voicemail_url : null)
+  return { recordingUrl, voicemailUrl }
+}
+
+/** Save discovered audio URLs to the DB and return the result */
+async function saveAndReturnAudioUrls(
+  supabase: ReturnType<typeof createAdminClient>,
+  callId: string,
+  recordingUrl: string | null,
+  voicemailUrl: string | null
+) {
+  const updates: Record<string, string> = {}
+  if (recordingUrl) updates.recording_url = recordingUrl
+  if (voicemailUrl) updates.voicemail_url = voicemailUrl
+
+  await supabase
+    .from('ringover_calls')
+    .update(updates)
+    .eq('id', callId)
+
+  revalidatePath('/appels')
+  return { data: { recording_url: recordingUrl || voicemailUrl } }
+}
+
+/** Fetch call detail from Ringover API and extract audio URLs */
+async function fetchCallDetailFromApi(
+  supabase: ReturnType<typeof createAdminClient>,
+  establishmentId: string,
+  ringoverCallId: string
+): Promise<{ error?: string; callDetail?: Record<string, unknown>; recordingUrl?: string | null; voicemailUrl?: string | null }> {
+  const { data: conn } = await supabase
+    .from('ringover_connections')
+    .select('api_key')
+    .eq('establishment_id', establishmentId)
+    .single()
+
+  if (!conn?.api_key) return { error: 'Connexion Ringover manquante' }
+
+  const detailResp = await fetch(`${RINGOVER_API_BASE}/calls/${ringoverCallId}`, {
+    headers: { Authorization: conn.api_key },
+  })
+
+  if (!detailResp.ok) return { error: `API Ringover ${detailResp.status}` }
+
+  const detail = await detailResp.json()
+  const callDetail = (detail?.call || detail) as Record<string, unknown>
+  const { recordingUrl, voicemailUrl } = extractAudioUrls(callDetail)
+  return { callDetail, recordingUrl, voicemailUrl }
+}
+
+/** Build a debug response when no audio URL could be found */
+function buildNoAudioResponse(callDetail: Record<string, unknown>) {
+  return {
+    data: {
+      recording_url: null,
+      detail_keys: Object.keys(callDetail),
+      record_field: callDetail.record,
+      voicemail_field: callDetail.voicemail,
+    },
+  }
+}
+
 export async function fetchRecordingUrl(callId: string) {
   try {
     const { establishmentId } = await requireEstablishment()
@@ -784,89 +920,25 @@ export async function fetchRecordingUrl(callId: string) {
 
     if (!call) return { error: 'Appel introuvable' }
 
-    const raw = (call.raw_data || {}) as Record<string, unknown>
-
-    // Helper: extract URL from string or object with .url/.link
-    function extractUrl(data: unknown): string | null {
-      if (typeof data === 'string' && data.startsWith('http')) return data
-      if (typeof data === 'object' && data !== null) {
-        const obj = data as Record<string, unknown>
-        if (typeof obj.url === 'string') return obj.url
-        if (typeof obj.link === 'string') return obj.link
-        if (typeof obj.record_url === 'string') return obj.record_url
-      }
-      return null
-    }
-
     // Step 1: Try to extract from existing raw_data
-    const recordingFromRaw = extractUrl(raw.record)
-    const voicemailFromRaw = extractUrl(raw.voicemail)
+    const raw = (call.raw_data || {}) as Record<string, unknown>
+    const { recordingUrl: recordingFromRaw, voicemailUrl: voicemailFromRaw } = extractAudioUrls(raw)
+    const hasAudioInRawData = !!(recordingFromRaw || voicemailFromRaw)
 
-    if (recordingFromRaw || voicemailFromRaw) {
-      const updates: Record<string, string> = {}
-      if (recordingFromRaw) updates.recording_url = recordingFromRaw
-      if (voicemailFromRaw) updates.voicemail_url = voicemailFromRaw
-
-      await supabase
-        .from('ringover_calls')
-        .update(updates)
-        .eq('id', callId)
-
-      revalidatePath('/appels')
-      return { data: { recording_url: recordingFromRaw || voicemailFromRaw } }
+    if (hasAudioInRawData) {
+      return saveAndReturnAudioUrls(supabase, callId, recordingFromRaw, voicemailFromRaw)
     }
 
     // Step 2: Call Ringover API for fresh data
-    const { data: conn } = await supabase
-      .from('ringover_connections')
-      .select('api_key')
-      .eq('establishment_id', establishmentId)
-      .single()
+    const apiResult = await fetchCallDetailFromApi(supabase, establishmentId, call.ringover_call_id)
+    if (apiResult.error) return { error: apiResult.error }
 
-    if (!conn?.api_key) return { error: 'Connexion Ringover manquante' }
-
-    const auth = conn.api_key
-    const cdrId = call.ringover_call_id
-
-    const detailResp = await fetch(`${RINGOVER_API_BASE}/calls/${cdrId}`, {
-      headers: { Authorization: auth },
-    })
-
-    if (detailResp.ok) {
-      const detail = await detailResp.json()
-      const callDetail = detail?.call || detail
-
-      const recordingUrl = extractUrl(callDetail.record)
-        || callDetail.record_url || callDetail.record_link || callDetail.recording_url || null
-      const voicemailUrl = extractUrl(callDetail.voicemail)
-        || callDetail.voicemail_url || null
-
-      const audioUrl = recordingUrl || voicemailUrl
-      if (audioUrl) {
-        const updates: Record<string, string> = {}
-        if (recordingUrl) updates.recording_url = recordingUrl
-        if (voicemailUrl) updates.voicemail_url = voicemailUrl
-
-        await supabase
-          .from('ringover_calls')
-          .update(updates)
-          .eq('id', callId)
-
-        revalidatePath('/appels')
-        return { data: { recording_url: audioUrl } }
-      }
-
-      return {
-        data: {
-          recording_url: null,
-          detail_keys: Object.keys(callDetail),
-          record_field: callDetail.record,
-          voicemail_field: callDetail.voicemail,
-        },
-      }
+    const hasAudioFromApi = !!(apiResult.recordingUrl || apiResult.voicemailUrl)
+    if (hasAudioFromApi) {
+      return saveAndReturnAudioUrls(supabase, callId, apiResult.recordingUrl!, apiResult.voicemailUrl!)
     }
 
-    return { error: `API Ringover ${detailResp.status}` }
+    return buildNoAudioResponse(apiResult.callDetail!)
   } catch (e) {
     return { error: (e as Error).message }
   }

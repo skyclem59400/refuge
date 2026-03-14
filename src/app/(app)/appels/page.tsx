@@ -18,9 +18,9 @@ import { TopCallers } from '@/components/calls/accueil/top-callers'
 
 export default async function AppelsAccueilPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ period?: string }>
-}) {
+}>) {
   const params = await searchParams
   const ctx = await getEstablishmentContext()
   if (!ctx) redirect('/login')
@@ -40,13 +40,18 @@ export default async function AppelsAccueilPage({
     )
   }
 
+  // Compute derived period values to avoid nested ternaries
+  const hourlyPeriodMap: Record<string, '7d' | '30d'> = { today: '7d', all: '30d' }
+  const hourlyPeriod = hourlyPeriodMap[period] ?? period
+  const dailyDays = (period === 'today' || period === '7d') ? 7 : 30
+
   // Fetch all dashboard data in parallel
   const [statsResult, callsResult, hourlyResult, dailyResult, topCallersResult] =
     await Promise.all([
       getRingoverAccueilStats(period),
       getRingoverAccueilCalls({ limit: 200 }),
-      getRingoverHourlyDistribution(period === 'today' ? '7d' : period === 'all' ? '30d' : period),
-      getRingoverDailyTrend(period === 'today' ? 7 : period === '7d' ? 7 : 30),
+      getRingoverHourlyDistribution(hourlyPeriod),
+      getRingoverDailyTrend(dailyDays),
       getRingoverTopCallers(10),
     ])
 

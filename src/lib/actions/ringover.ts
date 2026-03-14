@@ -146,6 +146,45 @@ export async function getRingoverNumbers() {
 // getRingoverIVRNumbers — fetch IVR/team numbers from Ringover /teams
 // ---------------------------------------------------------------------------
 
+/** Extract numbers from a Ringover team object */
+function extractTeamNumbers(team: Record<string, unknown>): RingoverNumber[] {
+  const numbers: RingoverNumber[] = []
+
+  if (team.number) {
+    numbers.push({
+      number: String(team.number),
+      label: String(team.name || team.label || team.number),
+      type: String(team.type || 'IVR'),
+    })
+  }
+
+  const innerNumbers = team.number_list || team.numbers || []
+  if (Array.isArray(innerNumbers)) {
+    for (const n of innerNumbers) {
+      const item = n as Record<string, unknown>
+      numbers.push({
+        number: String(item.number || item.format_e164 || ''),
+        label: String(item.label || item.alias || item.number || ''),
+        type: String(item.type || team.type || 'team'),
+      })
+    }
+  }
+
+  return numbers
+}
+
+/** Parse a Ringover number list response into RingoverNumber[] */
+function parseNumberList(body: Record<string, unknown>): RingoverNumber[] {
+  const numberList = body?.number_list || body?.numbers || []
+  if (!Array.isArray(numberList)) return []
+
+  return numberList.map((item: Record<string, unknown>) => ({
+    number: String(item.number || item.format_e164 || ''),
+    label: String(item.label || item.alias || item.number || ''),
+    type: String(item.type || 'unknown'),
+  }))
+}
+
 export async function getRingoverIVRNumbers() {
   try {
     const { establishmentId } = await requirePermission('manage_establishment')
@@ -160,59 +199,31 @@ export async function getRingoverIVRNumbers() {
     if (!conn) return { error: 'Ringover non configure' }
 
     const apiKey = conn.api_key.trim()
+    const numbers: RingoverNumber[] = []
 
     // Try /teams endpoint first (we know it works and returns IVR numbers)
     const teamsResp = await fetch(`${RINGOVER_API_BASE}/teams`, {
       headers: { Authorization: apiKey },
     })
 
-    const numbers: RingoverNumber[] = []
-
     if (teamsResp.ok) {
       const teamsBody = await teamsResp.json()
       const teamList = teamsBody?.team_list || teamsBody?.teams || []
       if (Array.isArray(teamList)) {
         for (const team of teamList) {
-          // Extract numbers from team
-          if (team.number) {
-            numbers.push({
-              number: String(team.number),
-              label: team.name || team.label || String(team.number),
-              type: team.type || 'IVR',
-            })
-          }
-          // Also check nested number_list
-          const innerNumbers = team.number_list || team.numbers || []
-          if (Array.isArray(innerNumbers)) {
-            for (const n of innerNumbers) {
-              numbers.push({
-                number: String(n.number || n.format_e164 || ''),
-                label: n.label || n.alias || String(n.number || ''),
-                type: n.type || team.type || 'team',
-              })
-            }
-          }
+          numbers.push(...extractTeamNumbers(team))
         }
       }
     }
 
-    // Also try /numbers endpoint as fallback
+    // Fallback to /numbers endpoint
     if (numbers.length === 0) {
       const numbersResp = await fetch(`${RINGOVER_API_BASE}/numbers`, {
         headers: { Authorization: apiKey },
       })
       if (numbersResp.ok) {
         const numbersBody = await numbersResp.json()
-        const numberList = numbersBody?.number_list || numbersBody?.numbers || []
-        if (Array.isArray(numberList)) {
-          for (const item of numberList) {
-            numbers.push({
-              number: item.number || item.format_e164 || '',
-              label: item.label || item.alias || item.number || '',
-              type: item.type || 'unknown',
-            })
-          }
-        }
+        numbers.push(...parseNumberList(numbersBody))
       }
     }
 

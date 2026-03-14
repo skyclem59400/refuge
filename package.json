@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "bundle:remotion": "remotion bundle src/remotion/index.tsx --out-dir remotion-bundle"
+    "bundle:remotion": "remotion bundle src/remotion/index.tsx --out-dir remotion-bundle",
+    "sonar": "docker run --rm --network host -e SONAR_HOST_URL=http://host.docker.internal:9000 -e SONAR_TOKEN=$SONAR_TOKEN -v $(pwd):/usr/src sonarsource/sonar-scanner-cli"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -36,6 +37,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "eslint-plugin-sonarjs": "^4.0.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

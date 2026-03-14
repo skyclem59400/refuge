@@ -7,7 +7,7 @@ import { addMember } from '@/lib/actions/establishments'
 import type { PermissionGroup } from '@/lib/types/database'
 
 interface AddMemberFormProps {
-  groups: PermissionGroup[]
+  readonly groups: PermissionGroup[]
 }
 
 export function AddMemberForm({ groups }: AddMemberFormProps) {

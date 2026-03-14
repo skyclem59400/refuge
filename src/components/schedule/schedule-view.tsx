@@ -38,12 +38,15 @@ type CalendarEvent =
   | { type: 'schedule'; data: StaffSchedule }
   | { type: 'appointment'; data: Appointment }
 
-export function ScheduleView({ schedules, appointments = [], userNames, animalNames = {} }: ScheduleViewProps) {
+export function ScheduleView({ schedules, appointments = [], userNames, animalNames = {} }: Readonly<ScheduleViewProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
-  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(() => {
+    const users = Array.from(new Set(schedules.map((s) => s.user_id)))
+    return new Set(users)
+  })
   const [showFilters, setShowFilters] = useState(false)
 
   // Calculate current week range
@@ -73,13 +76,6 @@ export function ScheduleView({ schedules, appointments = [], userNames, animalNa
       name: userNames[userId] || 'Inconnu',
     }))
   }, [schedules, userNames])
-
-  // Auto-select all users on first render
-  useMemo(() => {
-    if (selectedUsers.size === 0 && uniqueUsers.length > 0) {
-      setSelectedUsers(new Set(uniqueUsers.map((u) => u.id)))
-    }
-  }, [uniqueUsers])
 
   // Filter events based on selected users (schedules only)
   const filteredEvents = useMemo(() => {
@@ -344,7 +340,7 @@ export function ScheduleView({ schedules, appointments = [], userNames, animalNa
                   <p className={`text-sm font-semibold ${isToday ? 'text-primary' : ''}`}>
                     {formatDate(day)}
                   </p>
-                  {isToday && <p className="text-xs text-primary">Aujourd'hui</p>}
+                  {isToday && <p className="text-xs text-primary">Aujourd&apos;hui</p>}
                 </div>
               </div>
 

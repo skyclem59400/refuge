@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import type { CallCategory } from '@/lib/types/database'
 
 interface CallFiltersProps {
-  categories: CallCategory[]
+  readonly categories: CallCategory[]
 }
 
 const STATUS_OPTIONS = [
@@ -55,10 +55,11 @@ export function CallFilters({ categories }: CallFiltersProps) {
       {/* Category dropdown */}
       {categories.length > 0 && (
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted mb-2 block">
+          <label htmlFor="call-category-filter" className="text-xs font-semibold uppercase tracking-wider text-muted mb-2 block">
             Categorie
           </label>
           <select
+            id="call-category-filter"
             value={currentCategory}
             onChange={(e) => updateFilters('category', e.target.value)}
             className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"

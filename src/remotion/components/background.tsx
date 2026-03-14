@@ -4,7 +4,7 @@ interface BackgroundProps {
   gradient: [string, string]
 }
 
-export function Background({ gradient }: BackgroundProps) {
+export function Background({ gradient }: Readonly<BackgroundProps>) {
   const frame = useCurrentFrame()
 
   const rotation = interpolate(frame, [0, 300], [0, 360])

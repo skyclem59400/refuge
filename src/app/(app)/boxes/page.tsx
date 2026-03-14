@@ -51,13 +51,20 @@ function getBoxStatusColor(status: BoxStatus): string {
   return colors[status] || 'bg-muted/15 text-muted'
 }
 
+function getCapacityBarColor(animalCount: number, capacity: number): string {
+  if (animalCount >= capacity) return 'bg-error'
+  if (animalCount > 0) return 'bg-primary'
+  return 'bg-muted/30'
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 export default async function BoxesPage() {
   const ctx = await getEstablishmentContext()
-  const canManageBoxes = ctx!.permissions.canManageBoxes
+  if (!ctx) throw new Error('Establishment context required')
+  const canManageBoxes = ctx.permissions.canManageBoxes
 
   const { data: rawBoxes, error } = await getBoxes()
   const boxes = (rawBoxes as EnrichedBox[] | undefined)
@@ -136,13 +143,7 @@ export default async function BoxesPage() {
               {/* Capacity bar */}
               <div className="w-full h-1.5 bg-muted/15 rounded-full mb-3 overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${
-                    box.animal_count >= box.capacity
-                      ? 'bg-error'
-                      : box.animal_count > 0
-                      ? 'bg-primary'
-                      : 'bg-muted/30'
-                  }`}
+                  className={`h-full rounded-full transition-all ${getCapacityBarColor(box.animal_count, box.capacity)}`}
                   style={{
                     width: `${Math.min((box.animal_count / Math.max(box.capacity, 1)) * 100, 100)}%`,
                   }}

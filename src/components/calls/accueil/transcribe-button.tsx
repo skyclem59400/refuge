@@ -5,10 +5,10 @@ import { FileAudio, Loader2, Check } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface TranscribeButtonProps {
-  callId: string
-  hasAudio: boolean
-  alreadyTranscribed: boolean
-  onTranscribed?: (data: {
+  readonly callId: string
+  readonly hasAudio: boolean
+  readonly alreadyTranscribed: boolean
+  readonly onTranscribed?: (data: {
     transcript: string
     summary: string | null
     sentiment: string | null

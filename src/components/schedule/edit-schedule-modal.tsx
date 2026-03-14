@@ -18,14 +18,14 @@ export function EditScheduleModal({
   userNames,
   onClose,
   onSuccess,
-}: EditScheduleModalProps) {
+}: Readonly<EditScheduleModalProps>) {
   const [isPending, startTransition] = useTransition()
   const [date, setDate] = useState(schedule.date)
   const [startTime, setStartTime] = useState(schedule.start_time)
   const [endTime, setEndTime] = useState(schedule.end_time)
   const [notes, setNotes] = useState(schedule.notes || '')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     if (!date || !startTime || !endTime) {
@@ -67,8 +67,9 @@ export function EditScheduleModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* User (read-only) */}
           <div>
-            <label className="block text-sm font-medium mb-2">Collaborateur</label>
+            <label htmlFor="edit-schedule-collaborator" className="block text-sm font-medium mb-2">Collaborateur</label>
             <input
+              id="edit-schedule-collaborator"
               type="text"
               value={userNames[schedule.user_id] || 'Inconnu'}
               disabled

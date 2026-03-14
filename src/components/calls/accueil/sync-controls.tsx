@@ -9,7 +9,7 @@ import { saveRingoverConnection, disconnectRingover, getRingoverIVRNumbers } fro
 import type { RingoverConnection, RingoverNumber } from '@/lib/types/database'
 
 interface SyncControlsProps {
-  connection: RingoverConnection | null
+  readonly connection: RingoverConnection | null
 }
 
 export function SyncControls({ connection }: SyncControlsProps) {
@@ -80,8 +80,9 @@ export function SyncControls({ connection }: SyncControlsProps) {
 
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-muted block mb-1.5">Cle API Ringover</label>
+            <label htmlFor="ringover-api-key" className="text-xs font-medium text-muted block mb-1.5">Cle API Ringover</label>
             <input
+              id="ringover-api-key"
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
@@ -191,12 +192,13 @@ export function SyncControls({ connection }: SyncControlsProps) {
             </button>
           </div>
 
-          {loadingNumbers ? (
+          {loadingNumbers && (
             <div className="flex items-center gap-2 text-xs text-muted py-2">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               Chargement des numeros Ringover...
             </div>
-          ) : availableNumbers.length > 0 ? (
+          )}
+          {!loadingNumbers && availableNumbers.length > 0 && (
             <div className="space-y-1.5">
               {availableNumbers.map((num) => (
                 <button
@@ -215,7 +217,8 @@ export function SyncControls({ connection }: SyncControlsProps) {
                 </button>
               ))}
             </div>
-          ) : (
+          )}
+          {!loadingNumbers && availableNumbers.length === 0 && (
             <p className="text-xs text-muted">Aucun numero detecte automatiquement.</p>
           )}
 
@@ -264,7 +267,7 @@ export function SyncControls({ connection }: SyncControlsProps) {
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted">Numero accueil</span>
             <span className="font-medium">
-              {connection.accueil_label || connection.accueil_number || <span className="italic text-muted">Non configure</span>}
+              {connection.accueil_label || connection.accueil_number || (<span className="italic text-muted">Non configure</span>)}
             </span>
           </div>
           {connection.astreinte_number && (

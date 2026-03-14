@@ -13,7 +13,7 @@ interface AccountFormProps {
   avatarUrl: string | null
 }
 
-export function AccountForm({ userId, userEmail, fullName, avatarUrl }: AccountFormProps) {
+export function AccountForm({ userId, userEmail, fullName, avatarUrl }: Readonly<AccountFormProps>) {
   const [name, setName] = useState(fullName || '')
   const [email, setEmail] = useState(userEmail)
   const [isPending, startTransition] = useTransition()
@@ -72,10 +72,11 @@ export function AccountForm({ userId, userEmail, fullName, avatarUrl }: AccountF
         />
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+          <label htmlFor="account-full-name" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
             Nom complet
           </label>
           <input
+            id="account-full-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -105,10 +106,11 @@ export function AccountForm({ userId, userEmail, fullName, avatarUrl }: AccountF
         <h2 className="text-lg font-bold">Adresse email</h2>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+          <label htmlFor="account-email" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
             Email
           </label>
           <input
+            id="account-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}

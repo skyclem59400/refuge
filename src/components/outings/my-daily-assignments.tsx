@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { PawPrint, Clock, Loader2, Check, ListChecks, AlertTriangle } from 'lucide-react'
+import { PawPrint, Loader2, Check, ListChecks, AlertTriangle } from 'lucide-react'
 import { createOuting } from '@/lib/actions/outings'
 
 interface Assignment {
@@ -43,7 +43,7 @@ function getAnimalPhoto(animal: Assignment['animals']): string | null {
   return animal.photo_url
 }
 
-export function MyDailyAssignments({ assignments, canManageOutings }: MyDailyAssignmentsProps) {
+export function MyDailyAssignments({ assignments, canManageOutings }: Readonly<MyDailyAssignmentsProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null)
@@ -164,20 +164,25 @@ export function MyDailyAssignments({ assignments, canManageOutings }: MyDailyAss
                     <div>
                       <p className="text-[11px] font-medium text-muted mb-1">Note de la sortie</p>
                       <div className="flex gap-1">
-                        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => setRating(rating === n ? null : n)}
-                            className={`flex-1 py-1 rounded text-[11px] font-bold transition-colors
-                              ${rating === n
-                                ? n <= 3 ? 'bg-red-500 text-white' : n <= 5 ? 'bg-orange-500 text-white' : n <= 7 ? 'bg-yellow-500 text-white' : 'bg-green-500 text-white'
-                                : 'bg-surface-hover text-muted hover:text-text'
-                              }`}
-                          >
-                            {n}
-                          </button>
-                        ))}
+                        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+                          let ratingColorClass = 'bg-surface-hover text-muted hover:text-text'
+                          if (rating === n) {
+                            if (n <= 3) ratingColorClass = 'bg-red-500 text-white'
+                            else if (n <= 5) ratingColorClass = 'bg-orange-500 text-white'
+                            else if (n <= 7) ratingColorClass = 'bg-yellow-500 text-white'
+                            else ratingColorClass = 'bg-green-500 text-white'
+                          }
+                          return (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setRating(rating === n ? null : n)}
+                              className={`flex-1 py-1 rounded text-[11px] font-bold transition-colors ${ratingColorClass}`}
+                            >
+                              {n}
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
 
@@ -190,7 +195,9 @@ export function MyDailyAssignments({ assignments, canManageOutings }: MyDailyAss
                         required
                         rows={2}
                         className={`w-full px-2 py-1.5 bg-surface border rounded text-xs focus:outline-none focus:ring-1 resize-none ${
-                          rating <= 5 ? 'border-red-500/30 focus:ring-red-500/50' : 'border-border focus:ring-primary/50'
+                          rating <= 5
+                            ? 'border-red-500/30 focus:ring-red-500/50'
+                            : 'border-border focus:ring-primary/50'
                         }`}
                       />
                     )}

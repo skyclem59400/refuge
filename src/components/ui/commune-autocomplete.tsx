@@ -16,7 +16,7 @@ interface CommuneAutocompleteProps {
   className?: string
 }
 
-export function CommuneAutocomplete({ value, onChange, placeholder, className }: CommuneAutocompleteProps) {
+export function CommuneAutocomplete({ value, onChange, placeholder, className }: Readonly<CommuneAutocompleteProps>) {
   const [suggestions, setSuggestions] = useState<Commune[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
@@ -113,10 +113,12 @@ export function CommuneAutocomplete({ value, onChange, placeholder, className }:
         autoComplete="off"
       />
       {isOpen && suggestions.length > 0 && (
-        <ul className="absolute z-50 top-full left-0 right-0 mt-1 bg-surface border border-border rounded-lg shadow-xl max-h-56 overflow-y-auto">
+        <ul role="listbox" className="absolute z-50 top-full left-0 right-0 mt-1 bg-surface border border-border rounded-lg shadow-xl max-h-56 overflow-y-auto">
           {suggestions.map((commune, i) => (
             <li
               key={commune.code}
+              role="option"
+              aria-selected={i === highlightedIndex}
               onMouseDown={() => handleSelect(commune)}
               onMouseEnter={() => setHighlightedIndex(i)}
               className={`px-3 py-2 text-sm cursor-pointer flex items-center justify-between transition-colors

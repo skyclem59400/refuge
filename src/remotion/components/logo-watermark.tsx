@@ -6,7 +6,7 @@ interface LogoWatermarkProps {
   logoUrl?: string
 }
 
-export function LogoWatermark({ name, color, logoUrl }: LogoWatermarkProps) {
+export function LogoWatermark({ name, color, logoUrl }: Readonly<LogoWatermarkProps>) {
   const frame = useCurrentFrame()
 
   const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' })

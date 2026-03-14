@@ -15,7 +15,7 @@ interface RingoverSettingsProps {
   connection: RingoverConnection | null
 }
 
-export function RingoverSettings({ connection }: RingoverSettingsProps) {
+export function RingoverSettings({ connection }: Readonly<RingoverSettingsProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<string | null>(null)
@@ -231,8 +231,9 @@ export function RingoverSettings({ connection }: RingoverSettingsProps) {
       </p>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Cle API Ringover</label>
+        <label htmlFor="ringover-api-key" className="block text-sm font-medium mb-1">Cle API Ringover</label>
         <input
+          id="ringover-api-key"
           type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}

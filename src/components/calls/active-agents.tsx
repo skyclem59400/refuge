@@ -7,8 +7,8 @@ import { getAgentStatusLabel } from '@/lib/sda-utils'
 import type { AgentSession } from '@/lib/types/database'
 
 interface ActiveAgentsProps {
-  initialAgents: AgentSession[]
-  establishmentId: string
+  readonly initialAgents: AgentSession[]
+  readonly establishmentId: string
 }
 
 function getStatusDotClass(status: string): string {
@@ -22,8 +22,20 @@ function getStatusDotClass(status: string): string {
   }
 }
 
-export function ActiveAgents({ initialAgents, establishmentId }: ActiveAgentsProps) {
+export function ActiveAgents({ initialAgents, establishmentId }: Readonly<ActiveAgentsProps>) {
   const [agents, setAgents] = useState<AgentSession[]>(initialAgents)
+
+  const handleRealtimePayload = (payload: { eventType: string; new: unknown; old: unknown }) => {
+    if (payload.eventType === 'INSERT') {
+      setAgents((prev) => [payload.new as AgentSession, ...prev])
+    } else if (payload.eventType === 'UPDATE') {
+      setAgents((prev) =>
+        prev.map((a) => (a.id === (payload.new as AgentSession).id ? (payload.new as AgentSession) : a))
+      )
+    } else if (payload.eventType === 'DELETE') {
+      setAgents((prev) => prev.filter((a) => a.id !== (payload.old as { id: string }).id))
+    }
+  }
 
   useEffect(() => {
     const supabase = createClient()
@@ -38,17 +50,7 @@ export function ActiveAgents({ initialAgents, establishmentId }: ActiveAgentsPro
           table: 'agent_sessions',
           filter: `establishment_id=eq.${establishmentId}`,
         },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setAgents((prev) => [payload.new as AgentSession, ...prev])
-          } else if (payload.eventType === 'UPDATE') {
-            setAgents((prev) =>
-              prev.map((a) => (a.id === (payload.new as AgentSession).id ? (payload.new as AgentSession) : a))
-            )
-          } else if (payload.eventType === 'DELETE') {
-            setAgents((prev) => prev.filter((a) => a.id !== (payload.old as { id: string }).id))
-          }
-        }
+        handleRealtimePayload
       )
       .subscribe()
 
