@@ -74,12 +74,12 @@ export default async function HealthPage({
     getTreatments(),
   ])
 
-  // Fetch animals for the treatment form
+  // Fetch animals for the treatment form (DB column is "name", aliased to "nom" for the UI)
   const { data: allAnimals } = await admin
     .from('animals')
-    .select('id, nom')
+    .select('id, nom:name')
     .eq('establishment_id', ctx!.establishment.id)
-    .order('nom')
+    .order('name')
 
   const animalsForForm = (allAnimals || []).map((a: { id: string; nom: string }) => ({ id: a.id, nom: a.nom }))
 

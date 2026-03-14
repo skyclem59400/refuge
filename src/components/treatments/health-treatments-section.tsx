@@ -55,7 +55,7 @@ export function HealthTreatmentsSection({
         </div>
       )}
 
-      <TreatmentList treatments={treatments} canManage={canManageHealth} />
+      <TreatmentList treatments={treatments} animals={animals} healthRecords={healthRecords} canManage={canManageHealth} />
     </div>
   )
 }

@@ -3,9 +3,10 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Pill, Clock, Calendar, StopCircle, Trash2 } from 'lucide-react'
+import { Pill, Clock, Calendar, StopCircle, Trash2, Pencil } from 'lucide-react'
 import { stopTreatment, deleteTreatment } from '@/lib/actions/treatments'
-import type { AnimalTreatment } from '@/lib/types/database'
+import { TreatmentForm } from './treatment-form'
+import type { AnimalTreatment, AnimalHealthRecord } from '@/lib/types/database'
 
 type TreatmentWithAnimal = AnimalTreatment & {
   animals: { id: string; nom: string; species: string }
@@ -20,11 +21,14 @@ const frequencyLabels: Record<string, string> = {
 
 interface TreatmentListProps {
   treatments: TreatmentWithAnimal[]
+  animals: { id: string; nom: string }[]
+  healthRecords: AnimalHealthRecord[]
   canManage: boolean
 }
 
-export function TreatmentList({ treatments, canManage }: Readonly<TreatmentListProps>) {
+export function TreatmentList({ treatments, animals, healthRecords, canManage }: Readonly<TreatmentListProps>) {
   const [filter, setFilter] = useState<'active' | 'stopped' | 'all'>('active')
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -138,16 +142,26 @@ export function TreatmentList({ treatments, canManage }: Readonly<TreatmentListP
                   </div>
                 </div>
 
-                {canManage && treatment.active && (
+                {canManage && (
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button
-                      onClick={() => handleStop(treatment.id)}
+                      onClick={() => setEditingId(editingId === treatment.id ? null : treatment.id)}
                       disabled={isPending}
-                      className="p-1.5 rounded-lg text-muted hover:text-warning hover:bg-warning/10 transition-colors"
-                      title="Arreter le traitement"
+                      className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-primary/10 transition-colors"
+                      title="Modifier le traitement"
                     >
-                      <StopCircle className="w-4 h-4" />
+                      <Pencil className="w-4 h-4" />
                     </button>
+                    {treatment.active && (
+                      <button
+                        onClick={() => handleStop(treatment.id)}
+                        disabled={isPending}
+                        className="p-1.5 rounded-lg text-muted hover:text-warning hover:bg-warning/10 transition-colors"
+                        title="Arreter le traitement"
+                      >
+                        <StopCircle className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => setDeletingId(treatment.id)}
                       className="p-1.5 rounded-lg text-muted hover:text-error hover:bg-error/10 transition-colors"
@@ -158,6 +172,18 @@ export function TreatmentList({ treatments, canManage }: Readonly<TreatmentListP
                   </div>
                 )}
               </div>
+              {/* Inline edit form */}
+              {editingId === treatment.id && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <TreatmentForm
+                    animals={animals}
+                    healthRecords={healthRecords}
+                    editingTreatment={treatment}
+                    preselectedAnimalId={treatment.animal_id}
+                    onClose={() => setEditingId(null)}
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>

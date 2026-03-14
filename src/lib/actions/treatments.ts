@@ -21,7 +21,7 @@ export async function getTreatments(filters?: {
 
     let query = supabase
       .from('animal_treatments')
-      .select('*, animals!inner(id, nom, species, establishment_id)')
+      .select('*, animals!inner(id, nom:name, species, establishment_id)')
       .eq('establishment_id', establishmentId)
 
     if (filters?.animalId) {
@@ -52,7 +52,7 @@ export async function getTodayTreatments() {
     // Fetch active treatments that cover today
     const { data: treatments, error: treatmentsError } = await supabase
       .from('animal_treatments')
-      .select('*, animals!inner(id, nom, species, photo_url, establishment_id)')
+      .select('*, animals!inner(id, nom:name, species, photo_url, establishment_id)')
       .eq('establishment_id', establishmentId)
       .eq('active', true)
       .lte('start_date', today)
@@ -157,7 +157,7 @@ export async function createTreatment(data: {
         notes: data.notes?.trim() || null,
         created_by: userId,
       })
-      .select('*, animals!inner(nom)')
+      .select('*, animals!inner(nom:name)')
       .single()
 
     if (error) return { error: error.message }
