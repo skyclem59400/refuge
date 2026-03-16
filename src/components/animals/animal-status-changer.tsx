@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ArrowRightLeft, Loader2, X, AlertTriangle } from 'lucide-react'
 import { recordMovement } from '@/lib/actions/animals'
-import type { AnimalStatus, MovementType, IcadStatus } from '@/lib/types/database'
+import { ClientSearch } from '@/components/clients/client-search'
+import type { AnimalStatus, MovementType, IcadStatus, Client } from '@/lib/types/database'
 
 interface AnimalStatusChangerProps {
   animalId: string
   animalName: string
   currentStatus: AnimalStatus
+  establishmentId: string
 }
 
 const movementsByStatus: Record<string, { value: MovementType; label: string; danger?: boolean }[]> = {
@@ -67,12 +69,13 @@ const statusLabels: Record<string, string> = {
   euthanized: 'Euthanasie',
 }
 
-export function AnimalStatusChanger({ animalId, animalName, currentStatus }: Readonly<AnimalStatusChangerProps>) {
+export function AnimalStatusChanger({ animalId, animalName, currentStatus, establishmentId }: Readonly<AnimalStatusChangerProps>) {
   const [isOpen, setIsOpen] = useState(false)
   const [type, setType] = useState<MovementType | ''>('')
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0])
   const [notes, setNotes] = useState('')
   const [personName, setPersonName] = useState('')
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [destination, setDestination] = useState('')
   const [icadStatus, setIcadStatus] = useState<IcadStatus>('pending')
   const [isPending, startTransition] = useTransition()
@@ -81,8 +84,9 @@ export function AnimalStatusChanger({ animalId, animalName, currentStatus }: Rea
   const availableMovements = movementsByStatus[currentStatus] || []
   const selectedMovement = availableMovements.find((m) => m.value === type)
   const isDanger = selectedMovement?.danger ?? false
+  const isAdoption = type === 'adoption'
   const isTransferOut = type === 'transfer_out'
-  const needsPerson = type === 'adoption' || type === 'return_to_owner' || type === 'transfer_out'
+  const needsPerson = type === 'return_to_owner' || type === 'transfer_out'
 
   // No transitions available for terminal states
   if (currentStatus === 'deceased' || currentStatus === 'euthanized' || availableMovements.length === 0) {
@@ -94,6 +98,7 @@ export function AnimalStatusChanger({ animalId, animalName, currentStatus }: Rea
     setDate(new Date().toISOString().split('T')[0])
     setNotes('')
     setPersonName('')
+    setSelectedClient(null)
     setDestination('')
     setIcadStatus('pending')
   }
@@ -107,12 +112,23 @@ export function AnimalStatusChanger({ animalId, animalName, currentStatus }: Rea
     e.preventDefault()
     if (!type) return
 
+    if (isAdoption && !selectedClient) {
+      toast.error('Veuillez selectionner un adoptant dans le repertoire')
+      return
+    }
+
+    const adoptantName = isAdoption && selectedClient ? selectedClient.name : null
+    const adoptantContact = isAdoption && selectedClient
+      ? [selectedClient.phone, selectedClient.email].filter(Boolean).join(' / ') || null
+      : null
+
     startTransition(async () => {
       const result = await recordMovement(animalId, {
         type,
         date,
         notes: notes || null,
-        person_name: personName || null,
+        person_name: isAdoption ? adoptantName : (personName || null),
+        person_contact: isAdoption ? adoptantContact : null,
         destination: isTransferOut ? (destination || null) : null,
         icad_status: icadStatus,
       })
@@ -214,11 +230,25 @@ export function AnimalStatusChanger({ animalId, animalName, currentStatus }: Rea
                     />
                   </div>
 
-                  {/* Person (for adoption, return, transfer) */}
+                  {/* Client search for adoption */}
+                  {isAdoption && (
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+                        Adoptant (repertoire) *
+                      </label>
+                      <ClientSearch
+                        onSelect={setSelectedClient}
+                        selected={selectedClient}
+                        establishmentId={establishmentId}
+                      />
+                    </div>
+                  )}
+
+                  {/* Person (for return, transfer) */}
                   {needsPerson && (
                     <div>
                       <label htmlFor="status-person" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
-                        {type === 'adoption' ? 'Adoptant' : type === 'return_to_owner' ? 'Proprietaire' : 'Refuge destinataire'}
+                        {type === 'return_to_owner' ? 'Proprietaire' : 'Refuge destinataire'}
                       </label>
                       <input
                         id="status-person"
@@ -295,7 +325,7 @@ export function AnimalStatusChanger({ animalId, animalName, currentStatus }: Rea
                   </button>
                   <button
                     type="submit"
-                    disabled={isPending || !type}
+                    disabled={isPending || !type || (isAdoption && !selectedClient)}
                     className={`px-4 py-2 rounded-lg font-semibold text-sm text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
                       isDanger
                         ? 'bg-red-600 hover:bg-red-700'

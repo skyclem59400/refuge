@@ -130,6 +130,7 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
                 animalId={data.animal.id}
                 animalName={data.animal.name}
                 currentStatus={data.animal.status}
+                establishmentId={estabId}
               />
             )}
           </div>
