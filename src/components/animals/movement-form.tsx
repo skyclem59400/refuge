@@ -27,6 +27,31 @@ const movementsByStatus: Record<string, { value: MovementType; label: string }[]
     { value: 'death', label: 'Deces' },
     { value: 'euthanasia', label: 'Euthanasie' },
   ],
+  foster_family: [
+    { value: 'shelter_transfer', label: 'Retour au refuge' },
+    { value: 'adoption', label: 'Adoption' },
+    { value: 'return_to_owner', label: 'Restitution au proprietaire' },
+    { value: 'transfer_out', label: 'Transfert vers autre refuge' },
+    { value: 'death', label: 'Deces' },
+    { value: 'euthanasia', label: 'Euthanasie' },
+  ],
+  boarding: [
+    { value: 'shelter_transfer', label: 'Retour au refuge' },
+    { value: 'return_to_owner', label: 'Restitution au proprietaire' },
+    { value: 'death', label: 'Deces' },
+  ],
+  adopted: [
+    { value: 'shelter_transfer', label: 'Retour au refuge (retour adoption)' },
+    { value: 'death', label: 'Deces' },
+  ],
+  returned: [
+    { value: 'shelter_transfer', label: 'Placement en refuge' },
+    { value: 'death', label: 'Deces' },
+  ],
+  transferred: [
+    { value: 'shelter_transfer', label: 'Retour au refuge' },
+    { value: 'death', label: 'Deces' },
+  ],
 }
 
 const movementSuccessMessages: Record<MovementType, string> = {

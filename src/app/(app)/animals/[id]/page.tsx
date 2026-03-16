@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { AnimalDetailTabs } from '@/components/animals/animal-detail-tabs'
 import { AnimalStatusBadge, SpeciesBadge } from '@/components/animals/animal-status-badge'
+import { AnimalStatusChanger } from '@/components/animals/animal-status-changer'
 import { getSexIcon, calculateAge, getOriginLabel } from '@/lib/sda-utils'
 import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, AnimalTreatment, Box, SocialPost, IcadDeclaration, ActivityLog } from '@/lib/types/database'
 import { getTreatments } from '@/lib/actions/treatments'
@@ -124,6 +125,13 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
             </h1>
             <AnimalStatusBadge status={data.animal.status} />
             <SpeciesBadge species={data.animal.species} />
+            {canManageMovements && (
+              <AnimalStatusChanger
+                animalId={data.animal.id}
+                animalName={data.animal.name}
+                currentStatus={data.animal.status}
+              />
+            )}
           </div>
           <div className="flex items-center gap-2 text-sm text-muted mt-1 flex-wrap">
             {data.animal.breed && <span>{data.animal.breed}{data.animal.breed_cross ? ` x ${data.animal.breed_cross}` : ''}</span>}
