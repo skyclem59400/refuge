@@ -50,9 +50,9 @@ export async function uploadAnimalPhoto(animalId: string, formData: FormData) {
       return { error: 'Le fichier doit etre une image' }
     }
 
-    // Validate: max 5MB
-    if (file.size > 5 * 1024 * 1024) {
-      return { error: 'L\'image ne doit pas depasser 5 Mo' }
+    // Validate: max 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      return { error: 'L\'image ne doit pas depasser 10 Mo' }
     }
 
     // Generate storage path: {establishmentId}/{animalId}/{uuid}.{ext}

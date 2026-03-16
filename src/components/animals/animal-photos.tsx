@@ -31,6 +31,35 @@ export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: 
   const displayPhoto = selectedPhoto || primaryPhoto
   const displayUrl = displayPhoto?.url || fallbackPhotoUrl || null
 
+  async function compressImage(file: File, maxWidth = 1920, quality = 0.85): Promise<File> {
+    return new Promise((resolve, reject) => {
+      const img = new window.Image()
+      img.onload = () => {
+        let { width, height } = img
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width)
+          width = maxWidth
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { resolve(file); return }
+        ctx.drawImage(img, 0, 0, width, height)
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) { resolve(file); return }
+            resolve(new File([blob], file.name, { type: 'image/jpeg' }))
+          },
+          'image/jpeg',
+          quality
+        )
+      }
+      img.onerror = () => reject(new Error('Impossible de lire l\'image'))
+      img.src = URL.createObjectURL(file)
+    })
+  }
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -40,27 +69,36 @@ export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: 
       return
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("L'image ne doit pas depasser 5 Mo")
+    // Reject files over 20 MB (before compression)
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("L'image ne doit pas depasser 20 Mo")
       return
     }
 
     setPendingAction('upload')
     startTransition(async () => {
-      const formData = new FormData()
-      formData.append('file', file)
+      try {
+        // Compress if larger than 2 MB
+        const finalFile = file.size > 2 * 1024 * 1024
+          ? await compressImage(file)
+          : file
 
-      const result = await uploadAnimalPhoto(animalId, formData)
+        const formData = new FormData()
+        formData.append('file', finalFile)
 
-      if (result.error) {
-        toast.error(result.error)
-      } else {
-        toast.success('Photo ajoutee')
-        router.refresh()
+        const result = await uploadAnimalPhoto(animalId, formData)
+
+        if (result.error) {
+          toast.error(result.error)
+        } else {
+          toast.success('Photo ajoutee')
+          router.refresh()
+        }
+      } catch {
+        toast.error('Erreur lors du traitement de l\'image')
       }
 
       setPendingAction(null)
-      // Reset input so the same file can be re-selected
       if (fileRef.current) {
         fileRef.current.value = ''
       }
