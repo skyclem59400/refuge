@@ -335,8 +335,9 @@ export default async function SortiesPage({
   if (!ctx) redirect('/login')
 
   const { canManageOutings, canManageOutingAssignments: canManageAssignments, isAdmin } = ctx.permissions
+  const canViewStats = isAdmin || canManageAssignments
   const currentUserId = ctx.membership.user_id
-  const view: ViewKey = params.view === 'statistiques' ? 'statistiques' : 'promenades'
+  const view: ViewKey = params.view === 'statistiques' && canViewStats ? 'statistiques' : 'promenades'
   const currentPage = Math.max(1, parseInt(params.page || '1', 10) || 1)
 
   const raw = await fetchPageData(view, canManageAssignments, currentPage)
@@ -377,7 +378,7 @@ export default async function SortiesPage({
 
       {/* Tabs */}
       <div className="flex items-center gap-1 mb-6 border-b border-border">
-        {views.map((v) => (
+        {views.filter((v) => v.key !== 'statistiques' || canViewStats).map((v) => (
           <Link
             key={v.key}
             href={`/sorties?view=${v.key}`}
@@ -415,7 +416,7 @@ export default async function SortiesPage({
         />
       )}
 
-      {view === 'statistiques' && (
+      {view === 'statistiques' && canViewStats && (
         <StatistiquesViewContent
           leaderboardData={raw.leaderboardResult.data}
           userNames={userNames}
