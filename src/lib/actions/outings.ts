@@ -382,18 +382,30 @@ export async function createOuting(data: {
 
     if (error) return { error: error.message }
 
-    // Auto-link: if there's an assignment for this animal+user today, mark completed
+    // Auto-link: if there's a pending assignment for this animal+user, mark completed
+    // Matches today or any past overdue assignment (not just today)
     // (skip for TIG outings — TIG don't have assignments)
     if (!data.is_tig) {
       const todayDate = new Date().toISOString().split('T')[0]
       const adminForLink = createAdminClient()
-      await adminForLink
+      // Find the most recent pending assignment (today or overdue)
+      const { data: pendingAssignment } = await adminForLink
         .from('outing_assignments')
-        .update({ outing_id: outing.id })
+        .select('id')
         .eq('animal_id', data.animal_id)
         .eq('assigned_to', userId)
-        .eq('date', todayDate)
+        .lte('date', todayDate)
         .is('outing_id', null)
+        .order('date', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (pendingAssignment) {
+        await adminForLink
+          .from('outing_assignments')
+          .update({ outing_id: outing.id })
+          .eq('id', pendingAssignment.id)
+      }
     }
 
     revalidatePath('/sorties')
