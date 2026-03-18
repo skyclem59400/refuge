@@ -7,7 +7,21 @@ import { createClient } from '@/lib/supabase/client'
 import { deleteDocument, convertDevisToFacture, updateDocumentStatus, cancelFactureWithAvoir } from '@/lib/actions/documents'
 import { StatusBadge, TypeBadge } from './status-badge'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
-import type { Document, DocumentStatus } from '@/lib/types/database'
+import type { Document, DocumentStatus, DocumentPaymentMethod } from '@/lib/types/database'
+
+const PAYMENT_METHODS: { value: DocumentPaymentMethod; label: string }[] = [
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'virement', label: 'Virement bancaire' },
+  { value: 'especes', label: 'Especes' },
+  { value: 'cb', label: 'Carte bancaire' },
+  { value: 'prelevement', label: 'Prelevement' },
+  { value: 'autre', label: 'Autre' },
+]
+
+function paymentMethodLabel(method: string | null): string | null {
+  if (!method) return null
+  return PAYMENT_METHODS.find(m => m.value === method)?.label ?? method
+}
 
 function isEditable(doc: Document): boolean {
   if (doc.type === 'devis' && doc.status !== 'converted') return true
@@ -29,6 +43,11 @@ export function DocumentList({ initialData, canEdit, establishmentId }: Document
   const [statusFilter, setStatusFilter] = useState('')
   const [isPending, startTransition] = useTransition()
   const supabase = createClient()
+
+  // Payment dialog state
+  const [paymentDialog, setPaymentDialog] = useState<{ docId: string; numero: string } | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<DocumentPaymentMethod>('cb')
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
 
   const applyFilters = async (type: string, status: string) => {
     let query = supabase
@@ -86,7 +105,13 @@ export function DocumentList({ initialData, canEdit, establishmentId }: Document
     })
   }
 
-  const handleStatusUpdate = (id: string, status: DocumentStatus) => {
+  const handleStatusUpdate = (id: string, status: DocumentStatus, numero?: string) => {
+    if (status === 'paid' && numero) {
+      setPaymentDialog({ docId: id, numero })
+      setPaymentMethod('cb')
+      setPaymentDate(new Date().toISOString().split('T')[0])
+      return
+    }
     startTransition(async () => {
       const result = await updateDocumentStatus(id, status)
       if ('error' in result && result.error) {
@@ -99,6 +124,23 @@ export function DocumentList({ initialData, canEdit, establishmentId }: Document
         }
         applyFilters(typeFilter, statusFilter)
       }
+    })
+  }
+
+  const confirmPayment = () => {
+    if (!paymentDialog) return
+    startTransition(async () => {
+      const result = await updateDocumentStatus(paymentDialog.docId, 'paid', {
+        payment_method: paymentMethod,
+        payment_date: paymentDate,
+      })
+      if ('error' in result && result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success(`${paymentDialog.numero} marquee comme payee (${paymentMethodLabel(paymentMethod)})`)
+        applyFilters(typeFilter, statusFilter)
+      }
+      setPaymentDialog(null)
     })
   }
 
@@ -185,17 +227,24 @@ export function DocumentList({ initialData, canEdit, establishmentId }: Document
                       <StatusBadge status={doc.status} />
                     )}
                     {canEdit && doc.status !== 'converted' && doc.type !== 'avoir' && doc.status !== 'cancelled' && doc.type === 'facture' && (
-                      <select
-                        value={doc.status}
-                        onChange={(e) => handleStatusUpdate(doc.id, e.target.value as DocumentStatus)}
-                        className="bg-transparent border-none text-xs cursor-pointer p-0"
-                      >
-                        <option value="draft" disabled={doc.status !== 'draft'}>Brouillon</option>
-                        <option value="validated">Validee</option>
-                        <option value="sent">Envoyee</option>
-                        <option value="paid">Payee</option>
-                        <option value="cancelled">Annulee</option>
-                      </select>
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={doc.status}
+                          onChange={(e) => handleStatusUpdate(doc.id, e.target.value as DocumentStatus, doc.numero)}
+                          className="bg-transparent border-none text-xs cursor-pointer p-0"
+                        >
+                          <option value="draft" disabled={doc.status !== 'draft'}>Brouillon</option>
+                          <option value="validated">Validee</option>
+                          <option value="sent">Envoyee</option>
+                          <option value="paid">Payee</option>
+                          <option value="cancelled">Annulee</option>
+                        </select>
+                        {doc.status === 'paid' && doc.payment_method && (
+                          <span className="text-[10px] text-muted bg-surface-dark px-1.5 py-0.5 rounded">
+                            {paymentMethodLabel(doc.payment_method)}
+                          </span>
+                        )}
+                      </div>
                     )}
                     {canEdit && doc.status !== 'converted' && doc.type !== 'avoir' && doc.status !== 'cancelled' && doc.type !== 'facture' && (
                       <select
@@ -282,6 +331,62 @@ export function DocumentList({ initialData, canEdit, establishmentId }: Document
           </tbody>
         </table>
       </div>
+
+      {/* Payment method dialog */}
+      {paymentDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-surface rounded-xl border border-border p-6 w-full max-w-sm shadow-xl">
+            <h3 className="text-sm font-semibold mb-4">
+              Paiement — {paymentDialog.numero}
+            </h3>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1">
+                  Methode de paiement
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as DocumentPaymentMethod)}
+                  className="w-full px-3 py-2 bg-surface-dark border border-border rounded-lg text-sm focus:border-primary"
+                >
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1">
+                  Date de paiement
+                </label>
+                <input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface-dark border border-border rounded-lg text-sm focus:border-primary"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => setPaymentDialog(null)}
+                className="flex-1 py-2 rounded-lg text-sm font-medium bg-surface-dark text-muted border border-border hover:bg-surface-hover transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmPayment}
+                disabled={isPending}
+                className="flex-1 py-2 rounded-lg text-sm font-medium text-white bg-success hover:bg-success/90 transition-colors disabled:opacity-50"
+              >
+                {isPending ? 'Enregistrement...' : 'Confirmer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
-import type { Document, DocumentType, DocumentStatus, LineItem } from '@/lib/types/database'
+import type { Document, DocumentType, DocumentStatus, DocumentPaymentMethod, LineItem } from '@/lib/types/database'
 import { logActivity } from '@/lib/actions/activity-log'
 
 function documentTypeLabel(type: string): string {
@@ -384,7 +384,11 @@ export async function cancelFactureWithAvoir(factureId: string) {
   }
 }
 
-export async function updateDocumentStatus(id: string, status: DocumentStatus) {
+export async function updateDocumentStatus(
+  id: string,
+  status: DocumentStatus,
+  paymentInfo?: { payment_method: DocumentPaymentMethod; payment_date: string }
+) {
   try {
     const { establishmentId } = await requirePermission('manage_documents')
     const supabase = await createClient()
@@ -407,9 +411,19 @@ export async function updateDocumentStatus(id: string, status: DocumentStatus) {
       return await cancelFactureWithAvoir(id)
     }
 
+    const updateData: Record<string, unknown> = { status }
+    if (status === 'paid' && paymentInfo) {
+      updateData.payment_method = paymentInfo.payment_method
+      updateData.payment_date = paymentInfo.payment_date
+    }
+    if (status !== 'paid') {
+      updateData.payment_method = null
+      updateData.payment_date = null
+    }
+
     const { error } = await supabase
       .from('documents')
-      .update({ status })
+      .update(updateData)
       .eq('id', id)
       .eq('establishment_id', establishmentId)
 
@@ -422,7 +436,7 @@ export async function updateDocumentStatus(id: string, status: DocumentStatus) {
       entityType: 'document',
       entityId: id,
       entityName: doc.numero ? `${documentTypeLabel(doc.type)} ${doc.numero}` : undefined,
-      details: { statut: status },
+      details: { statut: status, ...(paymentInfo || {}) },
     })
     return { success: true }
   } catch (e) {

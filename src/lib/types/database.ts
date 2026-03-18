@@ -2,6 +2,7 @@ export type RoleType = 'admin' | 'salarie' | 'benevole'
 export type ContactCategory = 'client' | 'member' | 'volunteer' | 'board_member' | 'foster_family' | 'veterinarian'
 export type DocumentType = 'devis' | 'facture' | 'avoir'
 export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'converted' | 'validated'
+export type DocumentPaymentMethod = 'cheque' | 'virement' | 'especes' | 'cb' | 'prelevement' | 'autre'
 export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings' | 'manage_outing_assignments' | 'manage_adoptions' | 'manage_planning' | 'manage_leaves' | 'view_own_leaves' | 'manage_payslips'
 
 export interface LineItem {
@@ -48,6 +49,8 @@ export interface Document {
   converted_from_id: string | null
   converted_to_id: string | null
   cancelled_by_id: string | null
+  payment_method: DocumentPaymentMethod | null
+  payment_date: string | null
   pdf_url: string | null
   establishment_id: string
   created_at: string
