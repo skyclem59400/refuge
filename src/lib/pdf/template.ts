@@ -98,10 +98,10 @@ export function buildPdfHtml(doc: Document, companyInfo?: CompanyInfo, logoBase6
 
   const itemsHtml = lineItems.map((item, i) => `
     <tr style="background: ${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-      <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px;">${item.description}</td>
-      <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: center;">${item.quantity}</td>
-      <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: right;">${item.unit_price.toFixed(2)} &euro;</td>
-      <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: right; font-weight: 600;">${item.total.toFixed(2)} &euro;</td>
+      <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px;">${item.description || ''}</td>
+      <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: center;">${item.quantity ?? 0}</td>
+      <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: right;">${(item.unit_price ?? 0).toFixed(2)} &euro;</td>
+      <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: right; font-weight: 600;">${(item.total ?? 0).toFixed(2)} &euro;</td>
     </tr>`
   ).join('')
 
@@ -339,7 +339,7 @@ export function buildPdfHtml(doc: Document, companyInfo?: CompanyInfo, logoBase6
   <div class="total-section">
     <div class="total-box">
       <div class="total-label">Total TTC</div>
-      <div class="total-amount">${doc.total.toFixed(2)} &euro;</div>
+      <div class="total-amount">${(doc.total ?? 0).toFixed(2)} &euro;</div>
     </div>
   </div>
   <div class="legal">TVA non applicable &ndash; Article 293 B du CGI</div>
