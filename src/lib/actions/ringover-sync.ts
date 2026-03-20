@@ -145,7 +145,12 @@ async function findWorkingAuth(apiKey: string): Promise<{ auth: string | null; l
 
   for (const fmt of authFormats) {
     const testResp = await fetch(`${RINGOVER_API_BASE}/calls`, {
-      headers: { Authorization: fmt.value },
+      method: 'POST',
+      headers: {
+        Authorization: fmt.value,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ limit_count: 1 }),
     })
 
     if (!testResp.ok) {
@@ -192,41 +197,53 @@ function computeSyncStartDate(syncCursor: string | null, now: Date): string {
   return fifteenDaysAgo.toISOString()
 }
 
-/** Fetch a page of calls from Ringover API */
+/** Fetch a page of calls from Ringover API (POST with JSON body + cursor pagination) */
 async function fetchCallsPage(
   startDate: string,
-  endDate: string,
-  offset: number,
-  auth: string
-): Promise<{ callList: Record<string, unknown>[] | null; error?: string }> {
-  const params = new URLSearchParams({
+  lastIdReturned: number,
+  auth: string,
+  page: number
+): Promise<{ callList: Record<string, unknown>[] | null; lastId: number; error?: string }> {
+  const body: Record<string, unknown> = {
     start_date: startDate,
-    end_date: endDate,
-    limit_count: '500',
-    limit_offset: String(offset),
-  })
-  console.log('[Ringover Sync] Fetching offset', offset)
+    limit_count: 500,
+  }
+  if (lastIdReturned > 0) {
+    body.last_id_returned = lastIdReturned
+  }
 
-  const response = await fetch(`${RINGOVER_API_BASE}/calls?${params}`, {
-    headers: { Authorization: auth },
+  console.log('[Ringover Sync] Fetching page', page, 'cursor:', lastIdReturned)
+
+  const response = await fetch(`${RINGOVER_API_BASE}/calls`, {
+    method: 'POST',
+    headers: {
+      Authorization: auth,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
   })
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '')
     console.error('[Ringover Sync] API error:', response.status, errorText)
-    return { callList: null, error: `Erreur API Ringover (${response.status})` }
+    return { callList: null, lastId: 0, error: `Erreur API Ringover (${response.status})` }
   }
 
-  const body = await response.json()
-  const callList = body?.call_list || body?.calls || []
+  const data = await response.json()
+  const callList = data?.call_list || data?.calls || []
 
   if (!Array.isArray(callList) || callList.length === 0) {
-    if (offset === 0) console.log('[Ringover Sync] Empty response. Keys:', Object.keys(body))
-    return { callList: null }
+    if (page === 0) console.log('[Ringover Sync] Empty response. Keys:', Object.keys(data))
+    return { callList: null, lastId: 0 }
   }
 
-  if (offset === 0) console.log('[Ringover Sync] First call keys:', Object.keys(callList[0]))
-  return { callList }
+  if (page === 0) console.log('[Ringover Sync] First call keys:', Object.keys(callList[0]))
+
+  // Extract last cdr_id for cursor-based pagination
+  const lastCall = callList[callList.length - 1] as Record<string, unknown>
+  const lastId = Number(lastCall.cdr_id || lastCall.call_id || lastCall.id || 0)
+
+  return { callList, lastId }
 }
 
 /** Upsert a batch of call records and track the latest call time */
@@ -282,18 +299,18 @@ async function syncAllCallPages(
   supabase: ReturnType<typeof createAdminClient>,
   establishmentId: string,
   startDate: string,
-  endDate: string,
   auth: string,
   accueilNumber: string
 ): Promise<{ error?: string; totalCount: number; latestCallTime: string | null }> {
-  let offset = 0
+  let lastIdReturned = 0
   let totalCount = 0
   let latestCallTime: string | null = null
+  let pageNum = 0
   const PAGE_SIZE = 500
-  const MAX_OFFSET = 9000
+  const MAX_PAGES = 20
 
-  while (true) {
-    const page = await fetchCallsPage(startDate, endDate, offset, auth)
+  while (pageNum < MAX_PAGES) {
+    const page = await fetchCallsPage(startDate, lastIdReturned, auth, pageNum)
     if (page.error) return { error: page.error, totalCount, latestCallTime }
     if (!page.callList) break
 
@@ -307,9 +324,10 @@ async function syncAllCallPages(
     totalCount += records.length
 
     const isLastPage = page.callList.length < PAGE_SIZE
-    offset += PAGE_SIZE
-    const offsetLimitReached = offset >= MAX_OFFSET
-    if (isLastPage || offsetLimitReached) break
+    if (isLastPage || page.lastId === 0) break
+
+    lastIdReturned = page.lastId
+    pageNum++
     await sleep(600)
   }
 
@@ -346,14 +364,13 @@ export async function syncRingoverCalls() {
 
     const now = new Date()
     const startDate = computeSyncStartDate(conn.sync_cursor, now)
-    const endDate = now.toISOString()
 
     const { auth: workingAuth, lastStatus, lastBody } = await findWorkingAuth(conn.api_key.trim())
     if (!workingAuth) {
       return { error: buildAuthErrorMessage(lastStatus, lastBody) }
     }
 
-    const syncResult = await syncAllCallPages(supabase, establishmentId, startDate, endDate, workingAuth, conn.accueil_number || '')
+    const syncResult = await syncAllCallPages(supabase, establishmentId, startDate, workingAuth, conn.accueil_number || '')
     if (syncResult.error) return { error: syncResult.error }
 
     await updateSyncCursor(supabase, conn.id, now, syncResult.latestCallTime)

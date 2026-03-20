@@ -253,15 +253,14 @@ export async function getRecentAstreinteCalls() {
       return { data: [] }
     }
 
-    // Fetch recent calls via GET /calls with query parameters
-    const params = new URLSearchParams({
-      limit_count: '20',
-      limit_offset: '0',
-    })
-    const response = await fetch(`${RINGOVER_API_BASE}/calls?${params}`, {
+    // Fetch recent calls via POST /calls with JSON body
+    const response = await fetch(`${RINGOVER_API_BASE}/calls`, {
+      method: 'POST',
       headers: {
         Authorization: conn.api_key.trim(),
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ limit_count: 20 }),
     })
 
     if (!response.ok) {
