@@ -960,3 +960,131 @@ export async function fetchRecordingUrl(callId: string) {
     return { error: (e as Error).message }
   }
 }
+
+// ---------------------------------------------------------------------------
+// 13. Auto-sync configuration (Trigger.dev)
+// ---------------------------------------------------------------------------
+
+/** Get auto-sync config for current establishment */
+export async function getAutoSyncConfig() {
+  try {
+    const { establishmentId } = await requireEstablishment()
+    const supabase = createAdminClient()
+
+    const { data, error } = await supabase
+      .from('ringover_connections')
+      .select('auto_sync_enabled, auto_sync_cron, auto_sync_schedule_id')
+      .eq('establishment_id', establishmentId)
+      .maybeSingle()
+
+    if (error) return { error: error.message }
+    return { data: data || { auto_sync_enabled: false, auto_sync_cron: '0 6 * * *', auto_sync_schedule_id: null } }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+/** Toggle auto-sync and create/delete Trigger.dev schedule */
+export async function toggleAutoSync(enabled: boolean, cron?: string) {
+  try {
+    const { establishmentId } = await requirePermission('manage_establishment')
+    const supabase = createAdminClient()
+
+    const { data: conn, error: connError } = await supabase
+      .from('ringover_connections')
+      .select('id, auto_sync_schedule_id')
+      .eq('establishment_id', establishmentId)
+      .single()
+
+    if (connError || !conn) return { error: 'Connexion Ringover introuvable' }
+
+    const triggerSecretKey = process.env.TRIGGER_SECRET_KEY
+    if (!triggerSecretKey) {
+      return { error: 'TRIGGER_SECRET_KEY non configure sur le serveur' }
+    }
+
+    const cronExpression = cron || '0 6 * * *'
+
+    if (enabled) {
+      // Create or update Trigger.dev schedule
+      const schedulePayload: Record<string, unknown> = {
+        task: 'ringover-daily-sync',
+        cron: cronExpression,
+        timezone: 'Europe/Paris',
+        externalId: `ringover-${establishmentId}`,
+        deduplicationKey: `ringover-auto-sync-${establishmentId}`,
+      }
+
+      const resp = await fetch('https://api.trigger.dev/api/v1/schedules', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${triggerSecretKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(schedulePayload),
+      })
+
+      if (!resp.ok) {
+        const errorText = await resp.text().catch(() => '')
+        return { error: `Erreur Trigger.dev (${resp.status}): ${errorText.slice(0, 200)}` }
+      }
+
+      const schedule = await resp.json()
+      const scheduleId = schedule.id || schedule.scheduleId
+
+      await supabase
+        .from('ringover_connections')
+        .update({
+          auto_sync_enabled: true,
+          auto_sync_cron: cronExpression,
+          auto_sync_schedule_id: scheduleId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', conn.id)
+    } else {
+      // Delete Trigger.dev schedule if exists
+      if (conn.auto_sync_schedule_id) {
+        await fetch(`https://api.trigger.dev/api/v1/schedules/${conn.auto_sync_schedule_id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${triggerSecretKey}` },
+        })
+      }
+
+      await supabase
+        .from('ringover_connections')
+        .update({
+          auto_sync_enabled: false,
+          auto_sync_schedule_id: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', conn.id)
+    }
+
+    revalidatePath('/appels')
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+/** Update auto-sync cron schedule */
+export async function updateAutoSyncCron(cron: string) {
+  try {
+    const { establishmentId } = await requirePermission('manage_establishment')
+    const supabase = createAdminClient()
+
+    const { data: conn, error: connError } = await supabase
+      .from('ringover_connections')
+      .select('id, auto_sync_enabled, auto_sync_schedule_id')
+      .eq('establishment_id', establishmentId)
+      .single()
+
+    if (connError || !conn) return { error: 'Connexion Ringover introuvable' }
+    if (!conn.auto_sync_enabled) return { error: 'Auto-sync non active' }
+
+    // Re-create the schedule with new cron (deduplicationKey ensures replacement)
+    return toggleAutoSync(true, cron)
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}

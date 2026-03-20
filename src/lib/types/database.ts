@@ -605,6 +605,9 @@ export interface RingoverConnection {
   last_sync_at: string | null
   sync_cursor: string | null
   is_active: boolean
+  auto_sync_enabled: boolean
+  auto_sync_cron: string
+  auto_sync_schedule_id: string | null
   created_at: string
   updated_at: string
 }

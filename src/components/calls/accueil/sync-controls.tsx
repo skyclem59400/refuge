@@ -2,11 +2,22 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { RefreshCw, Settings, Loader2, Wifi, Key, X, Phone, ChevronDown } from 'lucide-react'
+import { RefreshCw, Settings, Loader2, Wifi, Key, X, Phone, ChevronDown, Clock, Timer } from 'lucide-react'
 import { toast } from 'sonner'
-import { syncRingoverCalls, saveAccueilNumber } from '@/lib/actions/ringover-sync'
+import { syncRingoverCalls, saveAccueilNumber, toggleAutoSync } from '@/lib/actions/ringover-sync'
 import { saveRingoverConnection, disconnectRingover, getRingoverIVRNumbers } from '@/lib/actions/ringover'
 import type { RingoverConnection, RingoverNumber } from '@/lib/types/database'
+
+const CRON_PRESETS = [
+  { label: '6h du matin', value: '0 6 * * *' },
+  { label: '7h du matin', value: '0 7 * * *' },
+  { label: '8h du matin', value: '0 8 * * *' },
+  { label: '12h (midi)', value: '0 12 * * *' },
+  { label: '20h (soir)', value: '0 20 * * *' },
+  { label: '2x/jour (7h + 19h)', value: '0 7,19 * * *' },
+  { label: 'Toutes les 6h', value: '0 */6 * * *' },
+  { label: 'Toutes les 12h', value: '0 */12 * * *' },
+]
 
 interface SyncControlsProps {
   readonly connection: RingoverConnection | null
@@ -22,6 +33,7 @@ export function SyncControls({ connection }: SyncControlsProps) {
   const [availableNumbers, setAvailableNumbers] = useState<RingoverNumber[]>([])
   const [loadingNumbers, setLoadingNumbers] = useState(false)
   const [manualNumber, setManualNumber] = useState('')
+  const [showAutoSync, setShowAutoSync] = useState(false)
 
   // ── Fetch available numbers from Ringover ──
   async function fetchNumbers() {
@@ -276,6 +288,87 @@ export function SyncControls({ connection }: SyncControlsProps) {
               <span className="font-medium">{connection.astreinte_label || connection.astreinte_number}</span>
             </div>
           )}
+
+          {/* ── Auto-sync toggle ── */}
+          <div className="pt-2 border-t border-border space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Timer className="w-3.5 h-3.5 text-muted" />
+                <span className="text-sm text-muted">Sync automatique</span>
+              </div>
+              <button
+                onClick={() => {
+                  setPendingAction('auto-sync')
+                  startTransition(async () => {
+                    const r = await toggleAutoSync(!connection.auto_sync_enabled, connection.auto_sync_cron)
+                    if (r.error) {
+                      toast.error(r.error)
+                    } else {
+                      toast.success(connection.auto_sync_enabled ? 'Sync automatique desactivee' : 'Sync automatique activee')
+                      router.refresh()
+                    }
+                    setPendingAction(null)
+                  })
+                }}
+                disabled={isPending}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  connection.auto_sync_enabled ? 'bg-primary' : 'bg-border'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    connection.auto_sync_enabled ? 'translate-x-4.5' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {connection.auto_sync_enabled && (
+              <div className="space-y-1.5">
+                <button
+                  onClick={() => setShowAutoSync(!showAutoSync)}
+                  className="text-xs text-primary hover:text-primary-dark transition-colors inline-flex items-center gap-1"
+                >
+                  <Clock className="w-3 h-3" />
+                  {CRON_PRESETS.find(p => p.value === connection.auto_sync_cron)?.label || connection.auto_sync_cron}
+                  <ChevronDown className={`w-3 h-3 transition-transform ${showAutoSync ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showAutoSync && (
+                  <div className="grid grid-cols-2 gap-1">
+                    {CRON_PRESETS.map((preset) => (
+                      <button
+                        key={preset.value}
+                        onClick={() => {
+                          setPendingAction('update-cron')
+                          startTransition(async () => {
+                            const r = await toggleAutoSync(true, preset.value)
+                            if (r.error) {
+                              toast.error(r.error)
+                            } else {
+                              toast.success(`Frequence mise a jour : ${preset.label}`)
+                              router.refresh()
+                            }
+                            setPendingAction(null)
+                            setShowAutoSync(false)
+                          })
+                        }}
+                        disabled={isPending}
+                        className={`px-2 py-1.5 rounded text-xs text-left transition-colors ${
+                          connection.auto_sync_cron === preset.value
+                            ? 'bg-primary/20 text-primary font-medium'
+                            : 'bg-surface hover:bg-surface-hover text-muted hover:text-text'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center gap-2 pt-2 border-t border-border">
             <button
               onClick={() => {
