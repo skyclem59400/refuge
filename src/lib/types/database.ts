@@ -69,6 +69,7 @@ export interface Establishment {
   bic: string
   address: string
   legal_name: string
+  siret: string
   logo_url: string | null
   type: EstablishmentType
   google_calendar_id: string
@@ -180,6 +181,7 @@ export interface CompanyInfo {
   bic: string
   address: string
   legal_name: string
+  siret: string
 }
 
 // ============================================

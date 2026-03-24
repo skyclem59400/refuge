@@ -21,6 +21,7 @@ export function EstablishmentForm({ establishment }: EstablishmentFormProps) {
   const [address, setAddress] = useState(establishment.address)
   const [iban, setIban] = useState(establishment.iban)
   const [bic, setBic] = useState(establishment.bic)
+  const [siret, setSiret] = useState(establishment.siret || '')
   const [googleCalendarId, setGoogleCalendarId] = useState(establishment.google_calendar_id || '')
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -43,6 +44,7 @@ export function EstablishmentForm({ establishment }: EstablishmentFormProps) {
         address: address.trim(),
         iban: iban.trim(),
         bic: bic.trim(),
+        siret: siret.trim(),
         google_calendar_id: googleCalendarId.trim(),
       })
 
@@ -189,6 +191,21 @@ export function EstablishmentForm({ establishment }: EstablishmentFormProps) {
               focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
           />
         </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+          SIRET
+        </label>
+        <input
+          type="text"
+          value={siret}
+          onChange={(e) => setSiret(e.target.value)}
+          placeholder="123 456 789 00012"
+          className="w-full px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm font-mono
+            focus:border-primary focus:ring-1 focus:ring-primary transition-colors
+            placeholder:text-muted/50"
+        />
       </div>
 
       <div>

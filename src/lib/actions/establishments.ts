@@ -30,6 +30,7 @@ export async function updateEstablishment(data: {
   bic?: string
   address?: string
   legal_name?: string
+  siret?: string
   logo_url?: string
   google_calendar_id?: string
 }) {

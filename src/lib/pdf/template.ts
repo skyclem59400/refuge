@@ -10,6 +10,7 @@ const DEFAULT_COMPANY: CompanyInfo = {
   bic: '',
   address: '',
   legal_name: '',
+  siret: '',
 }
 
 function getLineItems(doc: Document): LineItem[] {
@@ -63,7 +64,7 @@ function buildNotesHtml(doc: Document): string {
 }
 
 function buildPaymentHtml(doc: Document, company: CompanyInfo): string {
-  if (doc.type !== 'facture') return ''
+  if (!company.iban) return ''
   const bicLine = ('bic' in company && company.bic) ? `<p>BIC : ${company.bic}</p>` : ''
   return `
   <div class="payment">
@@ -75,12 +76,13 @@ function buildPaymentHtml(doc: Document, company: CompanyInfo): string {
 
 function buildFooterHtml(company: CompanyInfo): string {
   const legalLine = ('legal_name' in company && company.legal_name) ? `<p>${company.legal_name}</p>` : ''
+  const siretLine = ('siret' in company && company.siret) ? ` | SIRET : ${company.siret}` : ''
   const websitePart = company.website ? ` | ${company.website}` : ''
   return `
   <div class="footer">
     <p><strong>${company.name}</strong> &ndash; ${company.description}</p>
     ${legalLine}
-    <p>${company.email} | ${company.phone}${websitePart}</p>
+    <p>${company.email} | ${company.phone}${websitePart}${siretLine}</p>
   </div>`
 }
 

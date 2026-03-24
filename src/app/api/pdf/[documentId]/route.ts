@@ -52,6 +52,7 @@ export async function GET(
           bic: estab.bic,
           address: estab.address,
           legal_name: estab.legal_name,
+          siret: estab.siret || '',
         }
         logoUrl = estab.logo_url
       }
