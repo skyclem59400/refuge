@@ -575,6 +575,7 @@ export function buildCerfaHtml(donation: Donation, companyInfo?: CompanyInfo, lo
     bic: '',
     address: '',
     legal_name: '',
+    siret: '',
   }
 
   const dateFormatted = formatFrenchDate(donation.date)
