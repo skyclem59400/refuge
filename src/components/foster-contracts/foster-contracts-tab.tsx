@@ -14,11 +14,17 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  Send,
+  RefreshCw,
+  Eye,
+  Mail,
+  Clock,
 } from 'lucide-react'
 import { FosterContractForm } from '@/components/foster-contracts/foster-contract-form'
 import { deleteFosterContract } from '@/lib/actions/foster-contracts'
+import { sendContractForSignature, syncContractSignatureStatus } from '@/lib/actions/foster-contract-signature'
 import { formatDateShort } from '@/lib/utils'
-import type { FosterContract, FosterContractStatus } from '@/lib/types/database'
+import type { FosterContract, FosterContractStatus, SignatureStatus } from '@/lib/types/database'
 
 interface FosterContractWithRelations extends FosterContract {
   foster?: {
@@ -50,10 +56,20 @@ const statusStyles: Record<FosterContractStatus, string> = {
   cancelled: 'bg-warning/15 text-warning',
 }
 
+const signatureStatusConfig: Record<SignatureStatus, { label: string; icon: typeof Mail; className: string }> = {
+  not_sent:  { label: 'Non envoye',         icon: Mail,         className: 'bg-muted/15 text-muted' },
+  pending:   { label: 'En attente signature', icon: Clock,        className: 'bg-warning/15 text-warning' },
+  viewed:    { label: 'Consulte par la FA', icon: Eye,          className: 'bg-info/15 text-info' },
+  signed:    { label: 'Signe electroniquement', icon: CheckCircle2, className: 'bg-success/15 text-success' },
+  rejected:  { label: 'Refuse',             icon: AlertCircle,  className: 'bg-error/15 text-error' },
+  failed:    { label: 'Echec d’envoi',   icon: AlertCircle,  className: 'bg-error/15 text-error' },
+}
+
 export function FosterContractsTab({ animalId, contracts, canManage }: Readonly<FosterContractsTabProps>) {
   const [showForm, setShowForm] = useState(false)
   const [editingContract, setEditingContract] = useState<FosterContractWithRelations | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [actingId, setActingId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -82,6 +98,39 @@ export function FosterContractsTab({ animalId, contracts, canManage }: Readonly<
         toast.error(result.error)
       } else {
         toast.success('Contrat supprime')
+        router.refresh()
+      }
+    })
+  }
+
+  function handleSendForSignature(contract: FosterContractWithRelations) {
+    if (!contract.foster?.email) {
+      toast.error('La famille d’accueil n’a pas d’email enregistre')
+      return
+    }
+    if (!window.confirm(`Envoyer le contrat ${contract.contract_number} pour signature electronique a ${contract.foster.name} (${contract.foster.email}) ?`)) return
+    setActingId(contract.id)
+    startTransition(async () => {
+      const result = await sendContractForSignature(contract.id)
+      setActingId(null)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Contrat envoye pour signature electronique')
+        router.refresh()
+      }
+    })
+  }
+
+  function handleSyncSignature(contract: FosterContractWithRelations) {
+    setActingId(contract.id)
+    startTransition(async () => {
+      const result = await syncContractSignatureStatus(contract.id)
+      setActingId(null)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success(`Statut a jour : ${result.data?.status}`)
         router.refresh()
       }
     })
@@ -134,32 +183,76 @@ export function FosterContractsTab({ animalId, contracts, canManage }: Readonly<
                     <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${statusStyles[c.status]}`}>
                       {statusLabels[c.status]}
                     </span>
-                    {c.signed_at && (
-                      <span className="inline-flex items-center gap-1 text-xs text-success">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Signe le {formatDateShort(c.signed_at)}
-                      </span>
-                    )}
-                    {c.status === 'draft' && !c.signed_at && (
-                      <span className="inline-flex items-center gap-1 text-xs text-warning">
-                        <AlertCircle className="w-3 h-3" />
-                        Non signe
+                    {(() => {
+                      const sigConfig = signatureStatusConfig[c.signature_status]
+                      const SigIcon = sigConfig.icon
+                      return (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${sigConfig.className}`}>
+                          <SigIcon className="w-3 h-3" />
+                          {sigConfig.label}
+                        </span>
+                      )
+                    })()}
+                    {c.signed_at_via_documenso && (
+                      <span className="text-xs text-muted">
+                        le {formatDateShort(c.signed_at_via_documenso)}
                       </span>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
+                  {/* Voir le PDF original (template) */}
                   <a
                     href={`/api/pdf/foster-contract/${c.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 rounded-lg text-muted hover:text-primary hover:bg-primary/10 transition-colors"
-                    title="Telecharger / imprimer le contrat"
+                    title="Apercu du contrat (PDF non signe)"
                   >
                     <FileDown className="w-4 h-4" />
                   </a>
+
+                  {/* Voir le PDF signe si dispo */}
+                  {c.signed_pdf_url && (
+                    <a
+                      href={c.signed_pdf_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 rounded-lg text-success hover:bg-success/10 transition-colors"
+                      title="PDF signe (avec horodatage Documenso)"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                    </a>
+                  )}
+
                   {canManage && (
                     <>
+                      {/* Envoyer pour signature electronique */}
+                      {c.signature_status === 'not_sent' && (
+                        <button
+                          type="button"
+                          onClick={() => handleSendForSignature(c)}
+                          disabled={isPending && actingId === c.id}
+                          className="p-2 rounded-lg text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                          title="Envoyer pour signature electronique"
+                        >
+                          {isPending && actingId === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        </button>
+                      )}
+
+                      {/* Sync statut depuis Documenso */}
+                      {(c.signature_status === 'pending' || c.signature_status === 'viewed') && (
+                        <button
+                          type="button"
+                          onClick={() => handleSyncSignature(c)}
+                          disabled={isPending && actingId === c.id}
+                          className="p-2 rounded-lg text-muted hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                          title="Mettre a jour le statut de signature depuis Documenso"
+                        >
+                          {isPending && actingId === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => handleEdit(c)}

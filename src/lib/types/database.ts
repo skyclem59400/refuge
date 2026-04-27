@@ -424,6 +424,7 @@ export interface VeterinarianWithClinic extends Veterinarian {
 // ============================================
 
 export type FosterContractStatus = 'draft' | 'active' | 'ended' | 'cancelled'
+export type SignatureStatus = 'not_sent' | 'pending' | 'viewed' | 'signed' | 'rejected' | 'failed'
 
 export interface FosterContract {
   id: string
@@ -445,6 +446,15 @@ export interface FosterContract {
   signed_at: string | null
   notes: string | null
   pdf_url: string | null
+  // Documenso electronic signature workflow
+  documenso_document_id: number | null
+  documenso_recipient_id: number | null
+  documenso_signing_url: string | null
+  signature_status: SignatureStatus
+  signature_sent_at: string | null
+  signature_viewed_at: string | null
+  signed_at_via_documenso: string | null
+  signed_pdf_url: string | null
   created_by: string | null
   created_at: string
   updated_at: string
