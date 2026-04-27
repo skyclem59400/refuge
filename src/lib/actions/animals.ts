@@ -146,6 +146,8 @@ export async function createAnimal(data: {
   medal_number?: string | null
   loof_number?: string | null
   passport_number?: string | null
+  identification_date?: string | null
+  identifying_veterinarian_id?: string | null
   icad_updated?: boolean
   status: AnimalStatus
   behavior_score?: number | null
@@ -240,6 +242,8 @@ export async function updateAnimal(id: string, data: {
   medal_number?: string | null
   loof_number?: string | null
   passport_number?: string | null
+  identification_date?: string | null
+  identifying_veterinarian_id?: string | null
   icad_updated?: boolean
   behavior_score?: number | null
   description?: string | null
@@ -450,6 +454,7 @@ export async function recordMovement(animalId: string, data: {
     // Map movement type to animal status
     const statusMap: Record<string, AnimalStatus> = {
       shelter_transfer: 'shelter',
+      foster_placement: 'foster_family',
       adoption: 'adopted',
       return_to_owner: 'returned',
       transfer_out: 'transferred',

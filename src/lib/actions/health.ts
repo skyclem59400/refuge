@@ -108,8 +108,10 @@ export async function getOverdueReminders() {
 export async function createHealthRecord(data: {
   animal_id: string
   type: HealthRecordType
+  date?: string
   description: string
   veterinarian?: string | null
+  veterinarian_id?: string | null
   next_due_date?: string | null
   cost?: number | null
   notes?: string | null
@@ -123,9 +125,10 @@ export async function createHealthRecord(data: {
       .insert({
         animal_id: data.animal_id,
         type: data.type,
-        date: new Date().toISOString(),
+        date: data.date || new Date().toISOString().split('T')[0],
         description: data.description,
         veterinarian: data.veterinarian ?? null,
+        veterinarian_id: data.veterinarian_id ?? null,
         next_due_date: data.next_due_date ?? null,
         cost: data.cost ?? null,
         notes: data.notes ?? null,
@@ -152,6 +155,7 @@ export async function updateHealthRecord(id: string, data: {
   date?: string
   description?: string
   veterinarian?: string | null
+  veterinarian_id?: string | null
   next_due_date?: string | null
   cost?: number | null
   notes?: string | null

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { HeartPulse, AlertTriangle, Stethoscope, Calendar, Pill } from 'lucide-react'
+import { HeartPulse, AlertTriangle, Stethoscope, Calendar, Pill, ListChecks } from 'lucide-react'
 import { getHealthRecords, getUpcomingReminders, getOverdueReminders } from '@/lib/actions/health'
 import { getTreatments } from '@/lib/actions/treatments'
 import { getEstablishmentContext } from '@/lib/establishment/context'
@@ -20,9 +20,12 @@ interface HealthRecordWithAnimal {
   date: string
   description: string
   veterinarian: string | null
+  veterinarian_id: string | null
   next_due_date: string | null
   cost: number | null
   notes: string | null
+  protocol_instance_id: string | null
+  protocol_step_id: string | null
   created_by: string | null
   created_at: string
   animals: {
@@ -110,6 +113,15 @@ export default async function HealthPage({
               Suivi sanitaire global des animaux
             </p>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/health/protocols"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-surface-hover transition-colors"
+          >
+            <ListChecks className="w-4 h-4" />
+            Protocoles
+          </Link>
         </div>
       </div>
 

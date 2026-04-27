@@ -55,6 +55,7 @@ export function getOriginLabel(origin: string): string {
 export function getMovementLabel(type: string): string {
   const labels: Record<string, string> = {
     pound_entry: 'Entrée en fourrière', shelter_transfer: 'Transfert en refuge',
+    foster_placement: 'Placement en famille d’accueil',
     adoption: 'Adoption', return_to_owner: 'Restitution au propriétaire',
     transfer_out: 'Transfert vers autre refuge', death: 'Décès', euthanasia: 'Euthanasie',
   }

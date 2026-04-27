@@ -6,8 +6,11 @@ import { toast } from 'sonner'
 import Image from 'next/image'
 import { AnimalPhotos } from '@/components/animals/animal-photos'
 import { AnimalForm } from '@/components/animals/animal-form'
+import { AnimalIdentificationCard } from '@/components/animals/animal-identification-card'
 import { HealthRecordForm } from '@/components/health/health-record-form'
 import { MovementForm } from '@/components/animals/movement-form'
+import { FosterContractsTab } from '@/components/foster-contracts/foster-contracts-tab'
+import { ApplyProtocolModal } from '@/components/health/apply-protocol-modal'
 import { updatePost, deletePost } from '@/lib/actions/social-posts'
 import { formatDateShort, formatCurrency } from '@/lib/utils'
 import {
@@ -17,7 +20,17 @@ import {
 } from '@/lib/sda-utils'
 import { PostGenerator } from '@/components/social/post-generator'
 import { IcadDeclarations } from '@/components/icad/icad-declarations'
-import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, AnimalTreatment, Box, SocialPost, IcadDeclaration, ActivityLog } from '@/lib/types/database'
+import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, AnimalTreatment, AnimalStatus, Box, SocialPost, IcadDeclaration, ActivityLog, FosterContract, HealthProtocolWithSteps } from '@/lib/types/database'
+
+interface FosterContractWithRelations extends FosterContract {
+  foster?: {
+    id: string
+    name: string
+    email: string | null
+    phone: string | null
+    city: string | null
+  }
+}
 import { stopTreatment } from '@/lib/actions/treatments'
 import { ActivityTimeline } from '@/components/ui/activity-timeline'
 import { formatOutingDuration } from '@/lib/sda-utils'
@@ -49,9 +62,11 @@ import {
   Pill,
   StopCircle,
   Clock,
+  Home,
+  ListChecks,
 } from 'lucide-react'
 
-type TabId = 'info' | 'photos' | 'health' | 'movements' | 'outings' | 'posts' | 'icad' | 'activity'
+type TabId = 'info' | 'photos' | 'health' | 'movements' | 'foster' | 'outings' | 'posts' | 'icad' | 'activity'
 
 interface AnimalOuting {
   id: string
@@ -77,6 +92,8 @@ interface AnimalDetailTabsProps {
   outings?: AnimalOuting[]
   socialPosts: SocialPost[]
   icadDeclarations: IcadDeclaration[]
+  fosterContracts?: FosterContractWithRelations[]
+  healthProtocols?: HealthProtocolWithSteps[]
   boxes: Box[]
   userNames: Record<string, string>
   establishmentName: string
@@ -89,11 +106,12 @@ interface AnimalDetailTabsProps {
   activityLogs?: ActivityLog[]
 }
 
-const baseTabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'outings' | 'socialPosts' | 'icadDeclarations' | 'activityLogs'; adminOnly?: boolean }[] = [
+const baseTabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'outings' | 'socialPosts' | 'icadDeclarations' | 'activityLogs' | 'fosterContracts'; adminOnly?: boolean }[] = [
   { id: 'info', label: 'Infos', icon: Info },
   { id: 'photos', label: 'Photos', icon: Camera, countKey: 'photos' },
   { id: 'health', label: 'Sante', icon: HeartPulse, countKey: 'healthRecords' },
   { id: 'movements', label: 'Mouvements', icon: ArrowRightLeft, countKey: 'movements' },
+  { id: 'foster', label: 'Famille d’accueil', icon: Home, countKey: 'fosterContracts' },
   { id: 'outings', label: 'Sorties', icon: Footprints, countKey: 'outings' },
   { id: 'posts', label: 'Publications', icon: Share2, countKey: 'socialPosts' },
   { id: 'icad', label: 'I-CAD', icon: Shield, countKey: 'icadDeclarations' },
@@ -107,6 +125,8 @@ export function AnimalDetailTabs({
   healthRecords,
   socialPosts,
   icadDeclarations,
+  fosterContracts = [],
+  healthProtocols = [],
   boxes,
   userNames,
   establishmentName,
@@ -123,6 +143,7 @@ export function AnimalDetailTabs({
   const [activeTab, setActiveTab] = useState<TabId>('info')
   const [showHealthForm, setShowHealthForm] = useState(false)
   const [showMovementForm, setShowMovementForm] = useState(false)
+  const [showApplyProtocol, setShowApplyProtocol] = useState(false)
 
   const tabs = baseTabs.filter(t => !t.adminOnly || isAdmin)
 
@@ -136,6 +157,7 @@ export function AnimalDetailTabs({
     outings: outings.length,
     socialPosts: socialPosts.length,
     icadDeclarations: icadDeclarations.length,
+    fosterContracts: fosterContracts.length,
     activityLogs: activityLogs.length,
   }
 
@@ -242,8 +264,19 @@ export function AnimalDetailTabs({
             canManageHealth={canManageHealth}
             showForm={showHealthForm}
             onToggleForm={() => setShowHealthForm(!showHealthForm)}
+            onApplyProtocol={() => setShowApplyProtocol(true)}
+            hasProtocols={healthProtocols.length > 0}
             today={today}
             in30Days={in30Days}
+          />
+        )}
+
+        {showApplyProtocol && (
+          <ApplyProtocolModal
+            animalId={animal.id}
+            animalSpecies={animal.species}
+            protocols={healthProtocols}
+            onClose={() => setShowApplyProtocol(false)}
           />
         )}
 
@@ -255,6 +288,14 @@ export function AnimalDetailTabs({
             canManageMovements={canManageMovements}
             showForm={showMovementForm}
             onToggleForm={() => setShowMovementForm(!showMovementForm)}
+          />
+        )}
+
+        {activeTab === 'foster' && (
+          <FosterContractsTab
+            animalId={animal.id}
+            contracts={fosterContracts}
+            canManage={canManageAnimals}
           />
         )}
 
@@ -308,59 +349,7 @@ function InfoTab({
     <div className="grid lg:grid-cols-2 gap-6">
       {/* Left column */}
       <div className="space-y-4">
-        {/* Identification card */}
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Fingerprint className="w-4 h-4 text-muted" />
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">Identification</h3>
-          </div>
-          <div className="space-y-3 text-sm">
-            {animal.chip_number && (
-              <div className="flex justify-between">
-                <span className="text-muted">Puce</span>
-                <span className="font-mono font-medium">{animal.chip_number}</span>
-              </div>
-            )}
-            {animal.medal_number && (
-              <div className="flex justify-between">
-                <span className="text-muted">Medaille</span>
-                <span className="font-medium">{animal.medal_number}</span>
-              </div>
-            )}
-            {animal.tattoo_number && (
-              <div className="flex justify-between">
-                <span className="text-muted">Tatouage</span>
-                <span className="font-medium">
-                  {animal.tattoo_number}
-                  {animal.tattoo_position && (
-                    <span className="text-muted ml-1">({animal.tattoo_position})</span>
-                  )}
-                </span>
-              </div>
-            )}
-            {animal.loof_number && (
-              <div className="flex justify-between">
-                <span className="text-muted">LOOF</span>
-                <span className="font-medium">{animal.loof_number}</span>
-              </div>
-            )}
-            {animal.passport_number && (
-              <div className="flex justify-between">
-                <span className="text-muted">Passeport</span>
-                <span className="font-medium">{animal.passport_number}</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-muted">I-CAD</span>
-              <span className={`font-medium ${animal.icad_updated ? 'text-success' : 'text-warning'}`}>
-                {animal.icad_updated ? 'A jour' : 'Non mis a jour'}
-              </span>
-            </div>
-            {!animal.chip_number && !animal.medal_number && !animal.tattoo_number && !animal.loof_number && !animal.passport_number && (
-              <p className="text-muted text-center py-2">Aucune identification enregistree</p>
-            )}
-          </div>
-        </div>
+        <AnimalIdentificationCard animal={animal} />
 
         {/* Physical info card */}
         <div className="bg-surface rounded-xl border border-border p-5">
@@ -491,6 +480,8 @@ function HealthTab({
   canManageHealth,
   showForm,
   onToggleForm,
+  onApplyProtocol,
+  hasProtocols,
   today,
   in30Days,
 }: Readonly<{
@@ -500,6 +491,8 @@ function HealthTab({
   canManageHealth: boolean
   showForm: boolean
   onToggleForm: () => void
+  onApplyProtocol: () => void
+  hasProtocols: boolean
   today: string
   in30Days: string
 }>) {
@@ -515,9 +508,12 @@ function HealthTab({
 
   return (
     <div className="space-y-4">
-      {/* Add button */}
+      {/* Identification card en haut de l'espace sante (acces vetos / soigneurs) */}
+      <AnimalIdentificationCard animal={animal} />
+
+      {/* Add buttons */}
       {canManageHealth && (
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={onToggleForm}
@@ -525,6 +521,16 @@ function HealthTab({
           >
             <Plus className="w-4 h-4" />
             {showForm ? 'Masquer le formulaire' : 'Ajouter un acte'}
+          </button>
+          <button
+            type="button"
+            onClick={onApplyProtocol}
+            disabled={!hasProtocols}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-border hover:bg-surface-hover transition-colors disabled:opacity-50"
+            title={hasProtocols ? 'Appliquer un protocole de soins' : 'Aucun protocole defini'}
+          >
+            <ListChecks className="w-4 h-4" />
+            Appliquer un protocole
           </button>
         </div>
       )}
@@ -727,7 +733,8 @@ function MovementsTab({
   showForm: boolean
   onToggleForm: () => void
 }>) {
-  const canAddMovement = canManageMovements && (animal.status === 'pound' || animal.status === 'shelter')
+  const movableStatuses: AnimalStatus[] = ['pound', 'shelter', 'foster_family', 'boarding', 'adopted', 'returned', 'transferred']
+  const canAddMovement = canManageMovements && movableStatuses.includes(animal.status)
 
   return (
     <div className="space-y-4">

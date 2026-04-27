@@ -1,10 +1,38 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/establishment/permissions'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
 import type { ContactCategory } from '@/lib/types/database'
 import { logActivity } from '@/lib/actions/activity-log'
+
+export async function searchClientsByCategory(category: ContactCategory, search?: string) {
+  try {
+    const { establishmentId } = await requireEstablishment()
+    const supabase = createAdminClient()
+
+    let query = supabase
+      .from('clients')
+      .select('id, name, email, phone, city')
+      .eq('establishment_id', establishmentId)
+      .eq('type', category)
+
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`
+      query = query.or(`name.ilike.${term},email.ilike.${term},city.ilike.${term}`)
+    }
+
+    const { data, error } = await query.order('name', { ascending: true }).limit(20)
+
+    if (error) {
+      return { error: error.message }
+    }
+
+    return { data: data ?? [] }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
 
 export async function createClientAction(data: {
   name: string

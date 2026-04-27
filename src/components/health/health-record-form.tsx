@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createHealthRecord, updateHealthRecord } from '@/lib/actions/health'
+import { VeterinarianSelect } from '@/components/health/veterinarian-select'
 import type { HealthRecordType } from '@/lib/types/database'
 
 const typeLabels: Record<HealthRecordType, string> = {
@@ -24,6 +25,7 @@ interface HealthRecordFormProps {
     date: string
     description: string
     veterinarian: string | null
+    veterinarian_id: string | null
     next_due_date: string | null
     cost: number | null
     notes: string | null
@@ -37,13 +39,19 @@ export function HealthRecordForm({ animalId, record, onClose }: Readonly<HealthR
   const [type, setType] = useState<HealthRecordType>(record?.type || 'vaccination')
   const [date, setDate] = useState(record?.date || new Date().toISOString().split('T')[0])
   const [description, setDescription] = useState(record?.description || '')
-  const [veterinarian, setVeterinarian] = useState(record?.veterinarian || '')
+  const [veterinarianId, setVeterinarianId] = useState<string | null>(record?.veterinarian_id || null)
+  const [veterinarianName, setVeterinarianName] = useState<string>(record?.veterinarian || '')
   const [nextDueDate, setNextDueDate] = useState(record?.next_due_date || '')
   const [cost, setCost] = useState(record?.cost?.toString() || '')
   const [notes, setNotes] = useState(record?.notes || '')
 
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+
+  function handleVetChange(vetId: string | null, displayName: string | null) {
+    setVeterinarianId(vetId)
+    setVeterinarianName(displayName || '')
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -53,18 +61,20 @@ export function HealthRecordForm({ animalId, record, onClose }: Readonly<HealthR
       return
     }
 
-    startTransition(async () => {
-      if (isEditing) {
-        const result = await updateHealthRecord(record.id, {
-          type,
-          date,
-          description: description.trim(),
-          veterinarian: veterinarian.trim() || null,
-          next_due_date: nextDueDate || null,
-          cost: cost ? parseFloat(cost) : null,
-          notes: notes.trim() || null,
-        })
+    const payload = {
+      type,
+      date,
+      description: description.trim(),
+      veterinarian: veterinarianName.trim() || null,
+      veterinarian_id: veterinarianId,
+      next_due_date: nextDueDate || null,
+      cost: cost ? parseFloat(cost) : null,
+      notes: notes.trim() || null,
+    }
 
+    startTransition(async () => {
+      if (isEditing && record) {
+        const result = await updateHealthRecord(record.id, payload)
         if (result.error) {
           toast.error(result.error)
         } else {
@@ -75,14 +85,8 @@ export function HealthRecordForm({ animalId, record, onClose }: Readonly<HealthR
       } else {
         const result = await createHealthRecord({
           animal_id: animalId,
-          type,
-          description: description.trim(),
-          veterinarian: veterinarian.trim() || null,
-          next_due_date: nextDueDate || null,
-          cost: cost ? parseFloat(cost) : null,
-          notes: notes.trim() || null,
+          ...payload,
         })
-
         if (result.error) {
           toast.error(result.error)
         } else {
@@ -145,17 +149,13 @@ export function HealthRecordForm({ animalId, record, onClose }: Readonly<HealthR
 
       {/* Row 3: Veterinaire + Cout */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="health-veterinarian" className={labelClass}>Veterinaire</label>
-          <input
-            id="health-veterinarian"
-            type="text"
-            value={veterinarian}
-            onChange={(e) => setVeterinarian(e.target.value)}
-            placeholder="Nom du veterinaire"
-            className={inputClass}
-          />
-        </div>
+        <VeterinarianSelect
+          id="health-vet-select"
+          value={veterinarianId}
+          onChange={handleVetChange}
+          inputClass={inputClass}
+          labelClass={labelClass}
+        />
 
         <div>
           <label htmlFor="health-cost" className={labelClass}>Cout (EUR)</label>

@@ -8,6 +8,7 @@ import { AnimalStatusChanger } from '@/components/animals/animal-status-changer'
 import { getSexIcon, calculateAge, getOriginLabel } from '@/lib/sda-utils'
 import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, AnimalTreatment, Box, SocialPost, IcadDeclaration, ActivityLog } from '@/lib/types/database'
 import { getTreatments } from '@/lib/actions/treatments'
+import { getHealthProtocols } from '@/lib/actions/health-protocols'
 import { getActivityLogs } from '@/lib/actions/activity-log'
 import { getOutings } from '@/lib/actions/outings'
 import { ArrowLeft } from 'lucide-react'
@@ -42,6 +43,7 @@ async function fetchAnimalData(admin: SupabaseAdmin, id: string, estabId: string
     { data: boxes },
     { data: socialPosts },
     { data: icadDeclarations },
+    { data: fosterContracts },
   ] = await Promise.all([
     admin.from('animals').select('*').eq('id', id).eq('establishment_id', estabId).single(),
     admin.from('animal_photos').select('*').eq('animal_id', id).order('is_primary', { ascending: false }),
@@ -50,6 +52,12 @@ async function fetchAnimalData(admin: SupabaseAdmin, id: string, estabId: string
     admin.from('boxes').select('*').eq('establishment_id', estabId).order('name'),
     admin.from('social_posts').select('*').eq('animal_id', id).order('created_at', { ascending: false }),
     admin.from('icad_declarations').select('*').eq('animal_id', id).order('created_at', { ascending: false }),
+    admin
+      .from('foster_contracts')
+      .select('*, foster:clients!foster_client_id(id, name, email, phone, city)')
+      .eq('animal_id', id)
+      .eq('establishment_id', estabId)
+      .order('start_date', { ascending: false }),
   ])
 
   return {
@@ -60,6 +68,7 @@ async function fetchAnimalData(admin: SupabaseAdmin, id: string, estabId: string
     boxes: (boxes as Box[]) || [],
     socialPosts: (socialPosts as SocialPost[]) || [],
     icadDeclarations: (icadDeclarations as IcadDeclaration[]) || [],
+    fosterContracts: fosterContracts || [],
   }
 }
 
@@ -84,12 +93,14 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
   const data = await fetchAnimalData(admin, id, estabId)
   if (!data.animal) notFound()
 
-  const [outingsResult, treatmentsResult] = await Promise.all([
+  const [outingsResult, treatmentsResult, protocolsResult] = await Promise.all([
     getOutings({ animalId: id, limit: 100 }),
     getTreatments({ animalId: id }),
+    getHealthProtocols({ activeOnly: true, species: data.animal.species }),
   ])
   const outings = outingsResult.data || []
   const treatments = (treatmentsResult.data || []) as AnimalTreatment[]
+  const healthProtocols = protocolsResult.data || []
 
   // Collect user IDs from movements, health records, and outings
   const allCreatedByIds = [
@@ -154,6 +165,8 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
         outings={outings}
         socialPosts={data.socialPosts}
         icadDeclarations={data.icadDeclarations}
+        fosterContracts={data.fosterContracts}
+        healthProtocols={healthProtocols}
         boxes={data.boxes}
         userNames={userNames}
         establishmentName={ctx!.establishment.name}

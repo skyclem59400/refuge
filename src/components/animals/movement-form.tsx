@@ -15,6 +15,7 @@ interface MovementFormProps {
 const movementsByStatus: Record<string, { value: MovementType; label: string }[]> = {
   pound: [
     { value: 'shelter_transfer', label: 'Transfert en refuge' },
+    { value: 'foster_placement', label: 'Placement en famille d’accueil' },
     { value: 'return_to_owner', label: 'Restitution au proprietaire' },
     { value: 'transfer_out', label: 'Transfert vers autre refuge' },
     { value: 'death', label: 'Deces' },
@@ -22,6 +23,7 @@ const movementsByStatus: Record<string, { value: MovementType; label: string }[]
   ],
   shelter: [
     { value: 'adoption', label: 'Adoption' },
+    { value: 'foster_placement', label: 'Placement en famille d’accueil' },
     { value: 'return_to_owner', label: 'Restitution au proprietaire' },
     { value: 'transfer_out', label: 'Transfert vers autre refuge' },
     { value: 'death', label: 'Deces' },
@@ -57,6 +59,7 @@ const movementsByStatus: Record<string, { value: MovementType; label: string }[]
 const movementSuccessMessages: Record<MovementType, string> = {
   pound_entry: 'Entree en fourriere enregistree',
   shelter_transfer: 'Transfert en refuge enregistre',
+  foster_placement: 'Placement en famille d’accueil enregistre',
   adoption: 'Adoption enregistree',
   return_to_owner: 'Restitution au proprietaire enregistree',
   transfer_out: 'Transfert enregistre',

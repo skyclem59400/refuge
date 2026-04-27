@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Loader2, Sparkles } from 'lucide-react'
 import { createAnimal, updateAnimal } from '@/lib/actions/animals'
 import { CommuneAutocomplete } from '@/components/ui/commune-autocomplete'
+import { VeterinarianSelect } from '@/components/health/veterinarian-select'
 import { getBreedsForSpecies } from '@/lib/breeds'
 import type { Animal, Box, AnimalSpecies, AnimalSex, AnimalOrigin } from '@/lib/types/database'
 
@@ -44,6 +45,8 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
   const [medalNumber] = useState(animal?.medal_number || '')
   const [loofNumber, setLoofNumber] = useState(animal?.loof_number || '')
   const [passportNumber, setPassportNumber] = useState(animal?.passport_number || '')
+  const [identificationDate, setIdentificationDate] = useState(animal?.identification_date || '')
+  const [identifyingVetId, setIdentifyingVetId] = useState<string | null>(animal?.identifying_veterinarian_id || null)
 
   // Capture fields (only for creation)
   const [captureLocation, setCaptureLocation] = useState(animal?.capture_location || '')
@@ -82,6 +85,8 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
         medal_number: medalNumber || null,
         loof_number: loofNumber || null,
         passport_number: passportNumber || null,
+        identification_date: identificationDate || null,
+        identifying_veterinarian_id: identifyingVetId || null,
         capture_location: captureLocation || null,
         capture_circumstances: captureCircumstances || null,
         ok_cats: species === 'dog' ? okCats : null,
@@ -496,7 +501,7 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
 
           {/* Numero de passeport */}
           <div>
-            <label htmlFor="animal-passport-number" className={labelClass}>Numero de passeport</label>
+            <label htmlFor="animal-passport-number" className={labelClass}>Numero de passeport europeen</label>
             <input
               id="animal-passport-number"
               type="text"
@@ -504,6 +509,30 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
               onChange={(e) => setPassportNumber(e.target.value)}
               placeholder="Numero de passeport"
               className={inputClass}
+            />
+          </div>
+
+          {/* Date d'identification */}
+          <div>
+            <label htmlFor="animal-identification-date" className={labelClass}>Date d&apos;identification</label>
+            <input
+              id="animal-identification-date"
+              type="date"
+              value={identificationDate}
+              onChange={(e) => setIdentificationDate(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+
+          {/* Veterinaire identifiant */}
+          <div className="md:col-span-2 lg:col-span-2">
+            <VeterinarianSelect
+              id="animal-identifying-vet"
+              value={identifyingVetId}
+              onChange={(vetId) => setIdentifyingVetId(vetId)}
+              inputClass={inputClass}
+              labelClass={labelClass}
+              label="Veterinaire identifiant"
             />
           </div>
         </div>

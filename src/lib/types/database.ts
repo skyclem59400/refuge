@@ -192,7 +192,7 @@ export type AnimalSpecies = 'cat' | 'dog'
 export type AnimalSex = 'male' | 'female' | 'unknown'
 export type AnimalStatus = 'pound' | 'shelter' | 'foster_family' | 'boarding' | 'adopted' | 'returned' | 'transferred' | 'deceased' | 'euthanized'
 export type AnimalOrigin = 'found' | 'abandoned' | 'transferred_in' | 'surrender' | 'requisition' | 'divagation'
-export type MovementType = 'pound_entry' | 'shelter_transfer' | 'adoption' | 'return_to_owner' | 'transfer_out' | 'death' | 'euthanasia'
+export type MovementType = 'pound_entry' | 'shelter_transfer' | 'foster_placement' | 'adoption' | 'return_to_owner' | 'transfer_out' | 'death' | 'euthanasia'
 export type HealthRecordType = 'vaccination' | 'sterilization' | 'antiparasitic' | 'consultation' | 'surgery' | 'medication' | 'behavioral_assessment'
 export type IcadStatus = 'pending' | 'declared' | 'not_required'
 export type BoxSpecies = 'cat' | 'dog' | 'mixed'
@@ -231,6 +231,8 @@ export interface Animal {
   medal_number: string | null
   loof_number: string | null
   passport_number: string | null
+  identification_date: string | null
+  identifying_veterinarian_id: string | null
   icad_updated: boolean
   status: AnimalStatus
   behavior_score: number | null
@@ -361,11 +363,138 @@ export interface AnimalHealthRecord {
   date: string
   description: string
   veterinarian: string | null
+  veterinarian_id: string | null
   next_due_date: string | null
   cost: number | null
   notes: string | null
+  protocol_instance_id: string | null
+  protocol_step_id: string | null
   created_by: string | null
   created_at: string
+}
+
+// ============================================
+// Veterinary clinics and practitioners
+// ============================================
+
+export interface VeterinaryClinic {
+  id: string
+  establishment_id: string
+  name: string
+  address: string | null
+  postal_code: string | null
+  city: string | null
+  phone: string | null
+  email: string | null
+  website: string | null
+  siret: string | null
+  notes: string | null
+  is_default: boolean
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface Veterinarian {
+  id: string
+  clinic_id: string
+  first_name: string | null
+  last_name: string
+  ordre_number: string | null
+  specialty: string | null
+  phone: string | null
+  email: string | null
+  is_referent: boolean
+  is_active: boolean
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface VeterinaryClinicWithVets extends VeterinaryClinic {
+  veterinarians: Veterinarian[]
+}
+
+export interface VeterinarianWithClinic extends Veterinarian {
+  clinic: Pick<VeterinaryClinic, 'id' | 'name' | 'city'>
+}
+
+// ============================================
+// Foster Contracts (Convention famille d'accueil)
+// ============================================
+
+export type FosterContractStatus = 'draft' | 'active' | 'ended' | 'cancelled'
+
+export interface FosterContract {
+  id: string
+  establishment_id: string
+  animal_id: string
+  foster_client_id: string
+  contract_number: string
+  start_date: string
+  expected_end_date: string | null
+  actual_end_date: string | null
+  status: FosterContractStatus
+  vet_costs_covered_by_shelter: boolean
+  food_provided_by_shelter: boolean
+  insurance_required: boolean
+  household_consent: boolean
+  other_animals_at_home: string | null
+  special_conditions: string | null
+  signed_at_location: string | null
+  signed_at: string | null
+  notes: string | null
+  pdf_url: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ============================================
+// Health Protocols (modeles de soins avec rappels)
+// ============================================
+
+export type ProtocolApplicableSpecies = 'cat' | 'dog' | 'both'
+export type ProtocolInstanceStatus = 'active' | 'completed' | 'cancelled'
+
+export interface HealthProtocol {
+  id: string
+  establishment_id: string
+  name: string
+  description: string | null
+  applicable_species: ProtocolApplicableSpecies
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface HealthProtocolStep {
+  id: string
+  protocol_id: string
+  step_order: number
+  label: string
+  health_record_type: HealthRecordType
+  offset_days: number
+  recurrence_days: number | null
+  description: string | null
+  created_at: string
+}
+
+export interface HealthProtocolWithSteps extends HealthProtocol {
+  steps: HealthProtocolStep[]
+}
+
+export interface AnimalProtocolInstance {
+  id: string
+  animal_id: string
+  protocol_id: string
+  start_date: string
+  status: ProtocolInstanceStatus
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
 }
 
 export type TreatmentFrequency = 'daily' | 'twice_daily' | 'weekly' | 'custom'
@@ -811,6 +940,7 @@ export type NotificationType =
   | 'leave_request_refused'
   | 'payslip_uploaded'
   | 'treatment_new'
+  | 'health_reminder'
   | 'general'
 
 export interface Notification {
