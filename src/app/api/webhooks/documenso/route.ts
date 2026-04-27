@@ -5,7 +5,7 @@ import { downloadSignedPdf } from '@/lib/documenso/client'
 import type { SignatureStatus } from '@/lib/types/database'
 
 // Documenso webhook events we care about:
-//   document.viewed     -> recipient opened the link
+//   document.opened     -> recipient opened the link
 //   document.signed     -> a recipient signed (one of N)
 //   document.completed  -> all recipients have signed (final state)
 //   document.rejected   -> a recipient rejected
@@ -53,13 +53,16 @@ function verifySignature(body: string, signature: string | null, secret: string)
 
 function mapEventToStatus(event: string): SignatureStatus | null {
   switch (event) {
-    case 'document.viewed':
+    case 'document.opened':
       return 'viewed'
     case 'document.signed':
     case 'document.completed':
+    case 'document.recipient.completed':
       return 'signed'
     case 'document.rejected':
       return 'rejected'
+    case 'document.cancelled':
+      return 'failed'
     default:
       return null
   }
@@ -126,12 +129,15 @@ export async function POST(request: NextRequest) {
   if (firstSigned?.signedAt) {
     updateData.signed_at_via_documenso = firstSigned.signedAt
   }
-  if (newStatus === 'viewed') {
+  if (newStatus === 'viewed' && !updateData.signature_viewed_at) {
     updateData.signature_viewed_at = new Date().toISOString()
   }
 
-  // Once signed, also fetch the signed PDF and stash its URL
-  if (newStatus === 'signed' && contract.signature_status !== 'signed') {
+  // Once signed, also fetch the signed PDF and stash its URL.
+  // Only do this on completion events (not on every recipient signing) to
+  // avoid downloading partial documents if multiple recipients exist.
+  const finalEvent = payload.event === 'document.completed' || payload.event === 'document.signed'
+  if (newStatus === 'signed' && finalEvent && contract.signature_status !== 'signed') {
     try {
       const buf = await downloadSignedPdf(documensoDocId)
       const fileName = `signed_${contract.id}_${Date.now()}.pdf`
