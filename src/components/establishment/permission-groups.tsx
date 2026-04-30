@@ -33,14 +33,13 @@ const PERMISSION_LABELS: { key: Permission; label: string }[] = [
   { key: 'manage_payslips', label: 'Bulletins de paie' },
 ]
 
-function ToggleSwitch({ checked, onChange, disabled }: Readonly<{ checked: boolean; onChange: () => void; disabled?: boolean }>) {
+function ToggleSwitch({ checked, onChange, pending }: Readonly<{ checked: boolean; onChange: () => void; pending?: boolean }>) {
   return (
     <button
       type="button"
       onClick={onChange}
-      disabled={disabled}
-      className={`relative w-9 h-5 rounded-full transition-colors shrink-0
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+      className={`relative w-9 h-5 rounded-full transition-colors shrink-0 cursor-pointer
+        ${pending ? 'animate-pulse' : ''}
         ${checked ? 'bg-primary' : 'bg-border'}`}
     >
       <span
@@ -62,28 +61,42 @@ export function PermissionGroups({ groups: initialGroups }: PermissionGroupsProp
   const [showCreate, setShowCreate] = useState(false)
   const [editingNameId, setEditingNameId] = useState<string | null>(null)
   const [editingNameValue, setEditingNameValue] = useState('')
+  // Track des toggles en cours individuellement (clé = "groupId:permission")
+  const [pendingToggles, setPendingToggles] = useState<Set<string>>(new Set())
   const router = useRouter()
 
   useEffect(() => { setGroups(initialGroups) }, [initialGroups])
 
-  const togglePermissionAction = async (groupId: string, permission: Permission, currentValue: boolean) => {
-    const result = await updatePermissionGroup(groupId, { [permission]: !currentValue })
-    if (result.error) {
-      toast.error(result.error)
-      // Revert
-      setGroups(prev => prev.map(g =>
-        g.id === groupId ? { ...g, [permission]: currentValue } : g
-      ))
-    }
-  }
-
   const handleTogglePermission = (groupId: string, permission: Permission, currentValue: boolean) => {
-    // Optimistic update
+    const toggleKey = `${groupId}:${permission}`
+
+    // Optimistic update : on bascule la valeur immédiatement
     setGroups(prev => prev.map(g =>
       g.id === groupId ? { ...g, [permission]: !currentValue } : g
     ))
+    // Marquer ce toggle comme en cours (pulse visuel)
+    setPendingToggles(prev => {
+      const next = new Set(prev)
+      next.add(toggleKey)
+      return next
+    })
 
-    startTransition(() => togglePermissionAction(groupId, permission, currentValue))
+    // Appel async non-bloquant (pas de startTransition pour ne pas geler les autres toggles)
+    void (async () => {
+      const result = await updatePermissionGroup(groupId, { [permission]: !currentValue })
+      setPendingToggles(prev => {
+        const next = new Set(prev)
+        next.delete(toggleKey)
+        return next
+      })
+      if (result.error) {
+        toast.error(result.error)
+        // Revert sur erreur
+        setGroups(prev => prev.map(g =>
+          g.id === groupId ? { ...g, [permission]: currentValue } : g
+        ))
+      }
+    })()
   }
 
   const createGroupAction = async () => {
@@ -260,7 +273,7 @@ export function PermissionGroups({ groups: initialGroups }: PermissionGroupsProp
                   <ToggleSwitch
                     checked={!!group[key]}
                     onChange={() => handleTogglePermission(group.id, key, !!group[key])}
-                    disabled={isPending}
+                    pending={pendingToggles.has(`${group.id}:${key}`)}
                   />
                 </div>
               ))}

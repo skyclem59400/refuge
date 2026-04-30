@@ -244,7 +244,10 @@ export async function updatePermissionGroup(groupId: string, data: Partial<{
 
     if (error) return { error: error.message }
 
-    revalidatePath('/etablissement')
+    // Pas de revalidatePath('/etablissement') ici : il déclenchait un re-fetch
+    // complet de la page (members, groupes, counts...) qui bloquait l'UI ~30s
+    // à chaque toggle de permission. L'UI front gère déjà l'optimistic update.
+    // Les autres pages relisent les permissions au prochain chargement.
     logActivity({ action: 'update', entityType: 'permission_group', entityId: groupId, entityName: data.name })
     return { success: true }
   } catch (e) {
