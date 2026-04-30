@@ -597,6 +597,7 @@ function HealthTab({
           animalId={animal.id}
           judicialAnimal={animal.judicial_procedure}
           judicialBillingDefault={animal.judicial_billing_recipient}
+          currentChipNumber={animal.chip_number}
           onClose={onToggleForm}
         />
       )}

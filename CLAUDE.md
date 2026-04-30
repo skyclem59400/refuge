@@ -2,14 +2,14 @@
 
 ## Projet
 
-Application de gestion pour **La Ferme O 4 Vents** (refuge pour animaux, region Nord).
+Application de gestion pour **La Ferme Ô 4 Vents** (refuge/ferme pédagogique, région Nord) et **SDA d'Estourmel**.
 Nom interne : **Optimus**.
 
 - **Stack** : Next.js 16 (App Router) + TypeScript + Tailwind CSS v4 + Supabase (PostgreSQL, Auth, Storage) + Puppeteer (PDF) + Recharts (graphiques)
 - **Deploiement** : Docker multi-stage via Coolify sur VPS, auto-deploy sur push main
 - **Repo** : `https://github.com/skyclem59400/refuge.git`
 - **Admin principal** : `clement.scailteux@gmail.com`
-- **URL prod** : `https://crm.skyclem.fr`
+- **URL prod** : `https://sda.optimus-services.fr` (anciennement `crm.skyclem.fr` — domaine retiré)
 - **Supabase** : `https://zzevrtrgtgnlxxuwbnge.supabase.co`
 
 ## Commandes
@@ -184,7 +184,7 @@ Ce fichier est **OBSOLETE**. Il a ete remplace par les 3 scripts sequentiels ci-
   - `NEXT_PUBLIC_SUPABASE_URL` (build + runtime)
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (build + runtime)
   - `SUPABASE_SERVICE_ROLE_KEY` (runtime seulement)
-- **Redirect URL** Supabase Auth : `https://crm.skyclem.fr/auth/callback`
+- **Redirect URL** Supabase Auth : `https://sda.optimus-services.fr/auth/callback`
 
 ## Git
 
@@ -220,7 +220,7 @@ user.email: c.scailteux@sda-nord.com
 ## Methode de travail
 
 ### Skills disponibles
-Avant toute tache complexe, consulte les skills dans `~/.gemini/antigravity/scratch/skills/superpowers/`. Lis le SKILL.md correspondant avant d'agir.
+Avant toute tache complexe, consulte les skills dans `~/Projets/claude/skills/superpowers/`. Lis le SKILL.md correspondant avant d'agir.
 
 ### Agents paralleles
 Pour toute tache touchant **2+ fichiers independants**, utilise le pattern de dispatching d'agents paralleles (Task tool) :

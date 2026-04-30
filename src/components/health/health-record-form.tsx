@@ -26,6 +26,8 @@ interface HealthRecordFormProps {
   judicialAnimal?: boolean
   /** Suggestion par défaut du destinataire de la facture quand l'animal est en procédure */
   judicialBillingDefault?: string | null
+  /** N° de puce déjà saisi sur la fiche animal (pré-rempli pour le bloc Identification) */
+  currentChipNumber?: string | null
   record?: {
     id: string
     type: HealthRecordType
@@ -43,7 +45,7 @@ interface HealthRecordFormProps {
   onClose?: () => void
 }
 
-export function HealthRecordForm({ animalId, record, onClose, judicialAnimal = false, judicialBillingDefault = null }: Readonly<HealthRecordFormProps>) {
+export function HealthRecordForm({ animalId, record, onClose, judicialAnimal = false, judicialBillingDefault = null, currentChipNumber = null }: Readonly<HealthRecordFormProps>) {
   const isEditing = !!record
 
   const [type, setType] = useState<HealthRecordType>(record?.type || 'vaccination')
@@ -57,6 +59,8 @@ export function HealthRecordForm({ animalId, record, onClose, judicialAnimal = f
   const [judicialProcedure, setJudicialProcedure] = useState<boolean>(record?.judicial_procedure ?? judicialAnimal)
   const [billedTo, setBilledTo] = useState<string>(record?.billed_to || judicialBillingDefault || '')
   const [invoiceReference, setInvoiceReference] = useState<string>(record?.invoice_reference || '')
+  const [chipNumber, setChipNumber] = useState<string>(currentChipNumber || '')
+  const [reportToAnimal, setReportToAnimal] = useState<boolean>(true)
 
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -74,6 +78,12 @@ export function HealthRecordForm({ animalId, record, onClose, judicialAnimal = f
       return
     }
 
+    // Pour un acte d'identification, exiger le n° de puce
+    if (type === 'identification' && !chipNumber.trim()) {
+      toast.error('Le n° de puce est obligatoire pour un acte d’identification')
+      return
+    }
+
     const payload = {
       type,
       date,
@@ -86,6 +96,9 @@ export function HealthRecordForm({ animalId, record, onClose, judicialAnimal = f
       judicial_procedure: judicialProcedure,
       billed_to: judicialProcedure ? (billedTo.trim() || null) : null,
       invoice_reference: judicialProcedure ? (invoiceReference.trim() || null) : null,
+      // Si type=identification et report activé, on remonte aussi sur l'animal
+      identification_chip_number: type === 'identification' && reportToAnimal ? chipNumber.trim() : undefined,
+      identification_date: type === 'identification' && reportToAnimal ? date : undefined,
     }
 
     startTransition(async () => {
@@ -94,7 +107,7 @@ export function HealthRecordForm({ animalId, record, onClose, judicialAnimal = f
         if (result.error) {
           toast.error(result.error)
         } else {
-          toast.success('Fiche sante mise a jour')
+          toast.success(type === 'identification' && reportToAnimal ? 'Acte enregistré et puce mise à jour sur la fiche animal' : 'Fiche sante mise a jour')
           onClose?.()
           router.refresh()
         }
@@ -106,7 +119,7 @@ export function HealthRecordForm({ animalId, record, onClose, judicialAnimal = f
         if (result.error) {
           toast.error(result.error)
         } else {
-          toast.success('Fiche sante enregistree')
+          toast.success(type === 'identification' && reportToAnimal ? 'Acte enregistré et puce mise à jour sur la fiche animal' : 'Fiche sante enregistree')
           onClose?.()
           router.refresh()
         }
@@ -167,6 +180,48 @@ export function HealthRecordForm({ animalId, record, onClose, judicialAnimal = f
         </div>
       </div>
 
+      {/* Bloc spécifique : Identification (pose de puce) */}
+      {type === 'identification' && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+          <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+            🔬 Identification (pose de puce)
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="health-chip-number" className={labelClass}>N° de puce *</label>
+              <input
+                id="health-chip-number"
+                type="text"
+                value={chipNumber}
+                onChange={(e) => setChipNumber(e.target.value)}
+                placeholder="250..."
+                required
+                className={inputClass}
+              />
+              {currentChipNumber && chipNumber !== currentChipNumber && (
+                <p className="text-xs text-warning mt-1">
+                  ⚠️ La fiche contient déjà la puce <strong>{currentChipNumber}</strong> — sera remplacée.
+                </p>
+              )}
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 text-sm pb-2">
+                <input
+                  type="checkbox"
+                  checked={reportToAnimal}
+                  onChange={(e) => setReportToAnimal(e.target.checked)}
+                />
+                <span>Reporter sur la fiche animal (puce + date + véto)</span>
+              </label>
+            </div>
+          </div>
+          <p className="text-xs text-muted">
+            Le n° de puce, la date et le vétérinaire identifiant seront automatiquement enregistrés
+            sur la fiche de l&apos;animal pour servir aux certificats et déclarations I-CAD.
+          </p>
+        </div>
+      )}
+
       {/* Row 2: Description (full width) */}
       <div>
         <label htmlFor="health-description" className={labelClass}>Description *</label>
@@ -174,7 +229,7 @@ export function HealthRecordForm({ animalId, record, onClose, judicialAnimal = f
           id="health-description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Decrivez l'acte de sante realise..."
+          placeholder={type === 'identification' ? "Lieu d'identification, méthode (puce sous-cutanée), particularités..." : "Decrivez l'acte de sante realise..."}
           rows={3}
           required
           className={`${inputClass} resize-y`}

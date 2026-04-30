@@ -118,10 +118,15 @@ export async function createHealthRecord(data: {
   judicial_procedure?: boolean
   billed_to?: string | null
   invoice_reference?: string | null
+  /** Si type=identification, n° de puce à reporter sur l'animal */
+  identification_chip_number?: string
+  /** Si type=identification, date à reporter sur l'animal */
+  identification_date?: string
 }) {
   try {
     const { userId } = await requirePermission('manage_health')
     const supabase = await createClient()
+    const admin = createAdminClient()
 
     const { data: record, error } = await supabase
       .from('animal_health_records')
@@ -147,6 +152,25 @@ export async function createHealthRecord(data: {
       return { error: error.message }
     }
 
+    // Si acte d'identification : reporter automatiquement la puce + date + véto sur la fiche animal
+    if (data.type === 'identification' && data.identification_chip_number) {
+      const animalUpdate: Record<string, unknown> = {
+        chip_number: data.identification_chip_number.trim(),
+      }
+      if (data.identification_date) animalUpdate.identification_date = data.identification_date
+      if (data.veterinarian_id) animalUpdate.identifying_veterinarian_id = data.veterinarian_id
+
+      const { error: animalErr } = await admin
+        .from('animals')
+        .update(animalUpdate)
+        .eq('id', data.animal_id)
+
+      if (animalErr) {
+        console.error('Erreur report puce sur animal :', animalErr)
+        // On n'invalide pas la création de l'acte santé pour autant
+      }
+    }
+
     revalidatePath('/health')
     revalidatePath(`/animals/${data.animal_id}`)
     logActivity({ action: 'create', entityType: 'health_record', entityId: record.id, entityName: data.type, parentType: 'animal', parentId: data.animal_id })
@@ -168,6 +192,8 @@ export async function updateHealthRecord(id: string, data: {
   judicial_procedure?: boolean
   billed_to?: string | null
   invoice_reference?: string | null
+  identification_chip_number?: string
+  identification_date?: string
 }) {
   try {
     await requirePermission('manage_health')
@@ -181,16 +207,34 @@ export async function updateHealthRecord(id: string, data: {
       .eq('id', id)
       .single()
 
+    // On exclut les champs spéciaux de report animal du UPDATE de l'acte
+    const { identification_chip_number, identification_date, ...recordUpdate } = data
     const { error } = await supabase
       .from('animal_health_records')
-      .update(data)
+      .update(recordUpdate)
       .eq('id', id)
 
     if (error) {
       return { error: error.message }
     }
 
-    const changes = trackChanges(currentRecord, data)
+    // Report sur la fiche animal si acte d'identification
+    if (data.type === 'identification' && identification_chip_number && currentRecord?.animal_id) {
+      const animalUpdate: Record<string, unknown> = {
+        chip_number: identification_chip_number.trim(),
+      }
+      if (identification_date) animalUpdate.identification_date = identification_date
+      if (data.veterinarian_id) animalUpdate.identifying_veterinarian_id = data.veterinarian_id
+
+      const { error: animalErr } = await admin
+        .from('animals')
+        .update(animalUpdate)
+        .eq('id', currentRecord.animal_id)
+
+      if (animalErr) console.error('Erreur report puce sur animal :', animalErr)
+    }
+
+    const changes = trackChanges(currentRecord, recordUpdate)
 
     revalidatePath('/health')
     logActivity({
