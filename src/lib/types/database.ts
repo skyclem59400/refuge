@@ -257,6 +257,14 @@ export interface Animal {
   hunimalis_id: number | null
   photo_url: string | null
   last_synced_at: string | null
+  // Procédure judiciaire
+  judicial_procedure: boolean
+  judicial_case_number: string | null
+  judicial_jurisdiction: string | null
+  judicial_seizure_date: string | null
+  judicial_owner_name: string | null
+  judicial_billing_recipient: string | null
+  judicial_notes: string | null
   created_at: string
   updated_at: string
 }
@@ -371,6 +379,9 @@ export interface AnimalHealthRecord {
   notes: string | null
   protocol_instance_id: string | null
   protocol_step_id: string | null
+  judicial_procedure: boolean
+  billed_to: string | null
+  invoice_reference: string | null
   created_by: string | null
   created_at: string
 }

@@ -136,6 +136,14 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
             </h1>
             <AnimalStatusBadge status={data.animal.status} />
             <SpeciesBadge species={data.animal.species} />
+            {data.animal.judicial_procedure && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-error/15 text-error border border-error/30"
+                title={`Procédure judiciaire${data.animal.judicial_case_number ? ` - Dossier ${data.animal.judicial_case_number}` : ''}`}
+              >
+                ⚖️ EN PROCÉDURE
+              </span>
+            )}
             {canManageMovements && (
               <AnimalStatusChanger
                 animalId={data.animal.id}

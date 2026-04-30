@@ -115,6 +115,9 @@ export async function createHealthRecord(data: {
   next_due_date?: string | null
   cost?: number | null
   notes?: string | null
+  judicial_procedure?: boolean
+  billed_to?: string | null
+  invoice_reference?: string | null
 }) {
   try {
     const { userId } = await requirePermission('manage_health')
@@ -132,6 +135,9 @@ export async function createHealthRecord(data: {
         next_due_date: data.next_due_date ?? null,
         cost: data.cost ?? null,
         notes: data.notes ?? null,
+        judicial_procedure: data.judicial_procedure ?? false,
+        billed_to: data.billed_to ?? null,
+        invoice_reference: data.invoice_reference ?? null,
         created_by: userId,
       })
       .select()
@@ -159,6 +165,9 @@ export async function updateHealthRecord(id: string, data: {
   next_due_date?: string | null
   cost?: number | null
   notes?: string | null
+  judicial_procedure?: boolean
+  billed_to?: string | null
+  invoice_reference?: string | null
 }) {
   try {
     await requirePermission('manage_health')

@@ -52,6 +52,15 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
   const [captureLocation, setCaptureLocation] = useState(animal?.capture_location || '')
   const [captureCircumstances, setCaptureCircumstances] = useState(animal?.capture_circumstances || '')
 
+  // Procédure judiciaire
+  const [judicialProcedure, setJudicialProcedure] = useState(animal?.judicial_procedure || false)
+  const [judicialCaseNumber, setJudicialCaseNumber] = useState(animal?.judicial_case_number || '')
+  const [judicialJurisdiction, setJudicialJurisdiction] = useState(animal?.judicial_jurisdiction || '')
+  const [judicialSeizureDate, setJudicialSeizureDate] = useState(animal?.judicial_seizure_date || '')
+  const [judicialOwnerName, setJudicialOwnerName] = useState(animal?.judicial_owner_name || '')
+  const [judicialBillingRecipient, setJudicialBillingRecipient] = useState(animal?.judicial_billing_recipient || '')
+  const [judicialNotes, setJudicialNotes] = useState(animal?.judicial_notes || '')
+
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -92,6 +101,13 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
         ok_cats: species === 'dog' ? okCats : null,
         ok_males: species === 'dog' ? okMales : null,
         ok_females: species === 'dog' ? okFemales : null,
+        judicial_procedure: judicialProcedure,
+        judicial_case_number: judicialProcedure ? (judicialCaseNumber.trim() || null) : null,
+        judicial_jurisdiction: judicialProcedure ? (judicialJurisdiction.trim() || null) : null,
+        judicial_seizure_date: judicialProcedure ? (judicialSeizureDate || null) : null,
+        judicial_owner_name: judicialProcedure ? (judicialOwnerName.trim() || null) : null,
+        judicial_billing_recipient: judicialProcedure ? (judicialBillingRecipient.trim() || null) : null,
+        judicial_notes: judicialProcedure ? (judicialNotes.trim() || null) : null,
       }
 
       if (isEditing) {
@@ -107,11 +123,28 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
           ...data,
           status: 'pound',
         })
+        if ('duplicate' in result && result.duplicate) {
+          const d = result.duplicate
+          const created = new Date(d.created_at).toLocaleString('fr-FR')
+          const message = `Un animal nommé "${d.name}" (médaille ${d.medal_number || '—'}) a déjà été créé le ${created}.\n\nVoulez-vous ouvrir ce dossier existant ?\n\nOK = ouvrir le dossier existant\nAnnuler = créer quand même un nouveau dossier`
+          if (confirm(message)) {
+            router.push(`/animals/${d.id}/edit`)
+            return
+          }
+          const forced = await createAnimal({ ...data, status: 'pound', force: true })
+          if (forced.error) {
+            toast.error(forced.error)
+          } else if (forced.data) {
+            toast.success('Animal enregistre')
+            router.push(`/animals/${forced.data.id}`)
+          }
+          return
+        }
         if (result.error) {
           toast.error(result.error)
-        } else {
+        } else if (result.data) {
           toast.success('Animal enregistre')
-          router.push(`/animals/${result.data!.id}`)
+          router.push(`/animals/${result.data.id}`)
         }
       }
     })
@@ -582,6 +615,104 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
           </div>
         </div>
       )}
+
+      {/* Section: Procédure judiciaire */}
+      <div className="bg-surface rounded-xl border border-border p-5">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={judicialProcedure}
+            onChange={(e) => setJudicialProcedure(e.target.checked)}
+            className="mt-1"
+          />
+          <div className="flex-1">
+            <div className="text-sm font-semibold flex items-center gap-2">
+              <span>⚖️ Animal en procédure judiciaire</span>
+              {judicialProcedure && (
+                <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-error/15 text-error">
+                  EN PROCÉDURE
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted mt-0.5">
+              Cocher si l&apos;animal fait l&apos;objet d&apos;une procédure (réquisition, saisie). Les actes vétérinaires devront être facturés nominativement pour remboursement tribunal.
+            </p>
+          </div>
+        </label>
+
+        {judicialProcedure && (
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 pl-7">
+            <div>
+              <label htmlFor="judicial-case" className={labelClass}>N° de dossier</label>
+              <input
+                id="judicial-case"
+                type="text"
+                value={judicialCaseNumber}
+                onChange={(e) => setJudicialCaseNumber(e.target.value)}
+                placeholder="Ex: 2026/123"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="judicial-jur" className={labelClass}>Juridiction</label>
+              <input
+                id="judicial-jur"
+                type="text"
+                value={judicialJurisdiction}
+                onChange={(e) => setJudicialJurisdiction(e.target.value)}
+                placeholder="Tribunal de Cambrai..."
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="judicial-date" className={labelClass}>Date de saisine / réquisition</label>
+              <input
+                id="judicial-date"
+                type="date"
+                value={judicialSeizureDate}
+                onChange={(e) => setJudicialSeizureDate(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="judicial-owner" className={labelClass}>Propriétaire mis en cause</label>
+              <input
+                id="judicial-owner"
+                type="text"
+                value={judicialOwnerName}
+                onChange={(e) => setJudicialOwnerName(e.target.value)}
+                placeholder="Nom complet"
+                className={inputClass}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="judicial-billing" className={labelClass}>Destinataire facturation (clinique → SDA)</label>
+              <input
+                id="judicial-billing"
+                type="text"
+                value={judicialBillingRecipient}
+                onChange={(e) => setJudicialBillingRecipient(e.target.value)}
+                placeholder="SDA — pour remboursement tribunal"
+                className={inputClass}
+              />
+              <p className="text-xs text-muted mt-1">
+                Précisez à qui la clinique doit adresser sa facture (par défaut : SDA pour récupération auprès du tribunal).
+              </p>
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="judicial-notes" className={labelClass}>Notes procédure</label>
+              <textarea
+                id="judicial-notes"
+                value={judicialNotes}
+                onChange={(e) => setJudicialNotes(e.target.value)}
+                rows={2}
+                placeholder="Avocat, contacts, audience..."
+                className={`${inputClass} resize-y`}
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Actions */}
       <div className="flex items-center gap-3">

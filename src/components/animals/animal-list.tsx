@@ -30,6 +30,7 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
   const [adoptableFilter, setAdoptableFilter] = useState<string>('all')
   const [reservedFilter, setReservedFilter] = useState<string>('all')
   const [retirementBasketFilter, setRetirementBasketFilter] = useState<string>('all')
+  const [judicialFilter, setJudicialFilter] = useState<string>('all')
   const [isPending, startTransition] = useTransition()
   const [pendingAnimalId, setPendingAnimalId] = useState<string | null>(null)
   const [pendingField, setPendingField] = useState<'adoptable' | 'reserved' | 'retirement_basket' | null>(null)
@@ -82,8 +83,15 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
       result = result.filter((a) => a.id in optimisticRetirementBasket ? !optimisticRetirementBasket[a.id] : !a.retirement_basket)
     }
 
+    // Judicial procedure filter
+    if (judicialFilter === 'yes') {
+      result = result.filter((a) => a.judicial_procedure)
+    } else if (judicialFilter === 'no') {
+      result = result.filter((a) => !a.judicial_procedure)
+    }
+
     return result
-  }, [animals, search, speciesFilter, statusFilter, adoptableFilter, reservedFilter, retirementBasketFilter, optimisticAdoptable, optimisticReserved, optimisticRetirementBasket])
+  }, [animals, search, speciesFilter, statusFilter, adoptableFilter, reservedFilter, retirementBasketFilter, judicialFilter, optimisticAdoptable, optimisticReserved, optimisticRetirementBasket])
 
   function getPrimaryPhoto(animal: AnimalWithPhotos): string | null {
     if (animal.animal_photos && animal.animal_photos.length > 0) {
@@ -170,7 +178,7 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
     return animal.retirement_basket
   }
 
-  const hasActiveFilters = statusFilter !== 'all' || speciesFilter !== 'all' || adoptableFilter !== 'all' || reservedFilter !== 'all' || retirementBasketFilter !== 'all' || search.length >= 2
+  const hasActiveFilters = statusFilter !== 'all' || speciesFilter !== 'all' || adoptableFilter !== 'all' || reservedFilter !== 'all' || retirementBasketFilter !== 'all' || judicialFilter !== 'all' || search.length >= 2
 
   return (
     <div>
@@ -242,6 +250,16 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
           <option value="yes">Panier retraite</option>
           <option value="no">Pas en panier retraite</option>
         </select>
+        <select
+          value={judicialFilter}
+          onChange={(e) => setJudicialFilter(e.target.value)}
+          className="px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
+            focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+        >
+          <option value="all">Procédure : tous</option>
+          <option value="yes">⚖️ En procédure</option>
+          <option value="no">Hors procédure</option>
+        </select>
       </div>
 
       {/* Grid */}
@@ -301,6 +319,11 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/90 text-white backdrop-blur-sm">
                         <Home className="w-3 h-3 fill-current" />
                         Panier retraite
+                      </span>
+                    )}
+                    {animal.judicial_procedure && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-error/90 text-white backdrop-blur-sm">
+                        ⚖️ EN PROCÉDURE
                       </span>
                     )}
                   </div>

@@ -578,6 +578,16 @@ function HealthTab({
             <FileText className="w-3.5 h-3.5" />
             Certificat avant cession
           </a>
+          {animal.judicial_procedure && (
+            <a
+              href={`/api/pdf/judicial/${animal.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs border-2 border-error/40 bg-error/5 text-error hover:bg-error/10 transition-colors font-semibold"
+            >
+              ⚖️ Dossier procédure (tribunal)
+            </a>
+          )}
         </div>
       </div>
 
@@ -585,6 +595,8 @@ function HealthTab({
       {showForm && canManageHealth && (
         <HealthRecordForm
           animalId={animal.id}
+          judicialAnimal={animal.judicial_procedure}
+          judicialBillingDefault={animal.judicial_billing_recipient}
           onClose={onToggleForm}
         />
       )}

@@ -157,15 +157,50 @@ export async function createAnimal(data: {
   capture_circumstances?: string | null
   origin_type: AnimalOrigin
   box_id?: string | null
+  judicial_procedure?: boolean
+  judicial_case_number?: string | null
+  judicial_jurisdiction?: string | null
+  judicial_seizure_date?: string | null
+  judicial_owner_name?: string | null
+  judicial_billing_recipient?: string | null
+  judicial_notes?: string | null
+  /**
+   * Si true, court-circuite la détection de doublon (même nom créé dans les 24h).
+   * Utilisé quand l'utilisateur confirme explicitement qu'il s'agit bien d'un nouvel animal.
+   */
+  force?: boolean
 }) {
   try {
     const { establishmentId, userId } = await requirePermission('manage_animals')
     const supabase = await createClient()
 
     const now = new Date().toISOString()
+    const admin = createAdminClient()
+
+    // Détection de doublon : même nom créé dans les 24h sur le même établissement.
+    if (!data.force) {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      const { data: existing } = await admin
+        .from('animals')
+        .select('id, name, medal_number, created_at')
+        .eq('establishment_id', establishmentId)
+        .ilike('name', data.name.trim())
+        .gte('created_at', since)
+        .limit(1)
+      if (existing && existing.length > 0) {
+        const dup = existing[0] as { id: string; name: string; medal_number: string | null; created_at: string }
+        return {
+          duplicate: {
+            id: dup.id,
+            name: dup.name,
+            medal_number: dup.medal_number,
+            created_at: dup.created_at,
+          },
+        }
+      }
+    }
 
     // Auto-generate medal number
-    const admin = createAdminClient()
     const { data: nextMedal } = await admin.rpc('get_next_medal_number', {
       est_id: establishmentId,
     })
@@ -252,6 +287,13 @@ export async function updateAnimal(id: string, data: {
   capture_circumstances?: string | null
   origin_type?: AnimalOrigin
   box_id?: string | null
+  judicial_procedure?: boolean
+  judicial_case_number?: string | null
+  judicial_jurisdiction?: string | null
+  judicial_seizure_date?: string | null
+  judicial_owner_name?: string | null
+  judicial_billing_recipient?: string | null
+  judicial_notes?: string | null
 }) {
   try {
     const { establishmentId } = await requirePermission('manage_animals')

@@ -26,6 +26,9 @@ interface HealthRecordWithAnimal {
   notes: string | null
   protocol_instance_id: string | null
   protocol_step_id: string | null
+  judicial_procedure: boolean
+  billed_to: string | null
+  invoice_reference: string | null
   created_by: string | null
   created_at: string
   animals: {

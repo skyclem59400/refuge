@@ -22,6 +22,10 @@ const typeLabels: Record<HealthRecordType, string> = {
 
 interface HealthRecordFormProps {
   animalId: string
+  /** Si true, l'animal est en procédure judiciaire — afficher l'alerte facture nominative et activer judicial_procedure */
+  judicialAnimal?: boolean
+  /** Suggestion par défaut du destinataire de la facture quand l'animal est en procédure */
+  judicialBillingDefault?: string | null
   record?: {
     id: string
     type: HealthRecordType
@@ -32,11 +36,14 @@ interface HealthRecordFormProps {
     next_due_date: string | null
     cost: number | null
     notes: string | null
+    judicial_procedure?: boolean
+    billed_to?: string | null
+    invoice_reference?: string | null
   }
   onClose?: () => void
 }
 
-export function HealthRecordForm({ animalId, record, onClose }: Readonly<HealthRecordFormProps>) {
+export function HealthRecordForm({ animalId, record, onClose, judicialAnimal = false, judicialBillingDefault = null }: Readonly<HealthRecordFormProps>) {
   const isEditing = !!record
 
   const [type, setType] = useState<HealthRecordType>(record?.type || 'vaccination')
@@ -47,6 +54,9 @@ export function HealthRecordForm({ animalId, record, onClose }: Readonly<HealthR
   const [nextDueDate, setNextDueDate] = useState(record?.next_due_date || '')
   const [cost, setCost] = useState(record?.cost?.toString() || '')
   const [notes, setNotes] = useState(record?.notes || '')
+  const [judicialProcedure, setJudicialProcedure] = useState<boolean>(record?.judicial_procedure ?? judicialAnimal)
+  const [billedTo, setBilledTo] = useState<string>(record?.billed_to || judicialBillingDefault || '')
+  const [invoiceReference, setInvoiceReference] = useState<string>(record?.invoice_reference || '')
 
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -73,6 +83,9 @@ export function HealthRecordForm({ animalId, record, onClose }: Readonly<HealthR
       next_due_date: nextDueDate || null,
       cost: cost ? parseFloat(cost) : null,
       notes: notes.trim() || null,
+      judicial_procedure: judicialProcedure,
+      billed_to: judicialProcedure ? (billedTo.trim() || null) : null,
+      invoice_reference: judicialProcedure ? (invoiceReference.trim() || null) : null,
     }
 
     startTransition(async () => {
@@ -106,6 +119,24 @@ export function HealthRecordForm({ animalId, record, onClose }: Readonly<HealthR
 
   return (
     <form onSubmit={handleSubmit} className="bg-surface rounded-xl border border-border p-5 space-y-4">
+      {/* Alerte procédure judiciaire */}
+      {judicialAnimal && (
+        <div className="rounded-lg border-2 border-error/40 bg-error/5 p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">⚖️</span>
+            <div className="flex-1">
+              <h4 className="font-bold text-error mb-1">Animal en procédure judiciaire</h4>
+              <p className="text-xs text-text/80 leading-relaxed">
+                <strong>Précisez à la clinique vétérinaire</strong> que cet animal est en procédure
+                et que la facture doit être <strong>nominative</strong> au nom de
+                {judicialBillingDefault ? ` "${judicialBillingDefault}"` : ' la SDA'} pour permettre le
+                remboursement par le tribunal.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Row 1: Type + Date */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -200,7 +231,48 @@ export function HealthRecordForm({ animalId, record, onClose }: Readonly<HealthR
         />
       </div>
 
-      {/* Actions */}
+      {/* Procédure judiciaire (visible si animal en procédure) */}
+      {judicialAnimal && (
+        <div className="rounded-lg border border-error/30 bg-error/5 p-4 space-y-3">
+          <div className="flex items-center gap-2 text-error font-semibold text-sm">
+            ⚖️ Suivi facture nominative (procédure)
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={judicialProcedure}
+              onChange={(e) => setJudicialProcedure(e.target.checked)}
+            />
+            <span>Cet acte fait partie de la procédure (à inclure dans le dossier tribunal)</span>
+          </label>
+          {judicialProcedure && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="health-billed-to" className={labelClass}>Facturé à</label>
+                <input
+                  id="health-billed-to"
+                  type="text"
+                  value={billedTo}
+                  onChange={(e) => setBilledTo(e.target.value)}
+                  placeholder={judicialBillingDefault || 'SDA — pour remboursement tribunal'}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label htmlFor="health-invoice-ref" className={labelClass}>Réf. facture clinique</label>
+                <input
+                  id="health-invoice-ref"
+                  type="text"
+                  value={invoiceReference}
+                  onChange={(e) => setInvoiceReference(e.target.value)}
+                  placeholder="N° facture si déjà émise"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex items-center justify-end gap-3 pt-2">
         {onClose && (
           <button
