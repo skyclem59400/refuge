@@ -32,6 +32,7 @@ function buildPermissions(groups: PermissionGroup[], membership: EstablishmentMe
     canManageLeaves: has('manage_leaves'),
     canViewOwnLeaves: has('manage_leaves') || has('view_own_leaves'),
     canManagePayslips: has('manage_payslips'),
+    canManageVeterinarians: has('manage_veterinarians') || has('manage_establishment'),
   }
 }
 

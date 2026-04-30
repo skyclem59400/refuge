@@ -19,6 +19,9 @@ const healthTypeOptions: { value: HealthRecordType; label: string }[] = [
   { value: 'surgery', label: 'Chirurgie' },
   { value: 'medication', label: 'Medicament' },
   { value: 'behavioral_assessment', label: 'Bilan comportemental' },
+  { value: 'identification', label: 'Identification' },
+  { value: 'radio', label: 'Radio' },
+  { value: 'blood_test', label: 'Prise de sang' },
 ]
 
 interface StepFormState {

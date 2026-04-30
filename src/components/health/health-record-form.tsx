@@ -15,6 +15,9 @@ const typeLabels: Record<HealthRecordType, string> = {
   surgery: 'Chirurgie',
   medication: 'Medicament',
   behavioral_assessment: 'Bilan comportemental',
+  identification: 'Identification',
+  radio: 'Radio',
+  blood_test: 'Prise de sang',
 }
 
 interface HealthRecordFormProps {

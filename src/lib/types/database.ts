@@ -3,7 +3,7 @@ export type ContactCategory = 'client' | 'member' | 'volunteer' | 'board_member'
 export type DocumentType = 'devis' | 'facture' | 'avoir'
 export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'converted' | 'validated'
 export type DocumentPaymentMethod = 'cheque' | 'virement' | 'especes' | 'cb' | 'prelevement' | 'autre'
-export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings' | 'manage_outing_assignments' | 'manage_adoptions' | 'manage_planning' | 'manage_leaves' | 'view_own_leaves' | 'manage_payslips'
+export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings' | 'manage_outing_assignments' | 'manage_adoptions' | 'manage_planning' | 'manage_leaves' | 'view_own_leaves' | 'manage_payslips' | 'manage_veterinarians'
 
 export interface LineItem {
   description: string
@@ -102,6 +102,7 @@ export interface PermissionGroup {
   manage_leaves: boolean
   view_own_leaves: boolean
   manage_payslips: boolean
+  manage_veterinarians: boolean
   created_at: string
   updated_at: string
 }
@@ -153,6 +154,7 @@ export interface Permissions {
   canManageLeaves: boolean
   canViewOwnLeaves: boolean
   canManagePayslips: boolean
+  canManageVeterinarians: boolean
   isAdmin: boolean
   isOwner: boolean
 }
@@ -193,7 +195,7 @@ export type AnimalSex = 'male' | 'female' | 'unknown'
 export type AnimalStatus = 'pound' | 'shelter' | 'foster_family' | 'boarding' | 'adopted' | 'returned' | 'transferred' | 'deceased' | 'euthanized'
 export type AnimalOrigin = 'found' | 'abandoned' | 'transferred_in' | 'surrender' | 'requisition' | 'divagation'
 export type MovementType = 'pound_entry' | 'shelter_transfer' | 'foster_placement' | 'adoption' | 'return_to_owner' | 'transfer_out' | 'death' | 'euthanasia'
-export type HealthRecordType = 'vaccination' | 'sterilization' | 'antiparasitic' | 'consultation' | 'surgery' | 'medication' | 'behavioral_assessment'
+export type HealthRecordType = 'vaccination' | 'sterilization' | 'antiparasitic' | 'consultation' | 'surgery' | 'medication' | 'behavioral_assessment' | 'identification' | 'radio' | 'blood_test'
 export type IcadStatus = 'pending' | 'declared' | 'not_required'
 export type BoxSpecies = 'cat' | 'dog' | 'mixed'
 export type BoxStatus = 'available' | 'occupied' | 'maintenance'
@@ -938,6 +940,61 @@ export interface Payslip {
   file_size: number | null
   uploaded_by: string
   created_at: string
+}
+
+// ============================================
+// Animal Attachments (PDFs, certificats, etc.)
+// ============================================
+
+export interface AnimalAttachment {
+  id: string
+  animal_id: string
+  establishment_id: string
+  filename: string
+  file_path: string
+  file_url: string
+  mime_type: string | null
+  size_bytes: number | null
+  label: string | null
+  uploaded_by: string | null
+  created_at: string
+}
+
+// ============================================
+// Payment Entries (saisies de règlement)
+// ============================================
+
+export type PaymentEntryMethod = 'cheque' | 'virement' | 'especes' | 'cb' | 'prelevement' | 'helloasso' | 'autre'
+export type PaymentEntryType = 'pension' | 'adoption' | 'don' | 'fourriere' | 'autre'
+export type PaymentEntryInstallment = 'acompte' | 'solde' | 'total'
+
+export interface PaymentEntry {
+  id: string
+  establishment_id: string
+  amount: number
+  payment_date: string
+  method: PaymentEntryMethod
+  payment_type: PaymentEntryType
+  installment: PaymentEntryInstallment
+  payer_name: string | null
+  payer_phone: string | null
+  payer_email: string | null
+  reference: string | null
+  related_document_id: string | null
+  related_donation_id: string | null
+  related_animal_id: string | null
+  related_client_id: string | null
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PaymentEntryWithRelations extends PaymentEntry {
+  related_animal?: { id: string; name: string } | null
+  related_client?: { id: string; name: string } | null
+  related_document?: { id: string; numero: string; type: DocumentType } | null
+  related_donation?: { id: string; donor_name: string } | null
 }
 
 // ============================================

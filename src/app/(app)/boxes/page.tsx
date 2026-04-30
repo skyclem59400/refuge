@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Package } from 'lucide-react'
+import { Package, Printer } from 'lucide-react'
 import { getBoxes } from '@/lib/actions/boxes'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import type { Box, BoxSpecies, BoxStatus } from '@/lib/types/database'
@@ -84,16 +84,27 @@ export default async function BoxesPage() {
             </p>
           </div>
         </div>
-        {canManageBoxes && (
-          <details className="relative">
-            <summary className="cursor-pointer px-4 py-2 rounded-lg font-semibold text-white text-sm gradient-primary hover:opacity-90 transition-opacity shadow-lg shadow-primary/25 list-none flex items-center gap-2">
-              + Nouveau box
-            </summary>
-            <div className="absolute right-0 top-full mt-2 z-50 w-80 bg-surface rounded-xl border border-border shadow-xl p-4">
-              <BoxForm />
-            </div>
-          </details>
-        )}
+        <div className="flex items-center gap-2">
+          <a
+            href="/api/pdf/box-list"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border border-border text-muted hover:text-text hover:bg-surface-hover transition-colors"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimer la liste
+          </a>
+          {canManageBoxes && (
+            <details className="relative">
+              <summary className="cursor-pointer px-4 py-2 rounded-lg font-semibold text-white text-sm gradient-primary hover:opacity-90 transition-opacity shadow-lg shadow-primary/25 list-none flex items-center gap-2">
+                + Nouveau box
+              </summary>
+              <div className="absolute right-0 top-full mt-2 z-50 w-80 bg-surface rounded-xl border border-border shadow-xl p-4">
+                <BoxForm />
+              </div>
+            </details>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -165,6 +176,17 @@ export default async function BoxesPage() {
                   ))}
                 </div>
               )}
+
+              {/* Print sheet */}
+              <a
+                href={`/api/pdf/box/${box.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors"
+              >
+                <Printer className="w-3 h-3" />
+                Imprimer la fiche
+              </a>
             </div>
           ))}
         </div>

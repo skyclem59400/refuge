@@ -24,6 +24,7 @@ const PERMISSION_LABELS: { key: Permission; label: string }[] = [
   { key: 'manage_documents', label: 'Documents' },
   { key: 'manage_clients', label: 'Repertoire' },
   { key: 'manage_donations', label: 'Dons' },
+  { key: 'manage_veterinarians', label: 'Praticiens' },
   { key: 'manage_posts', label: 'Publications' },
   { key: 'view_pound', label: 'Fourriere' },
   { key: 'view_statistics', label: 'Statistiques' },

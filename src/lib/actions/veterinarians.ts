@@ -6,6 +6,16 @@ import { requireEstablishment, requirePermission } from '@/lib/establishment/per
 import { logActivity } from '@/lib/actions/activity-log'
 import type { Veterinarian, VeterinaryClinic, VeterinaryClinicWithVets } from '@/lib/types/database'
 
+// Cliniques et praticiens : accessibles aux porteurs de manage_veterinarians
+// (et toujours aux porteurs de manage_establishment via le helper).
+async function requireVeterinariansPermission() {
+  try {
+    return await requirePermission('manage_veterinarians')
+  } catch {
+    return await requirePermission('manage_establishment')
+  }
+}
+
 // ============================================
 // Veterinary clinics
 // ============================================
@@ -59,7 +69,7 @@ interface ClinicInput {
 
 export async function createVeterinaryClinic(input: ClinicInput) {
   try {
-    const { establishmentId } = await requirePermission('manage_establishment')
+    const { establishmentId } = await requireVeterinariansPermission()
     const supabase = await createClient()
 
     const { data, error } = await supabase
@@ -95,7 +105,7 @@ export async function createVeterinaryClinic(input: ClinicInput) {
 
 export async function updateVeterinaryClinic(id: string, input: Partial<ClinicInput>) {
   try {
-    const { establishmentId } = await requirePermission('manage_establishment')
+    const { establishmentId } = await requireVeterinariansPermission()
     const supabase = await createClient()
 
     const { error } = await supabase
@@ -118,7 +128,7 @@ export async function updateVeterinaryClinic(id: string, input: Partial<ClinicIn
 
 export async function deleteVeterinaryClinic(id: string) {
   try {
-    const { establishmentId } = await requirePermission('manage_establishment')
+    const { establishmentId } = await requireVeterinariansPermission()
     const supabase = await createClient()
 
     const { error } = await supabase
@@ -162,7 +172,7 @@ interface VetInput {
 
 export async function createVeterinarian(input: VetInput) {
   try {
-    const { establishmentId } = await requirePermission('manage_establishment')
+    const { establishmentId } = await requireVeterinariansPermission()
     const supabase = await createClient()
     const admin = createAdminClient()
 
@@ -209,7 +219,7 @@ export async function createVeterinarian(input: VetInput) {
 
 export async function updateVeterinarian(id: string, input: Partial<VetInput>) {
   try {
-    await requirePermission('manage_establishment')
+    await requireVeterinariansPermission()
     const supabase = await createClient()
 
     const { error } = await supabase
@@ -231,7 +241,7 @@ export async function updateVeterinarian(id: string, input: Partial<VetInput>) {
 
 export async function deleteVeterinarian(id: string) {
   try {
-    await requirePermission('manage_establishment')
+    await requireVeterinariansPermission()
     const supabase = await createClient()
 
     const { error } = await supabase

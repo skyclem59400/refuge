@@ -227,14 +227,24 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
               list="breed-cross-list"
               value={breedCross}
               onChange={(e) => setBreedCross(e.target.value)}
-              placeholder="Croise avec..."
+              placeholder="Indéfini, ou autre race..."
               className={inputClass}
             />
             <datalist id="breed-cross-list">
+              <option value="Indéfini" />
               {breedSuggestions.map((b) => (
                 <option key={b} value={b} />
               ))}
             </datalist>
+            {!breedCross && (
+              <button
+                type="button"
+                onClick={() => setBreedCross('Indéfini')}
+                className="text-[11px] text-muted hover:text-primary mt-1 transition-colors"
+              >
+                Marquer comme « Indéfini »
+              </button>
+            )}
           </div>
 
           {/* Date de naissance */}

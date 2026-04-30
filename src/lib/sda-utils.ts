@@ -68,6 +68,8 @@ export function getHealthTypeLabel(type: string): string {
     antiparasitic: 'Antiparasitaire', consultation: 'Consultation',
     surgery: 'Chirurgie', medication: 'Médicament',
     behavioral_assessment: 'Bilan comportemental',
+    identification: 'Identification', radio: 'Radio',
+    blood_test: 'Prise de sang',
   }
   return labels[type] || type
 }

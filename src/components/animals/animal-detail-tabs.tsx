@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { AnimalPhotos } from '@/components/animals/animal-photos'
 import { AnimalForm } from '@/components/animals/animal-form'
 import { AnimalIdentificationCard } from '@/components/animals/animal-identification-card'
+import { AnimalAttachmentsSection } from '@/components/animals/animal-attachments-section'
 import { HealthRecordForm } from '@/components/health/health-record-form'
 import { MovementForm } from '@/components/animals/movement-form'
 import { FosterContractsTab } from '@/components/foster-contracts/foster-contracts-tab'
@@ -66,7 +67,7 @@ import {
   ListChecks,
 } from 'lucide-react'
 
-type TabId = 'info' | 'photos' | 'health' | 'movements' | 'foster' | 'outings' | 'posts' | 'icad' | 'activity'
+type TabId = 'info' | 'photos' | 'health' | 'movements' | 'foster' | 'documents' | 'outings' | 'posts' | 'icad' | 'activity'
 
 interface AnimalOuting {
   id: string
@@ -112,6 +113,7 @@ const baseTabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 
   { id: 'health', label: 'Sante', icon: HeartPulse, countKey: 'healthRecords' },
   { id: 'movements', label: 'Mouvements', icon: ArrowRightLeft, countKey: 'movements' },
   { id: 'foster', label: 'Famille d’accueil', icon: Home, countKey: 'fosterContracts' },
+  { id: 'documents', label: 'Documents', icon: FileText },
   { id: 'outings', label: 'Sorties', icon: Footprints, countKey: 'outings' },
   { id: 'posts', label: 'Publications', icon: Share2, countKey: 'socialPosts' },
   { id: 'icad', label: 'I-CAD', icon: Shield, countKey: 'icadDeclarations' },
@@ -297,6 +299,10 @@ export function AnimalDetailTabs({
             contracts={fosterContracts}
             canManage={canManageAnimals}
           />
+        )}
+
+        {activeTab === 'documents' && (
+          <AnimalAttachmentsSection animalId={animal.id} canManage={canManageAnimals} />
         )}
 
         {activeTab === 'outings' && (
@@ -534,6 +540,46 @@ function HealthTab({
           </button>
         </div>
       )}
+
+      {/* Certificates */}
+      <div className="bg-surface rounded-xl border border-border p-4">
+        <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-primary" />
+          Certificats à imprimer
+        </h3>
+        <p className="text-xs text-muted mb-3">
+          Documents générés à partir des informations enregistrées sur l&apos;animal et des actes vétérinaires.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={`/api/pdf/animal/${animal.id}/medical-followup`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs border border-border hover:bg-surface-hover transition-colors"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Fiche de suivi médical
+          </a>
+          <a
+            href={`/api/pdf/animal/${animal.id}/sterilization`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs border border-border hover:bg-surface-hover transition-colors"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Certificat de stérilisation
+          </a>
+          <a
+            href={`/api/pdf/animal/${animal.id}/cession`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs border border-border hover:bg-surface-hover transition-colors"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Certificat avant cession
+          </a>
+        </div>
+      </div>
 
       {/* Health record form */}
       {showForm && canManageHealth && (

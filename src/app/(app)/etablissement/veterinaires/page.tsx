@@ -9,9 +9,9 @@ export default async function VeterinariansPage() {
   const ctx = await getEstablishmentContext()
   if (!ctx) return null
 
-  const { canManageEstablishment, isAdmin, isOwner } = ctx.permissions
-  // Restrict to admins / owners / managers (manage_establishment)
-  if (!canManageEstablishment && !isAdmin && !isOwner) {
+  const { canManageEstablishment, canManageVeterinarians, isAdmin, isOwner } = ctx.permissions
+  // Restrict to admins / owners / managers + porteurs de manage_veterinarians
+  if (!canManageEstablishment && !canManageVeterinarians && !isAdmin && !isOwner) {
     redirect('/dashboard')
   }
 

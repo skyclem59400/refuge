@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { useEffect, useState, useCallback } from 'react'
 import { Stethoscope, Plus, Loader2 } from 'lucide-react'
 import { getVeterinaryClinics } from '@/lib/actions/veterinarians'
+import { QuickAddVeterinarianDialog } from '@/components/health/quick-add-veterinarian-dialog'
 import type { VeterinaryClinicWithVets } from '@/lib/types/database'
 
 interface VeterinarianSelectProps {
@@ -31,13 +31,19 @@ export function VeterinarianSelect({
 }: Readonly<VeterinarianSelectProps>) {
   const [clinics, setClinics] = useState<VeterinaryClinicWithVets[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [showAdd, setShowAdd] = useState(false)
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
+    setIsLoading(true)
     getVeterinaryClinics(true).then((result) => {
       setIsLoading(false)
       if (result.data) setClinics(result.data)
     })
   }, [])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const vetId = e.target.value
@@ -52,6 +58,12 @@ export function VeterinarianSelect({
         return
       }
     }
+  }
+
+  function handleCreated(vetId: string, displayName: string) {
+    setShowAdd(false)
+    refresh()
+    onChange(vetId, displayName)
   }
 
   const totalVets = clinics.reduce((sum, c) => sum + c.veterinarians.length, 0)
@@ -73,12 +85,16 @@ export function VeterinarianSelect({
       )}
 
       {!isLoading && totalVets === 0 && (
-        <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 text-xs">
-          <p className="text-warning font-medium mb-1">Aucun veterinaire enregistre</p>
-          <Link href="/etablissement/veterinaires" className="inline-flex items-center gap-1 text-primary hover:underline">
+        <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 text-xs space-y-2">
+          <p className="text-warning font-medium">Aucun praticien enregistré</p>
+          <button
+            type="button"
+            onClick={() => setShowAdd(true)}
+            className="inline-flex items-center gap-1 text-primary hover:underline"
+          >
             <Plus className="w-3 h-3" />
-            Ajouter une clinique et des praticiens
-          </Link>
+            Ajouter un praticien
+          </button>
         </div>
       )}
 
@@ -104,15 +120,22 @@ export function VeterinarianSelect({
               </optgroup>
             ))}
           </select>
-          <Link
-            href="/etablissement/veterinaires"
+          <button
+            type="button"
+            onClick={() => setShowAdd(true)}
             className="inline-flex items-center gap-1 text-[11px] text-muted hover:text-primary mt-1 transition-colors"
           >
             <Plus className="w-3 h-3" />
-            Gerer les cliniques et praticiens
-          </Link>
+            Ajouter un praticien
+          </button>
         </>
       )}
+
+      <QuickAddVeterinarianDialog
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        onCreated={handleCreated}
+      />
     </div>
   )
 }
