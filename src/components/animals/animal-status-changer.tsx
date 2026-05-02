@@ -18,12 +18,15 @@ interface AnimalStatusChangerProps {
 const movementsByStatus: Record<string, { value: MovementType; label: string; danger?: boolean }[]> = {
   pound: [
     { value: 'shelter_transfer', label: 'Transfert en refuge' },
+    { value: 'reservation', label: 'Réservation' },
+    { value: 'adoption', label: 'Adoption (directe)' },
     { value: 'return_to_owner', label: 'Restitution au proprietaire' },
     { value: 'transfer_out', label: 'Transfert vers autre refuge' },
     { value: 'death', label: 'Deces', danger: true },
     { value: 'euthanasia', label: 'Euthanasie', danger: true },
   ],
   shelter: [
+    { value: 'reservation', label: 'Réservation' },
     { value: 'adoption', label: 'Adoption' },
     { value: 'return_to_owner', label: 'Restitution au proprietaire' },
     { value: 'transfer_out', label: 'Transfert vers autre refuge' },
@@ -32,6 +35,7 @@ const movementsByStatus: Record<string, { value: MovementType; label: string; da
   ],
   foster_family: [
     { value: 'shelter_transfer', label: 'Retour au refuge' },
+    { value: 'reservation', label: 'Réservation' },
     { value: 'adoption', label: 'Adoption' },
     { value: 'return_to_owner', label: 'Restitution au proprietaire' },
     { value: 'transfer_out', label: 'Transfert vers autre refuge' },

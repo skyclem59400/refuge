@@ -65,6 +65,8 @@ const movementSuccessMessages: Record<MovementType, string> = {
   transfer_out: 'Transfert enregistre',
   death: 'Deces enregistre',
   euthanasia: 'Euthanasie enregistree',
+  reservation: 'Réservation enregistrée',
+  reservation_cancelled: 'Réservation annulée',
 }
 
 export function MovementForm({ animalId, currentStatus, onClose }: Readonly<MovementFormProps>) {

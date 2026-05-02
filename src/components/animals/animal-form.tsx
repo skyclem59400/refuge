@@ -37,6 +37,8 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
   const [okCats, setOkCats] = useState<boolean | null>(animal?.ok_cats ?? null)
   const [okMales, setOkMales] = useState<boolean | null>(animal?.ok_males ?? null)
   const [okFemales, setOkFemales] = useState<boolean | null>(animal?.ok_females ?? null)
+  const [arrivedSterilized, setArrivedSterilized] = useState<boolean>(animal?.arrived_sterilized ?? false)
+  const [sterilizedNow, setSterilizedNow] = useState<boolean>(animal?.sterilized ?? false)
 
   // Identification fields
   const [chipNumber, setChipNumber] = useState(animal?.chip_number || '')
@@ -101,6 +103,9 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
         ok_cats: species === 'dog' ? okCats : null,
         ok_males: species === 'dog' ? okMales : null,
         ok_females: species === 'dog' ? okFemales : null,
+        arrived_sterilized: arrivedSterilized,
+        // Si l'animal est arrivé stérilisé, l'état actuel l'est aussi
+        sterilized: arrivedSterilized || sterilizedNow,
         judicial_procedure: judicialProcedure,
         judicial_case_number: judicialProcedure ? (judicialCaseNumber.trim() || null) : null,
         judicial_jurisdiction: judicialProcedure ? (judicialJurisdiction.trim() || null) : null,
@@ -367,6 +372,32 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+
+        {/* Stérilisation à l'arrivée */}
+        <div className="col-span-full mt-4">
+          <div className="flex flex-wrap items-center gap-6">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={arrivedSterilized}
+                onChange={(e) => {
+                  setArrivedSterilized(e.target.checked)
+                  if (e.target.checked) setSterilizedNow(true)
+                }}
+              />
+              <span>Arrivé déjà stérilisé(e)</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={sterilizedNow}
+                onChange={(e) => setSterilizedNow(e.target.checked)}
+                disabled={arrivedSterilized}
+              />
+              <span>Actuellement stérilisé(e){arrivedSterilized ? ' (auto)' : ''}</span>
+            </label>
           </div>
         </div>
 

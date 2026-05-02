@@ -22,6 +22,7 @@ const healthTypeOptions: { value: HealthRecordType; label: string }[] = [
   { value: 'identification', label: 'Identification' },
   { value: 'radio', label: 'Radio' },
   { value: 'blood_test', label: 'Prise de sang' },
+  { value: 'cession', label: 'Cession véto' },
 ]
 
 interface StepFormState {

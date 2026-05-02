@@ -13,7 +13,7 @@ const TYPE_LABELS: Record<string, string> = {
   antiparasitic: 'Antiparasitaire', consultation: 'Consultation',
   surgery: 'Chirurgie', medication: 'Médicament',
   behavioral_assessment: 'Bilan comportemental',
-  identification: 'Identification', radio: 'Radio', blood_test: 'Prise de sang',
+  identification: 'Identification', radio: 'Radio', blood_test: 'Prise de sang', cession: 'Cession véto',
 }
 
 function fmt(d: string | null) {

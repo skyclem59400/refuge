@@ -58,6 +58,7 @@ export function getMovementLabel(type: string): string {
     foster_placement: 'Placement en famille d’accueil',
     adoption: 'Adoption', return_to_owner: 'Restitution au propriétaire',
     transfer_out: 'Transfert vers autre refuge', death: 'Décès', euthanasia: 'Euthanasie',
+    reservation: 'Réservation', reservation_cancelled: 'Réservation annulée',
   }
   return labels[type] || type
 }
@@ -69,7 +70,7 @@ export function getHealthTypeLabel(type: string): string {
     surgery: 'Chirurgie', medication: 'Médicament',
     behavioral_assessment: 'Bilan comportemental',
     identification: 'Identification', radio: 'Radio',
-    blood_test: 'Prise de sang',
+    blood_test: 'Prise de sang', cession: 'Cession véto',
   }
   return labels[type] || type
 }

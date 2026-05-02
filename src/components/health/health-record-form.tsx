@@ -18,6 +18,7 @@ const typeLabels: Record<HealthRecordType, string> = {
   identification: 'Identification',
   radio: 'Radio',
   blood_test: 'Prise de sang',
+  cession: 'Cession véto',
 }
 
 interface HealthRecordFormProps {

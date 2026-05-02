@@ -194,8 +194,8 @@ export type AnimalSpecies = 'cat' | 'dog'
 export type AnimalSex = 'male' | 'female' | 'unknown'
 export type AnimalStatus = 'pound' | 'shelter' | 'foster_family' | 'boarding' | 'adopted' | 'returned' | 'transferred' | 'deceased' | 'euthanized'
 export type AnimalOrigin = 'found' | 'abandoned' | 'transferred_in' | 'surrender' | 'requisition' | 'divagation'
-export type MovementType = 'pound_entry' | 'shelter_transfer' | 'foster_placement' | 'adoption' | 'return_to_owner' | 'transfer_out' | 'death' | 'euthanasia'
-export type HealthRecordType = 'vaccination' | 'sterilization' | 'antiparasitic' | 'consultation' | 'surgery' | 'medication' | 'behavioral_assessment' | 'identification' | 'radio' | 'blood_test'
+export type MovementType = 'pound_entry' | 'shelter_transfer' | 'foster_placement' | 'adoption' | 'return_to_owner' | 'transfer_out' | 'death' | 'euthanasia' | 'reservation' | 'reservation_cancelled'
+export type HealthRecordType = 'vaccination' | 'sterilization' | 'antiparasitic' | 'consultation' | 'surgery' | 'medication' | 'behavioral_assessment' | 'identification' | 'radio' | 'blood_test' | 'cession'
 export type IcadStatus = 'pending' | 'declared' | 'not_required'
 export type BoxSpecies = 'cat' | 'dog' | 'mixed'
 export type BoxStatus = 'available' | 'occupied' | 'maintenance'
@@ -227,6 +227,7 @@ export interface Animal {
   color: string | null
   weight: number | null
   sterilized: boolean
+  arrived_sterilized: boolean
   chip_number: string | null
   tattoo_number: string | null
   tattoo_position: string | null
@@ -951,6 +952,64 @@ export interface Payslip {
   file_size: number | null
   uploaded_by: string
   created_at: string
+}
+
+// ============================================
+// Planning vétérinaire (visites quotidiennes — style Google Sheet)
+// ============================================
+
+export type VetVisitActKey =
+  | 'puce'           // identification
+  | 'cession'        // cession véto
+  | 'vaccin_chien'
+  | 'vaccin_chat'
+  | 'visite_divers' // = consultation
+  | 'importation'
+  | 'test_leucose'  // = blood_test
+  | 'consultation'
+  | 'sterilization'
+  | 'antiparasitic'
+  | 'radio'
+
+export type VetVisitActs = Partial<Record<VetVisitActKey, boolean>>
+
+export interface VetVisit {
+  id: string
+  establishment_id: string
+  visit_date: string
+  time_label: string | null
+  location_label: string | null
+  veterinarian_id: string | null
+  vet_label: string | null
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface VetVisitLine {
+  id: string
+  visit_id: string
+  animal_id: string
+  line_order: number
+  acts: VetVisitActs
+  chip_number: string | null
+  weight: number | null
+  cost: number | null
+  observations: string | null
+  complement: string | null
+  validated_at: string | null
+  validated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface VetVisitLineWithAnimal extends VetVisitLine {
+  animal: Pick<Animal, 'id' | 'name' | 'species' | 'medal_number' | 'breed' | 'breed_cross' | 'color' | 'box_id' | 'chip_number'>
+}
+
+export interface VetVisitWithLines extends VetVisit {
+  lines: VetVisitLineWithAnimal[]
 }
 
 // ============================================

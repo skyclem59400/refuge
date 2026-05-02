@@ -140,6 +140,7 @@ export async function createAnimal(data: {
   color?: string | null
   weight?: number | null
   sterilized?: boolean
+  arrived_sterilized?: boolean
   chip_number?: string | null
   tattoo_number?: string | null
   tattoo_position?: string | null
@@ -271,6 +272,7 @@ export async function updateAnimal(id: string, data: {
   color?: string | null
   weight?: number | null
   sterilized?: boolean
+  arrived_sterilized?: boolean
   chip_number?: string | null
   tattoo_number?: string | null
   tattoo_position?: string | null
@@ -528,6 +530,14 @@ export async function recordMovement(animalId: string, data: {
       if (updateError) {
         return { error: updateError.message }
       }
+    }
+
+    // Mouvement RESERVATION : ne change pas le statut mais bascule le flag reserved
+    if (data.type === 'reservation') {
+      await supabase.from('animals').update({ reserved: true }).eq('id', animalId).eq('establishment_id', establishmentId)
+    }
+    if (data.type === 'reservation_cancelled') {
+      await supabase.from('animals').update({ reserved: false }).eq('id', animalId).eq('establishment_id', establishmentId)
     }
 
     revalidatePath('/animals')

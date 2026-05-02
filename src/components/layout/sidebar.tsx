@@ -53,6 +53,7 @@ const shelterItems: NavItem[] = [
   { href: '/requisitions', label: 'R\u00e9quisition', Icon: Scale, permission: 'canViewAnimals' },
   { href: '/health', label: 'Sant\u00e9', Icon: HeartPulse, permission: 'canManageHealth' },
   { href: '/passages-veto', label: 'Passages v\u00e9to', Icon: Stethoscope, permission: 'canManageHealth' },
+  { href: '/planning-veto', label: 'Planning v\u00e9to', Icon: CalendarDays, permission: 'canManageHealth' },
   { href: '/etablissement/veterinaires', label: 'Praticiens', Icon: Stethoscope, permission: 'canManageVeterinarians' },
   { href: '/boxes', label: 'Box', Icon: Package, permission: 'canManageBoxes' },
   { href: '/sorties', label: 'Sorties', Icon: Footprints, permission: 'canManageOutings' },

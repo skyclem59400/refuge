@@ -19,7 +19,7 @@ interface Props {
 const TYPE_OPTIONS = [
   'vaccination', 'sterilization', 'antiparasitic', 'consultation',
   'surgery', 'medication', 'behavioral_assessment',
-  'identification', 'radio', 'blood_test',
+  'identification', 'radio', 'blood_test', 'cession',
 ]
 
 export function PassagesVetoClient({ passages, stats, clinics, initialFilters }: Readonly<Props>) {

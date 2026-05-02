@@ -272,7 +272,7 @@ function labelHealthType(t: string): string {
     surgery: 'Chirurgie', medication: 'Médicament',
     behavioral_assessment: 'Bilan comportemental',
     identification: 'Identification', radio: 'Radio',
-    blood_test: 'Prise de sang',
+    blood_test: 'Prise de sang', cession: 'Cession véto',
   }
   return labels[t] || t
 }
