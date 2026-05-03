@@ -171,7 +171,7 @@ export async function createHealthRecord(data: {
       }
     }
 
-    revalidatePath('/health')
+    revalidatePath('/sante')
     revalidatePath(`/animals/${data.animal_id}`)
     logActivity({ action: 'create', entityType: 'health_record', entityId: record.id, entityName: data.type, parentType: 'animal', parentId: data.animal_id })
     return { data: record }
@@ -236,7 +236,7 @@ export async function updateHealthRecord(id: string, data: {
 
     const changes = trackChanges(currentRecord, recordUpdate)
 
-    revalidatePath('/health')
+    revalidatePath('/sante')
     logActivity({
       action: 'update',
       entityType: 'health_record',
@@ -272,7 +272,7 @@ export async function deleteHealthRecord(id: string) {
       return { error: error.message }
     }
 
-    revalidatePath('/health')
+    revalidatePath('/sante')
     logActivity({ action: 'delete', entityType: 'health_record', entityId: id, parentType: 'animal', parentId: record?.animal_id })
     return { success: true }
   } catch (e) {

@@ -14,9 +14,9 @@ export default async function NewPlanningVetoPage() {
   const clinics = clinicsRes.data || []
 
   return (
-    <div className="animate-fade-up max-w-3xl">
+    <div className="max-w-3xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/planning-veto" className="text-muted hover:text-text">
+        <Link href="/sante/planning" className="text-muted hover:text-text">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex items-center gap-2">

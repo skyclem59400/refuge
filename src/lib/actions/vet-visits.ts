@@ -138,8 +138,8 @@ export async function createVetVisit(input: CreateVisitInput) {
 
     if (error) return { error: error.message }
 
-    revalidatePath('/passages-veto')
-    revalidatePath('/planning-veto')
+    revalidatePath('/sante/passages')
+    revalidatePath('/sante/planning')
     logActivity({ action: 'create', entityType: 'vet_visit', entityId: (data as VetVisit).id, entityName: input.visit_date })
     return { data: data as VetVisit }
   } catch (e) {
@@ -181,7 +181,7 @@ export async function deleteVetVisit(visitId: string) {
       .eq('id', visitId)
       .eq('establishment_id', establishmentId)
     if (error) return { error: error.message }
-    revalidatePath('/planning-veto')
+    revalidatePath('/sante/planning')
     return { success: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -230,7 +230,7 @@ export async function addVetVisitLine(input: AddLineInput) {
       .single()
 
     if (error) return { error: error.message }
-    revalidatePath('/planning-veto')
+    revalidatePath('/sante/planning')
     return { data: data as VetVisitLine }
   } catch (e) {
     return { error: (e as Error).message }
@@ -372,8 +372,8 @@ export async function validateVetVisitLine(lineId: string) {
       .eq('id', lineId)
 
     revalidatePath(`/animals/${lineData.animal_id}`)
-    revalidatePath(`/planning-veto/${lineData.visit.id}`)
-    revalidatePath('/passages-veto')
+    revalidatePath(`/sante/planning/${lineData.visit.id}`)
+    revalidatePath('/sante/passages')
 
     logActivity({
       action: 'create',

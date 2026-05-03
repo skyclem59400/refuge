@@ -145,7 +145,7 @@ export async function createHealthProtocol(input: ProtocolInput) {
       return { error: stepsError.message }
     }
 
-    revalidatePath('/health/protocols')
+    revalidatePath('/sante/protocols')
     logActivity({ action: 'create', entityType: 'health_protocol', entityId: protocol.id, entityName: protocol.name })
     return { data: protocol as HealthProtocol }
   } catch (e) {
@@ -205,7 +205,7 @@ export async function updateHealthProtocol(id: string, input: ProtocolInput) {
       return { error: insertError.message }
     }
 
-    revalidatePath('/health/protocols')
+    revalidatePath('/sante/protocols')
     logActivity({ action: 'update', entityType: 'health_protocol', entityId: id, entityName: input.name })
     return { success: true }
   } catch (e) {
@@ -238,7 +238,7 @@ export async function deleteHealthProtocol(id: string) {
       return { error: error.message }
     }
 
-    revalidatePath('/health/protocols')
+    revalidatePath('/sante/protocols')
     logActivity({ action: 'delete', entityType: 'health_protocol', entityId: id, entityName: existing?.name })
     return { success: true }
   } catch (e) {
@@ -297,7 +297,7 @@ export async function applyProtocolToAnimal(params: {
     }
 
     revalidatePath(`/animals/${params.animalId}`)
-    revalidatePath('/health')
+    revalidatePath('/sante')
     logActivity({
       action: 'create',
       entityType: 'protocol_instance',

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarDays, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { listVetVisits } from '@/lib/actions/vet-visits'
 
@@ -17,21 +17,13 @@ export default async function PlanningVetoListPage() {
   const visits = res.data || []
 
   return (
-    <div className="animate-fade-up">
+    <>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <CalendarDays className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Planning vétérinaire</h1>
-            <p className="text-sm text-muted mt-1">
-              Tableaux quotidiens style Google Sheet — actes prévus puis validés (génère automatiquement les fiches santé sur les animaux).
-            </p>
-          </div>
-        </div>
+        <p className="text-sm text-muted max-w-2xl">
+          Tableaux quotidiens style Google Sheet — actes prévus puis validés (génère automatiquement les fiches santé sur les animaux).
+        </p>
         <Link
-          href="/planning-veto/nouveau"
+          href="/sante/planning/nouveau"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-white text-sm gradient-primary hover:opacity-90 transition-opacity shadow-lg shadow-primary/25"
         >
           <Plus className="w-4 h-4" />
@@ -48,7 +40,7 @@ export default async function PlanningVetoListPage() {
           {visits.map((v) => (
             <Link
               key={v.id}
-              href={`/planning-veto/${v.id}`}
+              href={`/sante/planning/${v.id}`}
               className="bg-surface rounded-xl border border-border p-4 hover:border-primary/30 transition-colors flex items-center justify-between"
             >
               <div>
@@ -64,6 +56,6 @@ export default async function PlanningVetoListPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
   )
 }

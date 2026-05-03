@@ -28,9 +28,9 @@ export default async function PlanningVetoDetailPage({ params }: { params: Promi
     .order('name')
 
   return (
-    <div className="animate-fade-up">
+    <div>
       <div className="flex items-center gap-3 mb-4">
-        <Link href="/planning-veto" className="text-muted hover:text-text">
+        <Link href="/sante/planning" className="text-muted hover:text-text">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <CalendarDays className="w-6 h-6 text-primary" />

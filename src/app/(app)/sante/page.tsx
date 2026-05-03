@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { HeartPulse, AlertTriangle, Stethoscope, Calendar, Pill, ListChecks } from 'lucide-react'
+import { HeartPulse, AlertTriangle, Stethoscope, Calendar } from 'lucide-react'
 import { getHealthRecords, getUpcomingReminders, getOverdueReminders } from '@/lib/actions/health'
 import { getTreatments } from '@/lib/actions/treatments'
 import { getEstablishmentContext } from '@/lib/establishment/context'
@@ -103,31 +103,7 @@ export default async function HealthPage({
   const totalCost = records.reduce((sum, r) => sum + (r.cost || 0), 0)
 
   return (
-    <div className="animate-fade-up">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <HeartPulse className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Sante</h1>
-            <p className="text-sm text-muted mt-1">
-              Suivi sanitaire global des animaux
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/health/protocols"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-surface-hover transition-colors"
-          >
-            <ListChecks className="w-4 h-4" />
-            Protocoles
-          </Link>
-        </div>
-      </div>
-
+    <>
       {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div className="bg-surface rounded-xl border border-border p-4 text-center">
@@ -325,6 +301,6 @@ export default async function HealthPage({
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

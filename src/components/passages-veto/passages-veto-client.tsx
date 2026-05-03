@@ -43,7 +43,7 @@ export function PassagesVetoClient({ passages, stats, clinics, initialFilters }:
     if (clinicId) params.set('clinic', clinicId)
     if (type) params.set('type', type)
     if (judicialOnly) params.set('judicial', '1')
-    startTransition(() => router.push(`/passages-veto?${params.toString()}`))
+    startTransition(() => router.push(`/sante/passages?${params.toString()}`))
   }
 
   function exportCsv() {

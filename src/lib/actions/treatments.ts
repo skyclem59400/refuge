@@ -169,7 +169,7 @@ export async function createTreatment(data: {
       type: 'treatment_new',
       title: `Nouveau traitement : ${data.name.trim()}`,
       body: `${animalName} — ${data.description?.trim() || data.name.trim()}`,
-      link: '/health',
+      link: '/sante',
       metadata: { treatment_id: treatment.id, animal_id: data.animal_id },
     }).catch(() => {}) // Fire-and-forget
 
@@ -182,7 +182,7 @@ export async function createTreatment(data: {
       parentId: data.animal_id,
     })
 
-    revalidatePath('/health')
+    revalidatePath('/sante')
     revalidatePath('/dashboard')
     return { data: treatment as AnimalTreatment }
   } catch (e) {
@@ -218,7 +218,7 @@ export async function updateTreatment(id: string, data: Partial<{
       entityName: data.name,
     })
 
-    revalidatePath('/health')
+    revalidatePath('/sante')
     revalidatePath('/dashboard')
     return { success: true }
   } catch (e) {
@@ -246,7 +246,7 @@ export async function stopTreatment(id: string) {
       details: { action: 'stop' },
     })
 
-    revalidatePath('/health')
+    revalidatePath('/sante')
     revalidatePath('/dashboard')
     return { success: true }
   } catch (e) {
@@ -272,7 +272,7 @@ export async function deleteTreatment(id: string) {
       entityId: id,
     })
 
-    revalidatePath('/health')
+    revalidatePath('/sante')
     revalidatePath('/dashboard')
     return { success: true }
   } catch (e) {

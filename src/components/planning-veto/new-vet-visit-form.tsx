@@ -37,7 +37,7 @@ export function NewVetVisitForm({ clinics }: Readonly<Props>) {
         toast.error(res.error)
       } else if (res.data) {
         toast.success('Passage véto créé')
-        router.push(`/planning-veto/${res.data.id}`)
+        router.push(`/sante/planning/${res.data.id}`)
       }
     })
   }

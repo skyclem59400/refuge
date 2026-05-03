@@ -27,6 +27,16 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      { source: '/health', destination: '/sante', permanent: true },
+      { source: '/health/protocols', destination: '/sante/protocols', permanent: true },
+      { source: '/planning-veto', destination: '/sante/planning', permanent: true },
+      { source: '/planning-veto/nouveau', destination: '/sante/planning/nouveau', permanent: true },
+      { source: '/planning-veto/:id', destination: '/sante/planning/:id', permanent: true },
+      { source: '/passages-veto', destination: '/sante/passages', permanent: true },
+    ]
+  },
 };
 
 export default nextConfig;

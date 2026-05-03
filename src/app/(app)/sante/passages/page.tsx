@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import { Stethoscope } from 'lucide-react'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { getPassagesVeto, getPassagesVetoStats } from '@/lib/actions/passages-veto'
 import { getVeterinaryClinics } from '@/lib/actions/veterinarians'
@@ -58,18 +57,10 @@ export default async function PassagesVetoPage({
   const clinics = clinicsRes.data || []
 
   return (
-    <div className="animate-fade-up">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <Stethoscope className="w-6 h-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold">Passages vétérinaires</h1>
-          <p className="text-sm text-muted mt-1">
-            Liste de toutes les visites vétérinaires (consolidé multi-animaux). Exportable pour partage avec les cabinets.
-          </p>
-        </div>
-      </div>
+    <>
+      <p className="text-sm text-muted max-w-2xl mb-6">
+        Liste de toutes les visites vétérinaires (consolidé multi-animaux). Exportable pour partage avec les cabinets.
+      </p>
 
       <PassagesVetoClient
         passages={passages}
@@ -77,6 +68,6 @@ export default async function PassagesVetoPage({
         clinics={clinics}
         initialFilters={filters}
       />
-    </div>
+    </>
   )
 }
