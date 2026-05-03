@@ -78,10 +78,17 @@ export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: 
     setPendingAction('upload')
     startTransition(async () => {
       try {
-        // Compress if larger than 2 MB
-        const finalFile = file.size > 2 * 1024 * 1024
-          ? await compressImage(file)
-          : file
+        // Compress if larger than 2 MB. If compression fails (HEIC, exotic format,
+        // tainted canvas), fall back to the original file rather than aborting.
+        let finalFile: File = file
+        if (file.size > 2 * 1024 * 1024) {
+          try {
+            finalFile = await compressImage(file)
+          } catch (compressErr) {
+            console.warn('[animal-photos] Compression failed, uploading original:', compressErr)
+            finalFile = file
+          }
+        }
 
         const formData = new FormData()
         formData.append('file', finalFile)
@@ -94,8 +101,9 @@ export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: 
           toast.success('Photo ajoutee')
           router.refresh()
         }
-      } catch {
-        toast.error('Erreur lors du traitement de l\'image')
+      } catch (e) {
+        console.error('[animal-photos] Upload exception:', e)
+        toast.error(`Erreur upload : ${(e as Error).message || 'inconnue'}`)
       }
 
       setPendingAction(null)
