@@ -17,12 +17,30 @@ export async function buildAdoptionContractPdf(contractId: string): Promise<Buil
 
   const { data: contract, error } = await admin
     .from('adoption_contracts')
-    .select('*, animals!inner(name, species, breed, sex, birth_date, chip_number), adopter:clients!adopter_client_id(name, email, phone, address, postal_code, city)')
+    .select('*, animals!inner(id, name, species, breed, sex, birth_date, chip_number, animal_photos(url, is_primary)), adopter:clients!adopter_client_id(name, email, phone, address, postal_code, city)')
     .eq('id', contractId)
     .single()
 
   if (error || !contract) {
     throw new Error('Contrat introuvable')
+  }
+
+  // Embed primary animal photo as base64 so it survives in the PDF without
+  // depending on network access from Puppeteer.
+  let animalPhotoBase64: string | undefined
+  const photos = (contract.animals?.animal_photos ?? []) as Array<{ url: string; is_primary: boolean }>
+  const primaryPhoto = photos.find((p) => p.is_primary) ?? photos[0]
+  if (primaryPhoto?.url) {
+    try {
+      const r = await fetch(primaryPhoto.url)
+      if (r.ok) {
+        const buf = await r.arrayBuffer()
+        const ct = r.headers.get('content-type') || 'image/jpeg'
+        animalPhotoBase64 = `data:${ct};base64,${Buffer.from(buf).toString('base64')}`
+      }
+    } catch {
+      // ignore — fallback rendering without photo
+    }
   }
 
   let companyInfo: CompanyInfo | undefined
@@ -66,7 +84,7 @@ export async function buildAdoptionContractPdf(contractId: string): Promise<Buil
     }
   }
 
-  const html = buildAdoptionContractHtml(contract, contract.animals, contract.adopter, companyInfo, logoBase64)
+  const html = buildAdoptionContractHtml(contract, contract.animals, contract.adopter, companyInfo, logoBase64, animalPhotoBase64)
 
   const puppeteer = await import('puppeteer')
   const browser = await puppeteer.default.launch({

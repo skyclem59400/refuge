@@ -12,6 +12,7 @@ import { HealthRecordForm } from '@/components/health/health-record-form'
 import { MovementForm } from '@/components/animals/movement-form'
 import { FosterContractsTab } from '@/components/foster-contracts/foster-contracts-tab'
 import { AdoptionContractsTab } from '@/components/adoption-contracts/adoption-contracts-tab'
+import { MovementsTimeline } from '@/components/animals/movements-timeline'
 import { ApplyProtocolModal } from '@/components/health/apply-protocol-modal'
 import { updatePost, deletePost } from '@/lib/actions/social-posts'
 import { formatDateShort, formatCurrency } from '@/lib/utils'
@@ -846,48 +847,16 @@ function MovementsTab({
         </div>
       )}
 
-      {/* Movements table */}
-      <div className="bg-surface rounded-xl border border-border">
-        <div className="p-5 border-b border-border flex items-center gap-2">
+      {/* Movements timeline */}
+      <div>
+        <div className="flex items-center gap-2 mb-4 px-1">
           <ArrowRightLeft className="w-4 h-4 text-muted" />
           <div>
             <h3 className="font-semibold">Mouvements</h3>
-            <p className="text-xs text-muted mt-0.5">{movements.length} mouvement(s)</p>
+            <p className="text-xs text-muted mt-0.5">{movements.length} mouvement{movements.length > 1 ? 's' : ''}</p>
           </div>
         </div>
-
-        {movements.length === 0 ? (
-          <p className="p-5 text-sm text-muted text-center">Aucun mouvement enregistre</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-surface-hover/50">
-                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Type</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Date</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Personne liée</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Saisi par</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Notes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {movements.map((mv) => {
-                  const linkedPerson = mv.related_client?.name || mv.person_name || '—'
-                  const submittedBy = (mv.created_by && userNames[mv.created_by]) || '—'
-                  return (
-                    <tr key={mv.id} className="hover:bg-surface-hover/30 transition-colors">
-                      <td className="px-4 py-3 font-medium">{getMovementLabel(mv.type)}</td>
-                      <td className="px-4 py-3 text-muted">{formatDateShort(mv.date)}</td>
-                      <td className="px-4 py-3 text-muted">{linkedPerson}</td>
-                      <td className="px-4 py-3 text-muted text-xs">{submittedBy}</td>
-                      <td className="px-4 py-3 text-muted text-xs max-w-xs truncate">{mv.notes || '-'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <MovementsTimeline movements={movements} userNames={userNames} />
       </div>
     </div>
   )
