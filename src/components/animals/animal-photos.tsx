@@ -62,11 +62,27 @@ export function AnimalPhotos({ animalId, establishmentId, photos, canManage, fal
     })
   }
 
+  function isHeic(file: File): boolean {
+    const ext = file.name.toLowerCase().split('.').pop()
+    return file.type === 'image/heic'
+      || file.type === 'image/heif'
+      || ext === 'heic'
+      || ext === 'heif'
+  }
+
+  async function convertHeicToJpeg(file: File): Promise<File> {
+    const heic2any = (await import('heic2any')).default
+    const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 })
+    const jpegBlob = Array.isArray(blob) ? blob[0] : blob
+    const newName = file.name.replace(/\.(heic|heif)$/i, '.jpg')
+    return new File([jpegBlob], newName, { type: 'image/jpeg' })
+  }
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith('image/') && !isHeic(file)) {
       toast.error('Veuillez selectionner une image')
       return
     }
@@ -80,15 +96,29 @@ export function AnimalPhotos({ animalId, establishmentId, photos, canManage, fal
     setPendingAction('upload')
     startTransition(async () => {
       try {
-        // Compress if larger than 2 MB. If compression fails (HEIC, exotic format,
-        // tainted canvas), fall back to the original file rather than aborting.
-        let finalFile: File = file
-        if (file.size > 2 * 1024 * 1024) {
+        // Convert HEIC/HEIF to JPEG so browsers can actually display it.
+        let workingFile: File = file
+        if (isHeic(file)) {
           try {
-            finalFile = await compressImage(file)
+            workingFile = await convertHeicToJpeg(file)
+          } catch (heicErr) {
+            console.error('[animal-photos] HEIC conversion failed:', heicErr)
+            toast.error("Impossible de convertir l'image HEIC. Essayez en JPEG/PNG.")
+            setPendingAction(null)
+            if (fileRef.current) fileRef.current.value = ''
+            return
+          }
+        }
+
+        // Compress if larger than 2 MB. If compression fails (exotic format,
+        // tainted canvas), fall back to the working file rather than aborting.
+        let finalFile: File = workingFile
+        if (workingFile.size > 2 * 1024 * 1024) {
+          try {
+            finalFile = await compressImage(workingFile)
           } catch (compressErr) {
             console.warn('[animal-photos] Compression failed, uploading original:', compressErr)
-            finalFile = file
+            finalFile = workingFile
           }
         }
 
