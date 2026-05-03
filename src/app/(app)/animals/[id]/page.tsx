@@ -47,7 +47,7 @@ async function fetchAnimalData(admin: SupabaseAdmin, id: string, estabId: string
   ] = await Promise.all([
     admin.from('animals').select('*').eq('id', id).eq('establishment_id', estabId).single(),
     admin.from('animal_photos').select('*').eq('animal_id', id).order('is_primary', { ascending: false }),
-    admin.from('animal_movements').select('*').eq('animal_id', id).order('date', { ascending: false }),
+    admin.from('animal_movements').select('*, related_client:clients!related_client_id(id, name)').eq('animal_id', id).order('date', { ascending: false }),
     admin.from('animal_health_records').select('*').eq('animal_id', id).order('date', { ascending: false }),
     admin.from('boxes').select('*').eq('establishment_id', estabId).order('name'),
     admin.from('social_posts').select('*').eq('animal_id', id).order('created_at', { ascending: false }),

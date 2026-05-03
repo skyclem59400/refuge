@@ -288,6 +288,8 @@ export interface AnimalMovement {
   person_contact: string | null
   destination: string | null
   icad_status: IcadStatus
+  related_client_id: string | null
+  related_client?: { id: string; name: string } | null
   created_by: string | null
   created_at: string
 }

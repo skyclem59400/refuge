@@ -841,19 +841,25 @@ function MovementsTab({
                 <tr className="bg-surface-hover/50">
                   <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Type</th>
                   <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Date</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Personne</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Personne liée</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Saisi par</th>
                   <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Notes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {movements.map((mv) => (
-                  <tr key={mv.id} className="hover:bg-surface-hover/30 transition-colors">
-                    <td className="px-4 py-3 font-medium">{getMovementLabel(mv.type)}</td>
-                    <td className="px-4 py-3 text-muted">{formatDateShort(mv.date)}</td>
-                    <td className="px-4 py-3 text-muted">{mv.person_name || (mv.created_by && userNames[mv.created_by]) || '-'}</td>
-                    <td className="px-4 py-3 text-muted text-xs max-w-xs truncate">{mv.notes || '-'}</td>
-                  </tr>
-                ))}
+                {movements.map((mv) => {
+                  const linkedPerson = mv.related_client?.name || mv.person_name || '—'
+                  const submittedBy = (mv.created_by && userNames[mv.created_by]) || '—'
+                  return (
+                    <tr key={mv.id} className="hover:bg-surface-hover/30 transition-colors">
+                      <td className="px-4 py-3 font-medium">{getMovementLabel(mv.type)}</td>
+                      <td className="px-4 py-3 text-muted">{formatDateShort(mv.date)}</td>
+                      <td className="px-4 py-3 text-muted">{linkedPerson}</td>
+                      <td className="px-4 py-3 text-muted text-xs">{submittedBy}</td>
+                      <td className="px-4 py-3 text-muted text-xs max-w-xs truncate">{mv.notes || '-'}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
