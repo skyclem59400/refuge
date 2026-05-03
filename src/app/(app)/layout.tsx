@@ -43,6 +43,7 @@ export default async function AppLayout({
           userEmail={user.email || 'Utilisateur'}
           userAvatarUrl={user.user_metadata?.avatar_url}
           permissions={ctx.permissions}
+          roleType={ctx.membership.role_type}
           currentEstablishment={ctx.establishment}
           establishments={establishments}
         />
