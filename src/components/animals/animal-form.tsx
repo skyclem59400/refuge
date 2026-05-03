@@ -6,6 +6,14 @@ import { toast } from 'sonner'
 import { Loader2, Sparkles } from 'lucide-react'
 import { createAnimal, updateAnimal } from '@/lib/actions/animals'
 import { CommuneAutocomplete } from '@/components/ui/commune-autocomplete'
+import { DatePicker } from '@/components/ui/date-picker'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { VeterinarianSelect } from '@/components/health/veterinarian-select'
 import { getBreedsForSpecies } from '@/lib/breeds'
 import type { Animal, Box, AnimalSpecies, AnimalSex, AnimalOrigin } from '@/lib/types/database'
@@ -194,47 +202,41 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
 
           {/* Espece */}
           <div>
-            <label htmlFor="animal-species" className={labelClass}>Espece *</label>
-            <select
-              id="animal-species"
-              value={species}
-              onChange={(e) => setSpecies(e.target.value as AnimalSpecies)}
-              className={inputClass}
-            >
-              {Object.entries(speciesLabels).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
+            <label htmlFor="animal-species" className={labelClass}>Espèce *</label>
+            <Select value={species} onValueChange={(v) => setSpecies(v as AnimalSpecies)}>
+              <SelectTrigger id="animal-species"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(speciesLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Sexe */}
           <div>
             <label htmlFor="animal-sex" className={labelClass}>Sexe *</label>
-            <select
-              id="animal-sex"
-              value={sex}
-              onChange={(e) => setSex(e.target.value as AnimalSex)}
-              className={inputClass}
-            >
-              {Object.entries(sexLabels).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
+            <Select value={sex} onValueChange={(v) => setSex(v as AnimalSex)}>
+              <SelectTrigger id="animal-sex"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(sexLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Origine */}
           <div>
             <label htmlFor="animal-origin" className={labelClass}>Origine *</label>
-            <select
-              id="animal-origin"
-              value={originType}
-              onChange={(e) => setOriginType(e.target.value as AnimalOrigin)}
-              className={inputClass}
-            >
-              {Object.entries(originLabels).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
+            <Select value={originType} onValueChange={(v) => setOriginType(v as AnimalOrigin)}>
+              <SelectTrigger id="animal-origin"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(originLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Race */}
@@ -288,12 +290,10 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
           {/* Date de naissance */}
           <div>
             <label htmlFor="animal-birth-date" className={labelClass}>Date de naissance</label>
-            <input
+            <DatePicker
               id="animal-birth-date"
-              type="date"
               value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-              className={inputClass}
+              onChange={(v) => setBirthDate(v ?? '')}
             />
           </div>
 
@@ -341,37 +341,33 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
           {/* Score comportemental */}
           <div>
             <label htmlFor="animal-behavior-score" className={labelClass}>Score comportemental</label>
-            <select
-              id="animal-behavior-score"
-              value={behaviorScore}
-              onChange={(e) => setBehaviorScore(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Non evalue</option>
-              <option value="1">1 - Tres sociable</option>
-              <option value="2">2 - Sociable</option>
-              <option value="3">3 - Reserve</option>
-              <option value="4">4 - Craintif</option>
-              <option value="5">5 - Agressif</option>
-            </select>
+            <Select value={behaviorScore || '__none__'} onValueChange={(v) => setBehaviorScore(v === '__none__' ? '' : v)}>
+              <SelectTrigger id="animal-behavior-score"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Non évalué</SelectItem>
+                <SelectItem value="1">1 — Très sociable</SelectItem>
+                <SelectItem value="2">2 — Sociable</SelectItem>
+                <SelectItem value="3">3 — Réservé</SelectItem>
+                <SelectItem value="4">4 — Craintif</SelectItem>
+                <SelectItem value="5">5 — Agressif</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Box */}
           <div>
             <label htmlFor="animal-box" className={labelClass}>Box</label>
-            <select
-              id="animal-box"
-              value={boxId}
-              onChange={(e) => setBoxId(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Aucun box</option>
-              {boxes.map((box) => (
-                <option key={box.id} value={box.id}>
-                  {box.name} ({(() => { if (box.species_type === 'cat') return 'Chats'; if (box.species_type === 'dog') return 'Chiens'; return 'Mixte'; })()})
-                </option>
-              ))}
-            </select>
+            <Select value={boxId || '__none__'} onValueChange={(v) => setBoxId(v === '__none__' ? '' : v)}>
+              <SelectTrigger id="animal-box"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Aucun box</SelectItem>
+                {boxes.map((box) => (
+                  <SelectItem key={box.id} value={box.id}>
+                    {box.name} ({(() => { if (box.species_type === 'cat') return 'Chats'; if (box.species_type === 'dog') return 'Chiens'; return 'Mixte'; })()})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -589,12 +585,10 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
           {/* Date d'identification */}
           <div>
             <label htmlFor="animal-identification-date" className={labelClass}>Date d&apos;identification</label>
-            <input
+            <DatePicker
               id="animal-identification-date"
-              type="date"
               value={identificationDate}
-              onChange={(e) => setIdentificationDate(e.target.value)}
-              className={inputClass}
+              onChange={(v) => setIdentificationDate(v ?? '')}
             />
           </div>
 
@@ -697,12 +691,10 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
             </div>
             <div>
               <label htmlFor="judicial-date" className={labelClass}>Date de saisine / réquisition</label>
-              <input
+              <DatePicker
                 id="judicial-date"
-                type="date"
                 value={judicialSeizureDate}
-                onChange={(e) => setJudicialSeizureDate(e.target.value)}
-                className={inputClass}
+                onChange={(v) => setJudicialSeizureDate(v ?? '')}
               />
             </div>
             <div>

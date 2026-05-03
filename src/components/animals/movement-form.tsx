@@ -4,6 +4,14 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { recordMovement } from '@/lib/actions/animals'
+import { DatePicker } from '@/components/ui/date-picker'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import type { AnimalStatus, MovementType, IcadStatus } from '@/lib/types/database'
 
 interface MovementFormProps {
@@ -129,29 +137,26 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="movement-type" className={labelClass}>Type de mouvement *</label>
-          <select
-            id="movement-type"
-            value={type}
-            onChange={(e) => setType(e.target.value as MovementType)}
-            required
-            className={inputClass}
-          >
-            <option value="">Selectionnez un type</option>
-            {availableMovements.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
+          <Select value={type} onValueChange={(v) => setType(v as MovementType)}>
+            <SelectTrigger id="movement-type">
+              <SelectValue placeholder="Sélectionnez un type" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableMovements.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div>
           <label htmlFor="movement-date" className={labelClass}>Date *</label>
-          <input
+          <DatePicker
             id="movement-date"
-            type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(v) => setDate(v ?? '')}
             required
-            className={inputClass}
+            clearable={false}
           />
         </div>
       </div>
@@ -212,17 +217,17 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
 
       {/* I-CAD status */}
       <div>
-        <label htmlFor="movement-icad-status" className={labelClass}>Declaration I-CAD</label>
-        <select
-          id="movement-icad-status"
-          value={icadStatus}
-          onChange={(e) => setIcadStatus(e.target.value as IcadStatus)}
-          className={inputClass}
-        >
-          <option value="pending">En attente</option>
-          <option value="declared">Declaree</option>
-          <option value="not_required">Non requise</option>
-        </select>
+        <label htmlFor="movement-icad-status" className={labelClass}>Déclaration I-CAD</label>
+        <Select value={icadStatus} onValueChange={(v) => setIcadStatus(v as IcadStatus)}>
+          <SelectTrigger id="movement-icad-status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="pending">En attente</SelectItem>
+            <SelectItem value="declared">Déclarée</SelectItem>
+            <SelectItem value="not_required">Non requise</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Notes */}
