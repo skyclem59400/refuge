@@ -18,6 +18,7 @@ interface AnimalStatusChangerProps {
 const movementsByStatus: Record<string, { value: MovementType; label: string; danger?: boolean }[]> = {
   pound: [
     { value: 'shelter_transfer', label: 'Transfert en refuge' },
+    { value: 'foster_placement', label: 'Placement en famille d’accueil' },
     { value: 'reservation', label: 'Réservation' },
     { value: 'adoption', label: 'Adoption (directe)' },
     { value: 'return_to_owner', label: 'Restitution au proprietaire' },
@@ -26,6 +27,7 @@ const movementsByStatus: Record<string, { value: MovementType; label: string; da
     { value: 'euthanasia', label: 'Euthanasie', danger: true },
   ],
   shelter: [
+    { value: 'foster_placement', label: 'Placement en famille d’accueil' },
     { value: 'reservation', label: 'Réservation' },
     { value: 'adoption', label: 'Adoption' },
     { value: 'return_to_owner', label: 'Restitution au proprietaire' },
@@ -44,6 +46,7 @@ const movementsByStatus: Record<string, { value: MovementType; label: string; da
   ],
   boarding: [
     { value: 'shelter_transfer', label: 'Retour au refuge' },
+    { value: 'foster_placement', label: 'Placement en famille d’accueil' },
     { value: 'return_to_owner', label: 'Restitution au proprietaire' },
     { value: 'death', label: 'Deces', danger: true },
   ],
@@ -89,8 +92,11 @@ export function AnimalStatusChanger({ animalId, animalName, currentStatus, estab
   const selectedMovement = availableMovements.find((m) => m.value === type)
   const isDanger = selectedMovement?.danger ?? false
   const isAdoption = type === 'adoption'
+  const isFosterPlacement = type === 'foster_placement'
   const isTransferOut = type === 'transfer_out'
   const needsPerson = type === 'return_to_owner' || type === 'transfer_out'
+  const needsClient = isAdoption || isFosterPlacement
+  const clientCategory = isFosterPlacement ? 'foster_family' : 'client'
 
   // No transitions available for terminal states
   if (currentStatus === 'deceased' || currentStatus === 'euthanized' || availableMovements.length === 0) {
@@ -116,13 +122,15 @@ export function AnimalStatusChanger({ animalId, animalName, currentStatus, estab
     e.preventDefault()
     if (!type) return
 
-    if (isAdoption && !selectedClient) {
-      toast.error('Veuillez selectionner un adoptant dans le repertoire')
+    if (needsClient && !selectedClient) {
+      toast.error(isFosterPlacement
+        ? 'Veuillez sélectionner une famille d’accueil'
+        : 'Veuillez sélectionner un adoptant dans le repertoire')
       return
     }
 
-    const adoptantName = isAdoption && selectedClient ? selectedClient.name : null
-    const adoptantContact = isAdoption && selectedClient
+    const linkedName = needsClient && selectedClient ? selectedClient.name : null
+    const linkedContact = needsClient && selectedClient
       ? [selectedClient.phone, selectedClient.email].filter(Boolean).join(' / ') || null
       : null
 
@@ -131,10 +139,11 @@ export function AnimalStatusChanger({ animalId, animalName, currentStatus, estab
         type,
         date,
         notes: notes || null,
-        person_name: isAdoption ? adoptantName : (personName || null),
-        person_contact: isAdoption ? adoptantContact : null,
+        person_name: needsClient ? linkedName : (personName || null),
+        person_contact: needsClient ? linkedContact : null,
         destination: isTransferOut ? (destination || null) : null,
         icad_status: icadStatus,
+        related_client_id: needsClient && selectedClient ? selectedClient.id : null,
       })
 
       if (result.error) {
@@ -234,16 +243,18 @@ export function AnimalStatusChanger({ animalId, animalName, currentStatus, estab
                     />
                   </div>
 
-                  {/* Client search for adoption */}
-                  {isAdoption && (
+                  {/* Client search for adoption / foster placement */}
+                  {needsClient && (
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
-                        Adoptant (repertoire) *
+                        {isFosterPlacement ? 'Famille d’accueil (répertoire) *' : 'Adoptant (répertoire) *'}
                       </label>
                       <ClientSearch
                         onSelect={setSelectedClient}
                         selected={selectedClient}
                         establishmentId={establishmentId}
+                        category={clientCategory}
+                        placeholder={isFosterPlacement ? 'Rechercher une famille d’accueil...' : 'Rechercher un adoptant...'}
                       />
                     </div>
                   )}
@@ -329,7 +340,7 @@ export function AnimalStatusChanger({ animalId, animalName, currentStatus, estab
                   </button>
                   <button
                     type="submit"
-                    disabled={isPending || !type || (isAdoption && !selectedClient)}
+                    disabled={isPending || !type || (needsClient && !selectedClient)}
                     className={`px-4 py-2 rounded-lg font-semibold text-sm text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
                       isDanger
                         ? 'bg-red-600 hover:bg-red-700'

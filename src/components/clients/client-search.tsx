@@ -2,15 +2,17 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { Client } from '@/lib/types/database'
+import type { Client, ContactCategory } from '@/lib/types/database'
 
 interface ClientSearchProps {
   readonly onSelect: (client: Client | null) => void
   readonly selected: Client | null
   readonly establishmentId: string
+  readonly category?: ContactCategory
+  readonly placeholder?: string
 }
 
-export function ClientSearch({ onSelect, selected, establishmentId }: ClientSearchProps) {
+export function ClientSearch({ onSelect, selected, establishmentId, category, placeholder }: ClientSearchProps) {
   const [query, setQuery] = useState('')
   const [allClients, setAllClients] = useState<Client[]>([])
   const [results, setResults] = useState<Client[]>([])
@@ -21,11 +23,13 @@ export function ClientSearch({ onSelect, selected, establishmentId }: ClientSear
 
   async function loadClients() {
     if (loaded) return allClients
-    const { data } = await supabase
+    let q = supabase
       .from('clients')
       .select('*')
       .eq('establishment_id', establishmentId)
       .order('name')
+    if (category) q = q.eq('type', category)
+    const { data } = await q
     const clients = (data as Client[]) || []
     setAllClients(clients)
     setLoaded(true)
@@ -104,7 +108,7 @@ export function ClientSearch({ onSelect, selected, establishmentId }: ClientSear
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onFocus={handleFocus}
-        placeholder="Rechercher un client..."
+        placeholder={placeholder || 'Rechercher un client...'}
         className="w-full px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
           focus:border-primary focus:ring-1 focus:ring-primary transition-colors
           placeholder:text-muted/50"
