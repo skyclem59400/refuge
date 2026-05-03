@@ -93,12 +93,21 @@ export interface DocumensoFieldInput {
 // Operations
 // ============================================
 
+export interface DocumensoDocumentMeta {
+  subject?: string
+  message?: string
+  timezone?: string
+  dateFormat?: string
+  redirectUrl?: string
+}
+
 export interface CreateDocumentParams {
   title: string
   externalId?: string
   recipients: DocumensoRecipientInput[]
   pdfBase64: string
   pdfFileName: string
+  meta?: DocumensoDocumentMeta
 }
 
 export interface CreateDocumentResult {
@@ -111,7 +120,7 @@ export interface CreateDocumentResult {
  * payload to be passed at creation time as base64.
  */
 export async function createDocument(params: CreateDocumentParams): Promise<DocumensoDocument> {
-  const body = {
+  const body: Record<string, unknown> = {
     title: params.title,
     externalId: params.externalId,
     recipients: params.recipients.map((r, i) => ({
@@ -123,6 +132,13 @@ export async function createDocument(params: CreateDocumentParams): Promise<Docu
     documentDataType: 'BYTES_64',
     documentDataData: params.pdfBase64,
     fileName: params.pdfFileName,
+  }
+  if (params.meta) {
+    body.meta = {
+      timezone: 'Europe/Paris',
+      dateFormat: 'dd/MM/yyyy HH:mm',
+      ...params.meta,
+    }
   }
   return apiCall<DocumensoDocument>('/api/v1/documents', {
     method: 'POST',

@@ -37,12 +37,19 @@ export async function sendContractForSignature(contractId: string) {
     const supabase = await createClient()
     const admin = createAdminClient()
 
-    // Fetch contract + foster info
+    // Fetch contract + foster + animal info
     const { data: contract, error } = await admin
       .from('foster_contracts')
-      .select('*, foster:clients!foster_client_id(id, name, email)')
+      .select('*, foster:clients!foster_client_id(id, name, email), animal:animals!animal_id(id, name, species)')
       .eq('id', contractId)
       .eq('establishment_id', establishmentId)
+      .single()
+
+    // Fetch establishment info for the email branding
+    const { data: establishment } = await admin
+      .from('establishments')
+      .select('name, email')
+      .eq('id', establishmentId)
       .single()
 
     if (error || !contract) {
@@ -68,10 +75,24 @@ export async function sendContractForSignature(contractId: string) {
     const pdfBase64 = pdfResult.buffer.toString('base64')
 
     // 2. Create the Documenso document with the FA as recipient
+    const animalName = contract.animal?.name ?? 'votre futur protégé'
+    const fosterFirstName = contract.foster.name.split(' ')[0]
+    const orgName = establishment?.name?.trim() || 'le refuge'
+    const orgEmail = establishment?.email?.trim() || ''
+
+    const emailSubject = `Convention famille d'accueil — ${animalName} | ${orgName}`
+    const contactLine = orgEmail ? `Pour toute question : ${orgEmail}\n\n` : ''
+    const emailMessage =
+      `Bonjour ${fosterFirstName},\n\n` +
+      `Merci pour votre engagement aux côtés de ${orgName} pour accueillir ${animalName}.\n\n` +
+      `Vous trouverez ci-joint la convention de placement en famille d'accueil. Merci de la signer électroniquement avant le début du placement.\n\n` +
+      contactLine +
+      `L'équipe ${orgName}`
+
     let document
     try {
       document = await createDocument({
-        title: `Convention de placement FA — ${contract.contract_number}`,
+        title: `Convention famille d'accueil — ${animalName} — ${orgName} (${contract.contract_number})`,
         externalId: contract.id,
         pdfBase64,
         pdfFileName: pdfResult.filename,
@@ -82,6 +103,12 @@ export async function sendContractForSignature(contractId: string) {
             role: 'SIGNER',
           },
         ],
+        meta: {
+          subject: emailSubject,
+          message: emailMessage,
+          timezone: 'Europe/Paris',
+          dateFormat: 'dd/MM/yyyy HH:mm',
+        },
       })
     } catch (e) {
       return { error: `Erreur creation document Documenso : ${(e as Error).message}` }
