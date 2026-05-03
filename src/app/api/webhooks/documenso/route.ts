@@ -99,22 +99,37 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Find the contract by Documenso document id (or fallback on externalId)
-  let contractQuery = admin
-    .from('foster_contracts')
-    .select('id, animal_id, signature_status, documenso_document_id')
-    .eq('documenso_document_id', documensoDocId)
-    .maybeSingle()
+  // Documents from Optimus carry an externalId. Adoption contracts are
+  // namespaced with the "adoption_" prefix to differentiate from foster
+  // contracts (which use the bare contract uuid).
+  const externalId = payload.data?.externalId
+  const isAdoption = typeof externalId === 'string' && externalId.startsWith('adoption_')
+  const tableName: 'adoption_contracts' | 'foster_contracts' = isAdoption ? 'adoption_contracts' : 'foster_contracts'
+  const bucketName: 'adoption-contracts' | 'foster-contracts' = isAdoption ? 'adoption-contracts' : 'foster-contracts'
 
-  let { data: contract } = await contractQuery
+  type ContractRow = { id: string; animal_id: string; signature_status: string; documenso_document_id: number | null }
 
-  if (!contract && payload.data?.externalId) {
-    const { data: byExternal } = await admin
-      .from('foster_contracts')
+  // Find the contract by Documenso document id (preferred) or by id from externalId.
+  // We type the select results explicitly because Supabase narrows the runtime type to `never`
+  // when the table name is a union literal and not a hardcoded string.
+  let contract: ContractRow | null = null
+  {
+    const { data } = await admin
+      .from(tableName)
       .select('id, animal_id, signature_status, documenso_document_id')
-      .eq('id', payload.data.externalId)
-      .maybeSingle()
-    contract = byExternal
+      .eq('documenso_document_id', documensoDocId)
+      .maybeSingle<ContractRow>()
+    contract = data
+  }
+
+  if (!contract && externalId) {
+    const idLookup = isAdoption ? externalId.replace(/^adoption_/, '') : externalId
+    const { data } = await admin
+      .from(tableName)
+      .select('id, animal_id, signature_status, documenso_document_id')
+      .eq('id', idLookup)
+      .maybeSingle<ContractRow>()
+    contract = data
   }
 
   if (!contract) {
@@ -123,7 +138,6 @@ export async function POST(request: NextRequest) {
 
   const updateData: Record<string, unknown> = { signature_status: newStatus }
 
-  // Stamp viewed/signed timestamps from the recipient details if present
   const recipients = payload.data?.recipients ?? payload.data?.Recipient ?? []
   const firstSigned = recipients.find((r) => r.signedAt)
   if (firstSigned?.signedAt) {
@@ -133,22 +147,19 @@ export async function POST(request: NextRequest) {
     updateData.signature_viewed_at = new Date().toISOString()
   }
 
-  // Once signed, also fetch the signed PDF and stash its URL.
-  // Only do this on completion events (not on every recipient signing) to
-  // avoid downloading partial documents if multiple recipients exist.
   const finalEvent = payload.event === 'document.completed' || payload.event === 'document.signed'
   if (newStatus === 'signed' && finalEvent && contract.signature_status !== 'signed') {
     try {
       const buf = await downloadSignedPdf(documensoDocId)
       const fileName = `signed_${contract.id}_${Date.now()}.pdf`
       const { data: upload, error: uploadErr } = await admin.storage
-        .from('foster-contracts')
+        .from(bucketName)
         .upload(fileName, Buffer.from(buf), {
           contentType: 'application/pdf',
           upsert: false,
         })
       if (!uploadErr && upload) {
-        const { data: pub } = admin.storage.from('foster-contracts').getPublicUrl(upload.path)
+        const { data: pub } = admin.storage.from(bucketName).getPublicUrl(upload.path)
         updateData.signed_pdf_url = pub.publicUrl
       }
     } catch (e) {
@@ -157,7 +168,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { error } = await admin
-    .from('foster_contracts')
+    .from(tableName)
     .update(updateData)
     .eq('id', contract.id)
 
@@ -166,5 +177,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, contractId: contract.id, newStatus })
+  return NextResponse.json({ ok: true, contractId: contract.id, type: isAdoption ? 'adoption' : 'foster', newStatus })
 }

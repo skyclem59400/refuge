@@ -60,6 +60,13 @@ async function fetchAnimalData(admin: SupabaseAdmin, id: string, estabId: string
       .order('start_date', { ascending: false }),
   ])
 
+  const { data: adoptionContracts } = await admin
+    .from('adoption_contracts')
+    .select('*, adopter:clients!adopter_client_id(id, name, email, phone, city)')
+    .eq('animal_id', id)
+    .eq('establishment_id', estabId)
+    .order('adoption_date', { ascending: false })
+
   return {
     animal: animal as Animal | null,
     photos: (photos as AnimalPhoto[]) || [],
@@ -69,6 +76,7 @@ async function fetchAnimalData(admin: SupabaseAdmin, id: string, estabId: string
     socialPosts: (socialPosts as SocialPost[]) || [],
     icadDeclarations: (icadDeclarations as IcadDeclaration[]) || [],
     fosterContracts: fosterContracts || [],
+    adoptionContracts: adoptionContracts || [],
   }
 }
 
@@ -174,6 +182,7 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
         socialPosts={data.socialPosts}
         icadDeclarations={data.icadDeclarations}
         fosterContracts={data.fosterContracts}
+        adoptionContracts={data.adoptionContracts}
         healthProtocols={healthProtocols}
         boxes={data.boxes}
         userNames={userNames}

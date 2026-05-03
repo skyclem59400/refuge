@@ -11,6 +11,7 @@ import { AnimalAttachmentsSection } from '@/components/animals/animal-attachment
 import { HealthRecordForm } from '@/components/health/health-record-form'
 import { MovementForm } from '@/components/animals/movement-form'
 import { FosterContractsTab } from '@/components/foster-contracts/foster-contracts-tab'
+import { AdoptionContractsTab } from '@/components/adoption-contracts/adoption-contracts-tab'
 import { ApplyProtocolModal } from '@/components/health/apply-protocol-modal'
 import { updatePost, deletePost } from '@/lib/actions/social-posts'
 import { formatDateShort, formatCurrency } from '@/lib/utils'
@@ -21,10 +22,20 @@ import {
 } from '@/lib/sda-utils'
 import { PostGenerator } from '@/components/social/post-generator'
 import { IcadDeclarations } from '@/components/icad/icad-declarations'
-import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, AnimalTreatment, AnimalStatus, Box, SocialPost, IcadDeclaration, ActivityLog, FosterContract, HealthProtocolWithSteps } from '@/lib/types/database'
+import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, AnimalTreatment, AnimalStatus, Box, SocialPost, IcadDeclaration, ActivityLog, FosterContract, AdoptionContract, HealthProtocolWithSteps } from '@/lib/types/database'
 
 interface FosterContractWithRelations extends FosterContract {
   foster?: {
+    id: string
+    name: string
+    email: string | null
+    phone: string | null
+    city: string | null
+  }
+}
+
+interface AdoptionContractWithRelations extends AdoptionContract {
+  adopter?: {
     id: string
     name: string
     email: string | null
@@ -64,10 +75,11 @@ import {
   StopCircle,
   Clock,
   Home,
+  Heart,
   ListChecks,
 } from 'lucide-react'
 
-type TabId = 'info' | 'photos' | 'health' | 'movements' | 'foster' | 'documents' | 'outings' | 'posts' | 'icad' | 'activity'
+type TabId = 'info' | 'photos' | 'health' | 'movements' | 'foster' | 'adoption' | 'documents' | 'outings' | 'posts' | 'icad' | 'activity'
 
 interface AnimalOuting {
   id: string
@@ -94,6 +106,7 @@ interface AnimalDetailTabsProps {
   socialPosts: SocialPost[]
   icadDeclarations: IcadDeclaration[]
   fosterContracts?: FosterContractWithRelations[]
+  adoptionContracts?: AdoptionContractWithRelations[]
   healthProtocols?: HealthProtocolWithSteps[]
   boxes: Box[]
   userNames: Record<string, string>
@@ -107,12 +120,13 @@ interface AnimalDetailTabsProps {
   activityLogs?: ActivityLog[]
 }
 
-const baseTabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'outings' | 'socialPosts' | 'icadDeclarations' | 'activityLogs' | 'fosterContracts'; adminOnly?: boolean }[] = [
+const baseTabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'outings' | 'socialPosts' | 'icadDeclarations' | 'activityLogs' | 'fosterContracts' | 'adoptionContracts'; adminOnly?: boolean }[] = [
   { id: 'info', label: 'Infos', icon: Info },
   { id: 'photos', label: 'Photos', icon: Camera, countKey: 'photos' },
   { id: 'health', label: 'Sante', icon: HeartPulse, countKey: 'healthRecords' },
   { id: 'movements', label: 'Mouvements', icon: ArrowRightLeft, countKey: 'movements' },
   { id: 'foster', label: 'Famille d’accueil', icon: Home, countKey: 'fosterContracts' },
+  { id: 'adoption', label: 'Adoption', icon: Heart, countKey: 'adoptionContracts' },
   { id: 'documents', label: 'Documents', icon: FileText },
   { id: 'outings', label: 'Sorties', icon: Footprints, countKey: 'outings' },
   { id: 'posts', label: 'Publications', icon: Share2, countKey: 'socialPosts' },
@@ -128,6 +142,7 @@ export function AnimalDetailTabs({
   socialPosts,
   icadDeclarations,
   fosterContracts = [],
+  adoptionContracts = [],
   healthProtocols = [],
   boxes,
   userNames,
@@ -160,6 +175,7 @@ export function AnimalDetailTabs({
     socialPosts: socialPosts.length,
     icadDeclarations: icadDeclarations.length,
     fosterContracts: fosterContracts.length,
+    adoptionContracts: adoptionContracts.length,
     activityLogs: activityLogs.length,
   }
 
@@ -297,6 +313,14 @@ export function AnimalDetailTabs({
           <FosterContractsTab
             animalId={animal.id}
             contracts={fosterContracts}
+            canManage={canManageAnimals}
+          />
+        )}
+
+        {activeTab === 'adoption' && (
+          <AdoptionContractsTab
+            animalId={animal.id}
+            contracts={adoptionContracts}
             canManage={canManageAnimals}
           />
         )}

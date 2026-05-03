@@ -440,6 +440,7 @@ export interface VeterinarianWithClinic extends Veterinarian {
 // ============================================
 
 export type FosterContractStatus = 'draft' | 'active' | 'ended' | 'cancelled'
+export type AdoptionContractStatus = 'draft' | 'active' | 'cancelled'
 export type SignatureStatus = 'not_sent' | 'pending' | 'viewed' | 'signed' | 'rejected' | 'failed'
 
 export interface FosterContract {
@@ -463,6 +464,40 @@ export interface FosterContract {
   notes: string | null
   pdf_url: string | null
   // Documenso electronic signature workflow
+  documenso_document_id: number | null
+  documenso_recipient_id: number | null
+  documenso_signing_url: string | null
+  signature_status: SignatureStatus
+  signature_sent_at: string | null
+  signature_viewed_at: string | null
+  signed_at_via_documenso: string | null
+  signed_pdf_url: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AdoptionContract {
+  id: string
+  establishment_id: string
+  animal_id: string
+  adopter_client_id: string
+  contract_number: string
+  adoption_date: string
+  adoption_fee: number
+  status: AdoptionContractStatus
+  sterilization_required: boolean
+  sterilization_deadline: string | null
+  sterilization_deposit: number | null
+  visit_right_clause: boolean
+  non_resale_clause: boolean
+  shelter_return_clause: boolean
+  household_acknowledgment: boolean
+  special_conditions: string | null
+  signed_at_location: string | null
+  signed_at: string | null
+  notes: string | null
+  pdf_url: string | null
   documenso_document_id: number | null
   documenso_recipient_id: number | null
   documenso_signing_url: string | null
