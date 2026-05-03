@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { Plus } from 'lucide-react'
 import { recordMovement } from '@/lib/actions/animals'
+import { searchClientsByCategory, createClientAction } from '@/lib/actions/clients'
 import { DatePicker } from '@/components/ui/date-picker'
 import {
   Select,
@@ -12,7 +14,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { AnimalStatus, MovementType, IcadStatus } from '@/lib/types/database'
+import type { AnimalStatus, MovementType, IcadStatus, ContactCategory } from '@/lib/types/database'
+
+// Map each movement type to the kind of contact we should pick from the directory.
+// `null` means no client picker (intra-shelter transfers, deaths, fourriere entry, etc.).
+const clientCategoryByType: Partial<Record<MovementType, ContactCategory | null>> = {
+  adoption: 'client',
+  foster_placement: 'foster_family',
+  return_to_owner: 'client',
+}
+
+interface ClientOption {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  city: string | null
+}
 
 interface MovementFormProps {
   animalId: string
@@ -88,11 +106,84 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
   const [icadStatus, setIcadStatus] = useState<IcadStatus>('pending')
   const [notes, setNotes] = useState('')
 
+  // Client picker state (only used when clientCategoryByType[type] is set)
+  const [relatedClientId, setRelatedClientId] = useState<string | null>(null)
+  const [clientSearch, setClientSearch] = useState('')
+  const [showClientDropdown, setShowClientDropdown] = useState(false)
+  const [clientOptions, setClientOptions] = useState<ClientOption[]>([])
+  const [isCreatingClient, startCreatingClient] = useTransition()
+  const clientPickerRef = useRef<HTMLDivElement>(null)
+
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
   const isDeathOrEuthanasia = type === 'death' || type === 'euthanasia'
   const isTransferOut = type === 'transfer_out'
+  const clientCategory: ContactCategory | null | undefined = type ? clientCategoryByType[type] : undefined
+  const showClientPicker = !!clientCategory
+
+  // Reset client selection when switching to a movement type that does not need it
+  useEffect(() => {
+    if (!showClientPicker) {
+      setRelatedClientId(null)
+      setClientSearch('')
+      setShowClientDropdown(false)
+    }
+  }, [showClientPicker])
+
+  // Debounced search
+  useEffect(() => {
+    if (!showClientPicker || !clientCategory) return
+    const timer = setTimeout(async () => {
+      const result = await searchClientsByCategory(clientCategory, clientSearch)
+      if (result.data) setClientOptions(result.data as ClientOption[])
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [clientSearch, showClientPicker, clientCategory])
+
+  // Outside click closes dropdown
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (clientPickerRef.current && !clientPickerRef.current.contains(e.target as Node)) {
+        setShowClientDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  function selectClient(opt: ClientOption) {
+    setRelatedClientId(opt.id)
+    setClientSearch(opt.name)
+    setPersonName(opt.name)
+    setPersonContact(opt.email || opt.phone || '')
+    setShowClientDropdown(false)
+  }
+
+  function clearClient() {
+    setRelatedClientId(null)
+    setClientSearch('')
+    setPersonName('')
+    setPersonContact('')
+  }
+
+  function handleQuickCreateClient() {
+    const trimmed = clientSearch.trim()
+    if (!trimmed || !clientCategory) {
+      toast.error('Saisissez un nom avant de créer le contact')
+      return
+    }
+    startCreatingClient(async () => {
+      const result = await createClientAction({ name: trimmed, type: clientCategory })
+      if (result.error || !result.data) {
+        toast.error(result.error || 'Création impossible')
+        return
+      }
+      const created = result.data as ClientOption
+      selectClient(created)
+      toast.success('Contact créé et sélectionné')
+    })
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -107,6 +198,11 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
       return
     }
 
+    if (showClientPicker && !relatedClientId && !personName.trim()) {
+      toast.error('Sélectionnez un contact ou saisissez un nom')
+      return
+    }
+
     startTransition(async () => {
       const result = await recordMovement(animalId, {
         type,
@@ -116,6 +212,7 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
         person_contact: personContact || null,
         destination: isTransferOut ? (destination || null) : null,
         icad_status: icadStatus,
+        related_client_id: relatedClientId,
       })
 
       if (result.error) {
@@ -173,32 +270,112 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
         </div>
       )}
 
-      {/* Person name + Contact */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="movement-person-name" className={labelClass}>Personne liee</label>
-          <input
-            id="movement-person-name"
-            type="text"
-            value={personName}
-            onChange={(e) => setPersonName(e.target.value)}
-            placeholder="Nom de la personne"
-            className={inputClass}
-          />
-        </div>
+      {/* Client picker (adoption / foster placement / return to owner) */}
+      {showClientPicker ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div ref={clientPickerRef} className="relative">
+            <label htmlFor="movement-client-search" className={labelClass}>
+              {clientCategory === 'foster_family' ? 'Famille d’accueil *' : 'Adoptant / Propriétaire *'}
+            </label>
+            <input
+              id="movement-client-search"
+              type="text"
+              value={clientSearch}
+              onChange={(e) => {
+                setClientSearch(e.target.value)
+                if (relatedClientId) {
+                  // user is editing after a selection -> drop the link
+                  setRelatedClientId(null)
+                }
+                setShowClientDropdown(true)
+              }}
+              onFocus={() => setShowClientDropdown(true)}
+              placeholder={clientCategory === 'foster_family' ? 'Rechercher une famille d’accueil...' : 'Rechercher un contact...'}
+              className={inputClass}
+              autoComplete="off"
+            />
+            {relatedClientId && (
+              <button
+                type="button"
+                onClick={clearClient}
+                className="absolute right-2 top-[34px] text-xs text-muted hover:text-text"
+              >
+                ✕
+              </button>
+            )}
+            {showClientDropdown && (
+              <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
+                {clientOptions.length > 0 ? (
+                  clientOptions.map((opt) => (
+                    <button
+                      type="button"
+                      key={opt.id}
+                      onClick={() => selectClient(opt)}
+                      className="block w-full text-left px-3 py-2 hover:bg-surface-hover text-sm"
+                    >
+                      <div className="font-medium">{opt.name}</div>
+                      <div className="text-xs text-muted">
+                        {[opt.city, opt.email || opt.phone].filter(Boolean).join(' · ') || '—'}
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-3 py-2 text-sm text-muted">Aucun contact trouvé</div>
+                )}
+                {clientSearch.trim() && (
+                  <button
+                    type="button"
+                    onClick={handleQuickCreateClient}
+                    disabled={isCreatingClient}
+                    className="flex items-center gap-2 w-full text-left px-3 py-2 border-t border-border bg-surface-dark hover:bg-surface-hover text-sm font-medium text-primary disabled:opacity-50"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {isCreatingClient ? 'Création...' : `Créer "${clientSearch.trim()}" comme nouveau contact`}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
-        <div>
-          <label htmlFor="movement-person-contact" className={labelClass}>Contact</label>
-          <input
-            id="movement-person-contact"
-            type="text"
-            value={personContact}
-            onChange={(e) => setPersonContact(e.target.value)}
-            placeholder="Telephone ou email"
-            className={inputClass}
-          />
+          <div>
+            <label htmlFor="movement-person-contact" className={labelClass}>Contact</label>
+            <input
+              id="movement-person-contact"
+              type="text"
+              value={personContact}
+              onChange={(e) => setPersonContact(e.target.value)}
+              placeholder="Téléphone ou email"
+              className={inputClass}
+            />
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="movement-person-name" className={labelClass}>Personne liée</label>
+            <input
+              id="movement-person-name"
+              type="text"
+              value={personName}
+              onChange={(e) => setPersonName(e.target.value)}
+              placeholder="Nom de la personne"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="movement-person-contact" className={labelClass}>Contact</label>
+            <input
+              id="movement-person-contact"
+              type="text"
+              value={personContact}
+              onChange={(e) => setPersonContact(e.target.value)}
+              placeholder="Téléphone ou email"
+              className={inputClass}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Destination (only for transfer_out) */}
       {isTransferOut && (

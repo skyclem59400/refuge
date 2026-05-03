@@ -457,6 +457,7 @@ export async function recordMovement(animalId: string, data: {
   person_contact?: string | null
   destination?: string | null
   icad_status?: IcadStatus
+  related_client_id?: string | null
 }) {
   try {
     const { establishmentId, userId } = await requirePermission('manage_movements')
@@ -486,6 +487,7 @@ export async function recordMovement(animalId: string, data: {
         person_contact: data.person_contact ?? null,
         destination: data.destination ?? null,
         icad_status: data.icad_status ?? 'pending',
+        related_client_id: data.related_client_id ?? null,
         created_by: userId,
       })
       .select()
