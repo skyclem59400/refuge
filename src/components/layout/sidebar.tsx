@@ -122,7 +122,7 @@ export function Sidebar({ establishments, currentEstablishment, permissions, rol
 
   return (
     <aside
-      className={`hidden lg:flex flex-col bg-surface border-r border-border min-h-screen fixed left-0 top-0 transition-all duration-300 z-40
+      className={`hidden lg:flex flex-col bg-surface border-r border-border h-screen fixed left-0 top-0 transition-all duration-300 z-40
         ${sidebarCollapsed ? 'w-16' : 'w-60'}`}
     >
       {/* Brand / Switcher */}
@@ -136,7 +136,7 @@ export function Sidebar({ establishments, currentEstablishment, permissions, rol
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-2 space-y-1">
+      <nav className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href)
           return (
