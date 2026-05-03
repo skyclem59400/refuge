@@ -470,7 +470,7 @@ function PhotosTab({
 }>) {
   return (
     <div className="max-w-2xl">
-      <AnimalPhotos animalId={animal.id} photos={photos} canManage={canManageAnimals} fallbackPhotoUrl={animal.photo_url} />
+      <AnimalPhotos animalId={animal.id} establishmentId={animal.establishment_id} photos={photos} canManage={canManageAnimals} fallbackPhotoUrl={animal.photo_url} />
     </div>
   )
 }

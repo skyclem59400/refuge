@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import Image from 'next/image'
 import { Camera, Star, Trash2, Plus, Loader2 } from 'lucide-react'
-import { uploadAnimalPhoto, deleteAnimalPhoto, setPrimaryAnimalPhoto } from '@/lib/actions/photos'
+import { registerAnimalPhoto, deleteAnimalPhoto, setPrimaryAnimalPhoto } from '@/lib/actions/photos'
+import { createClient } from '@/lib/supabase/client'
 
 interface AnimalPhotosProps {
   animalId: string
+  establishmentId: string
   photos: {
     id: string
     url: string
@@ -19,7 +21,7 @@ interface AnimalPhotosProps {
   fallbackPhotoUrl?: string | null
 }
 
-export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: Readonly<AnimalPhotosProps>) {
+export function AnimalPhotos({ animalId, establishmentId, photos, canManage, fallbackPhotoUrl }: Readonly<AnimalPhotosProps>) {
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<string | null>(null)
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
@@ -90,10 +92,38 @@ export function AnimalPhotos({ animalId, photos, canManage, fallbackPhotoUrl }: 
           }
         }
 
-        const formData = new FormData()
-        formData.append('file', finalFile)
+        // Direct browser → Supabase Storage upload (bypasses Server Action body limits).
+        const supabase = createClient()
+        const ext = finalFile.name.split('.').pop()?.toLowerCase() || 'jpg'
+        const randomId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+        const storagePath = `${establishmentId}/${animalId}/${randomId}.${ext}`
 
-        const result = await uploadAnimalPhoto(animalId, formData)
+        const { error: uploadErr } = await supabase.storage
+          .from('animal-photos')
+          .upload(storagePath, finalFile, {
+            contentType: finalFile.type || 'image/jpeg',
+            upsert: false,
+          })
+
+        if (uploadErr) {
+          console.error('[animal-photos] Storage upload error:', uploadErr)
+          toast.error(`Erreur upload : ${uploadErr.message}`)
+          setPendingAction(null)
+          if (fileRef.current) fileRef.current.value = ''
+          return
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('animal-photos')
+          .getPublicUrl(storagePath)
+
+        const result = await registerAnimalPhoto({
+          animalId,
+          storagePath,
+          publicUrl,
+        })
 
         if (result.error) {
           toast.error(result.error)

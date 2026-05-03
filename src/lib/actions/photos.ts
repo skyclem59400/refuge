@@ -34,6 +34,63 @@ export async function getAnimalPhotos(animalId: string) {
 // Write actions (use adminClient — permission checked via requirePermission)
 // ============================================
 
+/**
+ * Register an animal photo whose binary has already been uploaded
+ * to Supabase Storage from the browser. This action only handles
+ * the DB row + permissions check — no large body crosses the wire.
+ *
+ * The legacy formData-based upload is kept below for the few callers
+ * that haven't been migrated, but new code should use this.
+ */
+export async function registerAnimalPhoto(params: {
+  animalId: string
+  storagePath: string
+  publicUrl: string
+}) {
+  try {
+    const { establishmentId } = await requirePermission('manage_animals')
+    const adminClient = createAdminClient()
+
+    // Sanity check: path must start with the user's establishment id
+    if (!params.storagePath.startsWith(`${establishmentId}/`)) {
+      return { error: "Chemin de stockage invalide pour cet etablissement" }
+    }
+
+    const { data: existingPhotos, error: countError } = await adminClient
+      .from('animal_photos')
+      .select('id')
+      .eq('animal_id', params.animalId)
+
+    if (countError) {
+      return { error: countError.message }
+    }
+
+    const isFirst = !existingPhotos || existingPhotos.length === 0
+
+    const { data: photo, error: insertError } = await adminClient
+      .from('animal_photos')
+      .insert({
+        animal_id: params.animalId,
+        url: params.publicUrl,
+        is_primary: isFirst,
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      // Best-effort cleanup of the orphan storage object
+      await adminClient.storage.from('animal-photos').remove([params.storagePath])
+      return { error: insertError.message }
+    }
+
+    revalidatePath(`/animals/${params.animalId}`)
+    revalidatePath('/animals')
+    return { data: photo }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
 export async function uploadAnimalPhoto(animalId: string, formData: FormData) {
   try {
     const { establishmentId } = await requirePermission('manage_animals')
