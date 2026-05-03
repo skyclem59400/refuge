@@ -20,15 +20,41 @@ interface Props {
 
 const NONE = '__none__'
 
+// Time slots every 30 min from 06:00 to 21:00
+const TIME_SLOTS: string[] = (() => {
+  const slots: string[] = []
+  for (let h = 6; h <= 21; h++) {
+    slots.push(`${String(h).padStart(2, '0')}:00`)
+    slots.push(`${String(h).padStart(2, '0')}:30`)
+  }
+  return slots
+})()
+
+function displaySlot(t: string): string {
+  if (!t) return ''
+  const [h, m] = t.split(':')
+  const hNum = parseInt(h, 10)
+  return m === '00' ? `${hNum}H` : `${hNum}H${m}`
+}
+
+function buildTimeLabel(start: string, end: string): string | null {
+  const s = displaySlot(start)
+  const e = displaySlot(end)
+  if (!s && !e) return null
+  if (s && e) return `${s}-${e}`
+  if (s) return `À partir de ${s}`
+  return `Jusqu'à ${e}`
+}
+
 export function NewVetVisitForm({ clinics }: Readonly<Props>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [date, setDate] = useState<string | null>(new Date().toISOString().split('T')[0])
-  const [timeLabel, setTimeLabel] = useState('')
+  const [startTime, setStartTime] = useState<string>(NONE)
+  const [endTime, setEndTime] = useState<string>(NONE)
   const [locationLabel, setLocationLabel] = useState('')
   const [clinicId, setClinicId] = useState<string>(NONE)
   const [vetId, setVetId] = useState<string>(NONE)
-  const [vetLabel, setVetLabel] = useState('')
   const [notes, setNotes] = useState('')
 
   const selectedClinic = useMemo(
@@ -39,8 +65,20 @@ export function NewVetVisitForm({ clinics }: Readonly<Props>) {
 
   function handleClinicChange(next: string) {
     setClinicId(next)
-    // Reset vet when clinic changes
     setVetId(NONE)
+  }
+
+  // End time options : only slots strictly after start (if start is set)
+  const endTimeOptions = useMemo(() => {
+    if (startTime === NONE) return TIME_SLOTS
+    return TIME_SLOTS.filter((t) => t > startTime)
+  }, [startTime])
+
+  function handleStartChange(next: string) {
+    setStartTime(next)
+    if (next !== NONE && endTime !== NONE && endTime <= next) {
+      setEndTime(NONE)
+    }
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -51,13 +89,14 @@ export function NewVetVisitForm({ clinics }: Readonly<Props>) {
     }
     startTransition(async () => {
       const resolvedVetId = vetId !== NONE ? vetId : null
-      const resolvedVet = resolvedVetId ? availableVets.find((v) => v.id === resolvedVetId) : null
+      const resolvedStart = startTime !== NONE ? startTime : ''
+      const resolvedEnd = endTime !== NONE ? endTime : ''
       const res = await createVetVisit({
         visit_date: date,
-        time_label: timeLabel.trim() || null,
+        time_label: buildTimeLabel(resolvedStart, resolvedEnd),
         location_label: locationLabel.trim() || null,
         veterinarian_id: resolvedVetId,
-        vet_label: vetLabel.trim() || resolvedVet?.first_name || null,
+        vet_label: null,
         notes: notes.trim() || null,
       })
       if (res.error) {
@@ -80,12 +119,36 @@ export function NewVetVisitForm({ clinics }: Readonly<Props>) {
           <DatePicker id="vv-date" value={date} onChange={setDate} required />
         </div>
         <div>
-          <label htmlFor="vv-time" className={labelClass}>Créneau</label>
-          <input id="vv-time" type="text" value={timeLabel} onChange={(e) => setTimeLabel(e.target.value)} placeholder="9H-11H" className={inputClass} />
-        </div>
-        <div>
           <label htmlFor="vv-loc" className={labelClass}>Lieu</label>
           <input id="vv-loc" type="text" value={locationLabel} onChange={(e) => setLocationLabel(e.target.value)} placeholder="Saint Druon (SV) / Tilques (TQ)..." className={inputClass} />
+        </div>
+        <div className="md:col-span-1">
+          <span className={labelClass}>Créneau</span>
+          <div className="flex items-center gap-2">
+            <Select value={startTime} onValueChange={handleStartChange}>
+              <SelectTrigger id="vv-start" aria-label="Heure de début">
+                <SelectValue placeholder="Début" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>—</SelectItem>
+                {TIME_SLOTS.map((t) => (
+                  <SelectItem key={t} value={t}>{displaySlot(t)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-muted text-sm shrink-0">→</span>
+            <Select value={endTime} onValueChange={setEndTime}>
+              <SelectTrigger id="vv-end" aria-label="Heure de fin">
+                <SelectValue placeholder="Fin" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>—</SelectItem>
+                {endTimeOptions.map((t) => (
+                  <SelectItem key={t} value={t}>{displaySlot(t)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div>
@@ -105,7 +168,7 @@ export function NewVetVisitForm({ clinics }: Readonly<Props>) {
           </Select>
         </div>
 
-        <div>
+        <div className="md:col-span-2">
           <label htmlFor="vv-vet" className={labelClass}>Vétérinaire</label>
           <Select value={vetId} onValueChange={setVetId} disabled={!selectedClinic}>
             <SelectTrigger id="vv-vet">
@@ -120,11 +183,6 @@ export function NewVetVisitForm({ clinics }: Readonly<Props>) {
               ))}
             </SelectContent>
           </Select>
-        </div>
-
-        <div>
-          <label htmlFor="vv-vet-label" className={labelClass}>Libellé véto (libre)</label>
-          <input id="vv-vet-label" type="text" value={vetLabel} onChange={(e) => setVetLabel(e.target.value)} placeholder="JULIE, CAROLINE..." className={inputClass} />
         </div>
       </div>
 
