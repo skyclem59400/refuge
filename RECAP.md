@@ -23,9 +23,13 @@
 - ✅ CRUD complet ([animals/](src/app/(app)/animals/), [animals/[id]](src/app/(app)/animals/[id]/page.tsx))
 - ✅ Champs : identité, identification (puce, tatouage, médaille, LOOF, passeport, date d'identification, vétérinaire identifiant), comportement, compatibilité (chiens), description publique avec génération IA
 - ✅ Champ **`arrived_sterilized`** distinct du flag d'état actuel (utile pour distinguer "déjà stérilisé en arrivant" vs "stérilisé chez nous")
-- ✅ Photos (bucket `animal-photos`)
+- ✅ Photos (bucket `animal-photos`) — **upload direct browser → Supabase Storage** (bypass Server Actions pour ne pas être limité par la taille de body Next.js), conversion automatique HEIC/HEIF → JPEG côté client via `heic2any` (les iPhones envoient du HEIC que Chrome/Firefox ne savent pas afficher), policies RLS qui autorisent l'authentified user à uploader/modifier/supprimer dans le dossier `{son_establishment_id}/...`
 - ✅ Mouvements (entrée fourrière, transfert, adoption, retour, transfert sortant, décès, euthanasie, **réservation** + réservation annulée)
 - ✅ Adoption directe possible depuis la fourrière (utile pour les chats — pas de délai légal de 8 jours)
+- ✅ **Placement en famille d'accueil** disponible depuis fourrière, refuge et pension (pas seulement refuge)
+- ✅ **Client picker autocomplete** dans le formulaire mouvement et le changeur de statut : pour adoption / placement FA / restitution propriétaire, recherche dans la table `clients` filtrée par catégorie (`client` pour adoption, `foster_family` pour FA), bouton « créer un nouveau contact » inline si pas trouvé. Le mouvement enregistre `related_client_id` (FK clients) en plus du snapshot text `person_name` / `person_contact`.
+- ✅ **Timeline mouvements visuelle** ([movements-timeline.tsx](src/components/animals/movements-timeline.tsx)) qui remplace le tableau austère : cercle coloré + icône par type, ligne verticale entre items, badge type pillulé bordé, carte avec date + heure + durée écoulée auto-calculée, bloc personne liée avec avatar à initiales, contacts cliquables (mailto / téléphone), notes en italique, footer "Saisi par <user>"
+- ✅ Séparation claire **Personne liée** (adoptant/FA/propriétaire) **vs Saisi par** (utilisateur du logiciel) — plus de confusion entre l'auteur de la saisie et la personne du mouvement
 - ✅ Sorties (promenade) + assignations
 - ✅ Sync Hunimalis (intégration externe) — **merge intelligent** : Hunimalis n'écrase plus jamais une donnée locale (puce, race, date naissance, couleur…) si Hunimalis renvoie null/vide
 - ✅ Onglets fiche : Infos, Photos, Santé, Mouvements, Famille d'accueil, **Documents** (PDF), Sorties, Publications, I-CAD, Activité (admin)
@@ -100,6 +104,18 @@
 - ✅ Convention de placement ([foster_contracts](src/components/foster-contracts/)) avec génération PDF
 - ✅ Signature électronique via **Documenso** (signature.optimus-services.fr)
 - ✅ Suivi statut signature (not_sent, pending, viewed, signed, rejected, failed)
+- ✅ **Email Documenso multi-tenant** : sujet et corps personnalisés selon l'établissement actif (nom + email contact dynamiques)
+- ✅ **PDF refondu visuellement** : bandeau primary teal en gradient + photo de l'animal embarquée + sections numérotées avec pastilles + clauses en cards à checkmark
+
+### Adoption (contrats avec signature électronique)
+- ✅ Convention d'adoption ([adoption_contracts](src/components/adoption-contracts/)) avec génération PDF
+- ✅ Numérotation auto **`CA-YYYY-NNN`** par établissement (RPC `get_next_adoption_contract_number`)
+- ✅ Champs : adoptant, date d'adoption, frais d'adoption (montant variable), clauses opt-in (stérilisation obligatoire avec deadline + caution, non-cession, reprise refuge, droit de visite, accord du foyer)
+- ✅ Signature électronique via **Documenso** (mêmes statuts que FA)
+- ✅ **Email Documenso multi-tenant** : subject `Contrat d'adoption — [Animal] | [Établissement]`, message custom prénom + nom de l'animal + contact établissement
+- ✅ Onglet **Adoption** sur la fiche animal (icône Heart) avec form + tableau + boutons envoi/sync/aperçu/signé/édition/suppression
+- ✅ PDF visuellement riche (bandeau primary, photo animal, box frais en gradient, clauses graphiques, signatures stylées)
+- ✅ Webhook Documenso commun aux 2 types de contrats (route via préfixe `externalId="adoption_…"`, dispatch sur la bonne table et le bon bucket storage)
 
 ### Dons & CERFA
 - ✅ CRUD dons ([donations/](src/app/(app)/donations/page.tsx))
@@ -136,6 +152,7 @@
 | `/api/pdf/[documentId]` | Devis / facture / avoir |
 | `/api/pdf/cerfa/[donationId]` | Reçu fiscal CERFA |
 | `/api/pdf/foster-contract/[id]` | Convention famille d'accueil |
+| `/api/pdf/adoption-contract/[id]` | Contrat d'adoption |
 | `/api/pdf/box/[id]` | Fiche box (animaux hébergés) |
 | `/api/pdf/box-list` | Liste consolidée des box |
 | `/api/pdf/animal/[id]/medical-followup` | Fiche suivi médical |
@@ -162,6 +179,7 @@
 | `boxes` | Box du refuge |
 | `veterinary_clinics`, `veterinarians` | Cabinets et praticiens |
 | `foster_contracts` | Conventions FA + workflow signature Documenso |
+| `adoption_contracts` | Contrats d'adoption + workflow signature Documenso (numérotation `CA-YYYY-NNN`) |
 | `payment_entries` | Saisies de règlement |
 | `donations`, `helloasso_connections` | Dons et intégration HelloAsso |
 | `icad_declarations` | Déclarations I-CAD |
@@ -185,6 +203,7 @@
 | `animal-photos` | oui | Photos animaux |
 | `animal-documents` | oui | PDF/images attachés aux dossiers animaux |
 | `foster-contracts` | oui | PDF contrats FA signés |
+| `adoption-contracts` | oui | PDF contrats d'adoption signés |
 | `social-media` | oui | Médias publications |
 | `payslips` | non | Bulletins de paie (privé) |
 
@@ -207,6 +226,15 @@
 - `2026_05_02_vet_visits_planning` (appliquée via MCP) :
   - Tables `vet_visits` (visite globale : date + créneau + lieu + véto) et `vet_visit_lines` (1 ligne par animal avec acts JSONB + validation)
   - RLS multi-établissement sur les 2 tables, triggers `updated_at`
+- `20260503_animal_movements_related_client` ([fichier](supabase/migrations/20260503_animal_movements_related_client.sql), appliquée via MCP) :
+  - Colonne `related_client_id` UUID FK vers `clients` sur `animal_movements` (ON DELETE SET NULL — l'historique mouvement persiste même si le contact est supprimé)
+- `animal_photos_storage_policies` (appliquée via MCP) :
+  - Policies RLS sur `storage.objects` pour le bucket `animal-photos` : INSERT / UPDATE / DELETE autorisés à `authenticated` si le 1er segment du path correspond à un `establishment_id` dont l'user est membre
+- `20260503_adoption_contracts` ([fichier](supabase/migrations/20260503_adoption_contracts.sql), appliquée via MCP) :
+  - Table `adoption_contracts` : adopter_client_id, adoption_date, adoption_fee, clauses booléennes (sterilization_required + deadline + deposit, visit_right, non_resale, shelter_return, household_acknowledgment), conditions, signatures, champs Documenso complets
+  - RPC `get_next_adoption_contract_number(est_id)` → format `CA-YYYY-NNN`
+  - Trigger `tr_adoption_contracts_updated`, RLS multi-établissement
+  - Bucket storage `adoption-contracts` (10 MB, PDF only)
 
 ## Infrastructure & Déploiement
 
@@ -226,6 +254,7 @@
 | 2026-04-30 (fin) | **Pose de puce auto-fill + URL prod** : acte d'identification → report puce/date/véto sur fiche animal ; documentation URL prod migrée vers `sda.optimus-services.fr` (ancienne `crm.skyclem.fr` retirée du Coolify) | commit `2d5f51a` |
 | 2026-04-30 (soir) | **Fix UX permissions** : freeze 30s lors d'un toggle de permission corrigé. Suppression du `revalidatePath('/etablissement')` qui déclenchait un re-fetch complet, et passage à un pending tracké par toggle individuel (le toggle en cours pulse, les autres restent cliquables) | commit `46f0954` |
 | 2026-05-02 | **Planning véto + cession + RESERVATION + fix sync Hunimalis** : module `/planning-veto` (tableaux quotidiens style Google Sheet, actes cochables avec validation qui crée auto les fiches santé), nouveau type d'acte `cession`, mouvements `reservation` / `reservation_cancelled`, adoption directe depuis fourrière, champ `arrived_sterilized`. **Fix critique** : la sync Hunimalis n'écrase plus jamais les données locales (puces, dates, couleurs saisies par les soigneurs) si Hunimalis renvoie null/vide. **Backfill** des données perdues pour Abby, Sweet, Cléo, Izel. | commit `6ea5cd8` (21 fichiers, +1202 lignes) |
+| 2026-05-03 | **Documenso multi-tenant + Contrats d'adoption + Refonte UX** : <ul><li>Email Documenso personnalisé par établissement (subject + corps), commit `506e7ff`</li><li>Fix upload photos animaux : bypass Server Actions via upload direct browser → Supabase Storage avec policies RLS, fallback compression + conversion HEIC/HEIF→JPEG via heic2any, commits `44e19e7` `99e3a7b` `0d94c3b`</li><li>Client picker autocomplete dans MovementForm + AnimalStatusChanger (catégorie filtrée selon le type de mouvement, création rapide inline), migration `related_client_id` sur `animal_movements`, commit `e707fe8` `5953aec`</li><li>Foster placement ajouté dans le changeur de statut + picker FA dédié, commit `79ec9a0`</li><li>Séparation visuelle « Personne liée » vs « Saisi par » dans la liste des mouvements, commit `7dc0e37`</li><li>**Contrats d'adoption complets** (migration + types + CRUD + signature Documenso + webhook étendu + PDF Puppeteer + UI nouvel onglet « Adoption » avec icône Heart), commit `1f6544f`</li><li>**Refonte design** : timeline mouvements visuelle (cercles colorés par type + avatars + durées écoulées + contacts cliquables) et PDFs entièrement repensés (bandeau primary teal en gradient avec liseré scalloped, photo animal embarquée en base64, sections numérotées avec pastilles, box frais en gradient, clauses graphiques avec ✓/○), commit `e796976`</li></ul> | 8 commits sur la session |
 
 ## Problèmes connus / Dette technique
 
@@ -234,6 +263,8 @@
 - ⚠️ Avertissement build Next.js : `metadataBase` non défini (cosmétique)
 - ⚠️ Lien sidebar `/contacts-entrants` réservé aux owners mais la route n'est pas encore committée → 404 pour Clément
 - ⚠️ `MIGRATION_TO_RUN_2026_04_27.sql` à la racine : déjà appliqué en prod, à archiver dans `supabase/migrations/`
+- ⚠️ **Branding global Documenso reporté** : la création d'organisation dans l'admin Documenso self-hosted (image `:latest`) plante sur un appel Stripe absent en self-hosted. Solution acceptée : contournement via UI/SQL direct quand le besoin sera prioritaire. En attendant, la personnalisation passe par le sujet + le corps de l'email (déjà customisés par établissement). Logo SDA disponible sur https://sda.optimus-services.fr/logo-sda.png pour quand on s'y attaquera.
+- ⚠️ Fichier orphelin HEIC dans le bucket `animal-photos` (`fbf2ebf8-…/167c7f2b-….heic`) — la ligne DB a été supprimée mais Supabase bloque le DELETE direct sur `storage.objects` (sécurité). Suppression à faire via l'API Storage si on veut faire le ménage
 
 ## Prochaines étapes (TODO V2 demandées par l'équipe)
 
