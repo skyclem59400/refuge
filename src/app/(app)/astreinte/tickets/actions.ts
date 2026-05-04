@@ -3,8 +3,11 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getEstablishmentContext } from '@/lib/establishment/context'
 import { persistAstreinteReportPdf } from '@/lib/pdf/astreinte-report-pdf'
 import { sendAstreinteReport } from '@/lib/email/astreinte-report-email'
+import { createAnimalFromTicket } from '@/lib/astreinte/create-animal-from-ticket'
+import { createInvoiceFromTicket } from '@/lib/astreinte/create-invoice-from-ticket'
 
 // =============================================================================
 // Types
@@ -210,9 +213,76 @@ export async function completeInterventionWithReport(
     }
   }
 
+  // 4. Auto-création animal (refuge_sda OU veterinary) — best-effort
+  const ctx = await getEstablishmentContext()
+  const establishmentId = ctx?.establishment.id
+  const animalNotes: string[] = []
+  if (establishmentId) {
+    if (
+      parsed.data.outcome === 'animal_recovered' &&
+      (parsed.data.destination === 'refuge_sda' ||
+        parsed.data.destination === 'veterinary')
+    ) {
+      try {
+        const animal = await createAnimalFromTicket(parsed.data.ticket_id, establishmentId)
+        if (animal) {
+          animalNotes.push(`Animal "${animal.animalName}" créé en fourrière.`)
+          await admin.from('astreinte_ticket_events').insert({
+            ticket_id: parsed.data.ticket_id,
+            event_type: 'comment',
+            performed_by: userId,
+            message: `Animal créé automatiquement : ${animal.animalName}`,
+            metadata: { animal_id: animal.animalId, animal_name: animal.animalName },
+            visible_to_declarant: false,
+          })
+        }
+      } catch (err) {
+        console.error('[astreinte] auto-create animal failed:', err)
+        animalNotes.push('⚠️ Création animal échouée (à reprendre manuellement).')
+      }
+    }
+  }
+
+  // 5. Auto-création facture pour interventions de nuit — best-effort
+  const invoiceNotes: string[] = []
+  if (establishmentId) {
+    try {
+      const invoice = await createInvoiceFromTicket(
+        parsed.data.ticket_id,
+        establishmentId,
+        userId
+      )
+      if (invoice) {
+        invoiceNotes.push(
+          `Facture ${invoice.invoiceNumber} générée pour ${invoice.clientName} (${invoice.total} €).`
+        )
+        await admin.from('astreinte_ticket_events').insert({
+          ticket_id: parsed.data.ticket_id,
+          event_type: 'comment',
+          performed_by: userId,
+          message: `Facture nuit générée : ${invoice.invoiceNumber} (${invoice.total} €)`,
+          metadata: {
+            invoice_id: invoice.invoiceId,
+            invoice_number: invoice.invoiceNumber,
+            total: invoice.total,
+          },
+          visible_to_declarant: false,
+        })
+      }
+    } catch (err) {
+      console.error('[astreinte] auto-create invoice failed:', err)
+      invoiceNotes.push('⚠️ Génération facture échouée (à reprendre manuellement).')
+    }
+  }
+
   revalidatePath('/astreinte/tickets')
   revalidatePath(`/astreinte/tickets/${parsed.data.ticket_id}`)
-  return { status: 'success', message: 'Compte-rendu envoyé au déclarant et à la fourrière.' }
+
+  const successParts = ['Compte-rendu envoyé au déclarant et à la fourrière.']
+  if (animalNotes.length) successParts.push(...animalNotes)
+  if (invoiceNotes.length) successParts.push(...invoiceNotes)
+
+  return { status: 'success', message: successParts.join(' ') }
 }
 
 // =============================================================================

@@ -675,6 +675,34 @@ export default async function TicketDetailPage({ params }: PageProps) {
                 )}
               </div>
             )}
+
+            {ticket.optimus_animal_id && (
+              <div className="text-xs mt-3 pt-3 border-t">
+                <div className="font-semibold text-green-700 dark:text-green-400">
+                  ✓ Animal créé en fourrière
+                </div>
+                <a
+                  href={`/animals/${ticket.optimus_animal_id}`}
+                  className="text-primary hover:underline text-[12px] font-semibold mt-1 inline-block"
+                >
+                  Voir la fiche animal ↗
+                </a>
+              </div>
+            )}
+
+            {ticket.optimus_invoice_id && (
+              <div className="text-xs mt-3 pt-3 border-t">
+                <div className="font-semibold text-green-700 dark:text-green-400">
+                  ✓ Facture nuit générée
+                </div>
+                <a
+                  href={`/documents/${ticket.optimus_invoice_id}`}
+                  className="text-primary hover:underline text-[12px] font-semibold mt-1 inline-block"
+                >
+                  Voir la facture ↗
+                </a>
+              </div>
+            )}
           </Card>
 
           {/* Timeline (tous events, y compris notes internes) */}
