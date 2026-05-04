@@ -227,9 +227,18 @@ export async function getDocument(documentId: number): Promise<DocumensoDocument
   return apiCall<DocumensoDocument>(`/api/v1/documents/${documentId}`)
 }
 
-/** Download the signed PDF as ArrayBuffer (only available once status = COMPLETED). */
+/**
+ * Download the signed PDF as ArrayBuffer (only available once status = COMPLETED).
+ *
+ * Endpoint utilisé : v2-beta `/api/v2-beta/document/{id}/download` qui retourne
+ * directement le PDF binaire (content-type: application/pdf).
+ *
+ * L'endpoint v1 `/api/v1/documents/{id}/download` retourne désormais du JSON
+ * `{ downloadUrl: "<S3 presigned>" }` (depuis la migration S3 de Documenso) —
+ * il faudrait suivre cette URL en 2e fetch. v2-beta nous évite ça.
+ */
 export async function downloadSignedPdf(documentId: number): Promise<ArrayBuffer> {
-  const res = await fetch(`${BASE_URL}/api/v1/documents/${documentId}/download`, {
+  const res = await fetch(`${BASE_URL}/api/v2-beta/document/${documentId}/download`, {
     headers: { Authorization: `Bearer ${requireToken()}` },
   })
   if (!res.ok) {
