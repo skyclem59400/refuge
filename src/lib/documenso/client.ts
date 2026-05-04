@@ -39,6 +39,21 @@ async function apiCall<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>
 }
 
+async function apiCallV2Beta<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${BASE_URL}/api/v2-beta${path}`, {
+    ...init,
+    headers: {
+      ...authHeaders(),
+      ...(init.headers || {}),
+    },
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Documenso v2-beta ${res.status} on ${path}: ${text}`)
+  }
+  return res.json() as Promise<T>
+}
+
 // ============================================
 // Types
 // ============================================
@@ -105,19 +120,42 @@ export interface CreateDocumentParams {
   title: string
   externalId?: string
   recipients: DocumensoRecipientInput[]
-  pdfBase64: string
+  /** PDF binaire (Buffer Node ou Uint8Array). Sera uploadé sur l'URL S3 retournée par v2-beta. */
+  pdfBuffer: Buffer | Uint8Array
   pdfFileName: string
   meta?: DocumensoDocumentMeta
+  /** Optionnel : range le doc dans un dossier dès la création (au lieu d'un /update après). */
+  folderId?: string
 }
 
-export interface CreateDocumentResult {
-  document: DocumensoDocument
-  uploadUrl?: string
+interface V2BetaCreateResponse {
+  document: {
+    id: number
+    title: string
+    status: DocumensoStatus
+    folderId: string | null
+    createdAt: string
+    updatedAt: string
+  }
+  uploadUrl: string
+  recipients?: Array<{
+    id: number
+    email: string
+    name: string
+    role: DocumensoRole
+    signingUrl?: string
+    token?: string
+  }>
 }
 
 /**
- * Create a draft document with recipients. Documenso v1 expects the PDF
- * payload to be passed at creation time as base64.
+ * Crée un document Documenso (v2-beta) puis uploade le PDF sur l'URL S3
+ * retournée. C'est le flux requis depuis que l'instance Documenso refuse
+ * les uploads inline base64 (v1 retourne 500 "Create document is not
+ * available without S3 transport").
+ *
+ * Retourne le document Documenso au format v1 (id, recipients) pour rester
+ * compatible avec addField() et sendDocument() qui sont en v1.
  */
 export async function createDocument(params: CreateDocumentParams): Promise<DocumensoDocument> {
   const body: Record<string, unknown> = {
@@ -129,10 +167,8 @@ export async function createDocument(params: CreateDocumentParams): Promise<Docu
       role: r.role || 'SIGNER',
       signingOrder: r.signingOrder ?? i + 1,
     })),
-    documentDataType: 'BYTES_64',
-    documentDataData: params.pdfBase64,
-    fileName: params.pdfFileName,
   }
+  if (params.folderId) body.folderId = params.folderId
   if (params.meta) {
     body.meta = {
       timezone: 'Europe/Paris',
@@ -140,10 +176,29 @@ export async function createDocument(params: CreateDocumentParams): Promise<Docu
       ...params.meta,
     }
   }
-  return apiCall<DocumensoDocument>('/api/v1/documents', {
+
+  // 1. Création via v2-beta : retourne uploadUrl S3
+  const created = await apiCallV2Beta<V2BetaCreateResponse>('/document/create/beta', {
     method: 'POST',
     body: JSON.stringify(body),
   })
+
+  // 2. Upload du PDF sur l'URL S3 presigned
+  const pdfBytes = params.pdfBuffer instanceof Buffer
+    ? new Uint8Array(params.pdfBuffer)
+    : params.pdfBuffer
+  const uploadRes = await fetch(created.uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/pdf' },
+    body: pdfBytes as BodyInit,
+  })
+  if (!uploadRes.ok) {
+    const text = await uploadRes.text().catch(() => '')
+    throw new Error(`Documenso S3 upload failed (${uploadRes.status}): ${text}`)
+  }
+
+  // 3. Récupérer le document complet (avec recipients formattés v1) pour la suite du flux
+  return getDocument(created.document.id)
 }
 
 /** Add a signature field to a recipient on a document. */
@@ -188,24 +243,7 @@ export function isDocumentFullySigned(doc: DocumensoDocument): boolean {
 
 // ============================================
 // Folders (v2-beta API)
-// L'API v1 ne gère pas les dossiers — on utilise l'API v2-beta pour
-// créer des dossiers et déplacer les documents dedans.
 // ============================================
-
-async function apiCallV2Beta<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE_URL}/api/v2-beta${path}`, {
-    ...init,
-    headers: {
-      ...authHeaders(),
-      ...(init.headers || {}),
-    },
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Documenso v2-beta ${res.status} on ${path}: ${text}`)
-  }
-  return res.json() as Promise<T>
-}
 
 export interface DocumensoFolder {
   id: string

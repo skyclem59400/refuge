@@ -12,7 +12,6 @@ import {
   getDocument,
   downloadSignedPdf,
   isDocumentFullySigned,
-  moveDocumentToFolder,
   type DocumensoStatus,
 } from '@/lib/documenso/client'
 import { ensureDocumensoFolder } from '@/lib/establishment/documenso-folder'
@@ -65,8 +64,6 @@ export async function sendAdoptionContractForSignature(contractId: string) {
       return { error: `Erreur génération PDF : ${(e as Error).message}` }
     }
 
-    const pdfBase64 = pdfResult.buffer.toString('base64')
-
     // 2. Customised email content
     const animalName = contract.animal?.name ?? 'votre futur compagnon'
     const adopterFirstName = contract.adopter.name.split(' ')[0]
@@ -82,14 +79,16 @@ export async function sendAdoptionContractForSignature(contractId: string) {
       contactLine +
       `L'équipe ${orgName}`
 
-    // 3. Create the Documenso document
+    // 3. Create the Documenso document (PDF uploadé sur S3 par v2-beta)
+    const folderId = await ensureDocumensoFolder(establishmentId, orgName)
     let document
     try {
       document = await createDocument({
         title: `Contrat d'adoption — ${animalName} — ${orgName} (${contract.contract_number})`,
         externalId: `adoption_${contract.id}`,
-        pdfBase64,
+        pdfBuffer: pdfResult.buffer,
         pdfFileName: pdfResult.filename,
+        folderId: folderId ?? undefined,
         recipients: [
           {
             email: contract.adopter.email,
@@ -111,16 +110,6 @@ export async function sendAdoptionContractForSignature(contractId: string) {
     const recipient = (document.recipients ?? document.Recipient ?? [])[0]
     if (!recipient) {
       return { error: "Documenso n'a pas créé de destinataire" }
-    }
-
-    // 3.5 Best-effort : ranger le document dans le dossier Documenso de l'établissement
-    try {
-      const folderId = await ensureDocumensoFolder(establishmentId, orgName)
-      if (folderId) {
-        await moveDocumentToFolder(document.id, folderId)
-      }
-    } catch (e) {
-      console.warn('[adoption-contract-signature] move to folder failed:', (e as Error).message)
     }
 
     // 4. Pre-position signature field

@@ -12,7 +12,6 @@ import {
   getDocument,
   downloadSignedPdf,
   isDocumentFullySigned,
-  moveDocumentToFolder,
   type DocumensoStatus,
 } from '@/lib/documenso/client'
 import { ensureDocumensoFolder } from '@/lib/establishment/documenso-folder'
@@ -74,9 +73,10 @@ export async function sendContractForSignature(contractId: string) {
       return { error: `Erreur generation PDF : ${(e as Error).message}` }
     }
 
-    const pdfBase64 = pdfResult.buffer.toString('base64')
-
     // 2. Create the Documenso document with the FA as recipient
+    // (pdfBuffer sera uploadé sur l'URL S3 retournée par v2-beta)
+    const folderId = await ensureDocumensoFolder(establishmentId, establishment?.name?.trim() || 'le refuge')
+
     const animalName = contract.animal?.name ?? 'votre futur protégé'
     const fosterFirstName = contract.foster.name.split(' ')[0]
     const orgName = establishment?.name?.trim() || 'le refuge'
@@ -96,8 +96,9 @@ export async function sendContractForSignature(contractId: string) {
       document = await createDocument({
         title: `Convention famille d'accueil — ${animalName} — ${orgName} (${contract.contract_number})`,
         externalId: contract.id,
-        pdfBase64,
+        pdfBuffer: pdfResult.buffer,
         pdfFileName: pdfResult.filename,
+        folderId: folderId ?? undefined,
         recipients: [
           {
             email: contract.foster.email,
@@ -119,17 +120,6 @@ export async function sendContractForSignature(contractId: string) {
     const recipient = (document.recipients ?? document.Recipient ?? [])[0]
     if (!recipient) {
       return { error: 'Documenso n’a pas cree de destinataire' }
-    }
-
-    // 2.5 Best-effort : ranger le document dans le dossier Documenso de l'établissement
-    try {
-      const folderId = await ensureDocumensoFolder(establishmentId, orgName)
-      if (folderId) {
-        await moveDocumentToFolder(document.id, folderId)
-      }
-    } catch (e) {
-      console.warn('[foster-contract-signature] move to folder failed:', (e as Error).message)
-      // non-bloquant : le doc reste à la racine, l'admin pourra le déplacer manuellement
     }
 
     // 3. Position a signature field on the last page (bottom-right area, A4)
