@@ -37,10 +37,17 @@ function getTransporter(): Transporter {
   return transporter
 }
 
+export interface SendEmailAttachment {
+  filename: string
+  content: Buffer
+  contentType?: string
+}
+
 export interface SendEmailParams {
   to: string
   /** Nom affiché du destinataire (optionnel, améliore l'UX dans les clients mail). */
   toName?: string
+  cc?: string | string[]
   subject: string
   html: string
   /** Plain-text fallback pour les clients qui n'affichent pas l'HTML. Auto-généré si omis. */
@@ -51,6 +58,7 @@ export interface SendEmailParams {
   fromName?: string
   /** Reply-To si différent du from (utile pour rediriger les réponses vers la boîte ops). */
   replyTo?: string
+  attachments?: SendEmailAttachment[]
 }
 
 export async function sendEmail(params: SendEmailParams): Promise<{ messageId: string }> {
@@ -60,10 +68,16 @@ export async function sendEmail(params: SendEmailParams): Promise<{ messageId: s
   const result = await getTransporter().sendMail({
     from: `"${fromName}" <${fromAddress}>`,
     to: params.toName ? `"${params.toName}" <${params.to}>` : params.to,
+    cc: params.cc,
     subject: params.subject,
     html: params.html,
     text: params.text || stripHtml(params.html),
     replyTo: params.replyTo,
+    attachments: params.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+      contentType: a.contentType ?? 'application/octet-stream',
+    })),
   })
 
   return { messageId: result.messageId }

@@ -4,16 +4,22 @@ import { useTransition } from 'react'
 import {
   CheckCircle2,
   Loader2,
-  PlayCircle,
+  Navigation,
+  MapPin,
   XCircle,
   Flag,
+  RotateCcw,
 } from 'lucide-react'
 import {
   acknowledgeTicket,
+  setTicketOnRoute,
+  setTicketOnSite,
   changeTicketStatus,
   changeTicketPriority,
   assignTicket,
+  resendInterventionReport,
 } from '@/app/(app)/astreinte/tickets/actions'
+import { InterventionReportForm } from './intervention-report-form'
 
 interface AssignableMember {
   user_id: string
@@ -26,6 +32,7 @@ interface Props {
   currentPriority: string
   currentAssignee: string | null
   assignableMembers: AssignableMember[]
+  reportSentAt: string | null
 }
 
 export function TicketActions({
@@ -34,18 +41,21 @@ export function TicketActions({
   currentPriority,
   currentAssignee,
   assignableMembers,
+  reportSentAt,
 }: Props) {
   const [pending, startTransition] = useTransition()
 
-  function call(action: () => Promise<void>) {
+  function call(action: () => Promise<unknown>) {
     startTransition(async () => {
       await action()
     })
   }
 
+  const isClosed = currentStatus === 'completed' || currentStatus === 'cancelled'
+
   return (
     <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[280px]">
-      {/* Boutons de statut */}
+      {/* Boutons de transition */}
       <div className="flex flex-wrap gap-2">
         {currentStatus === 'new' && (
           <button
@@ -61,26 +71,33 @@ export function TicketActions({
         {currentStatus === 'acknowledged' && (
           <button
             disabled={pending}
-            onClick={() => call(() => changeTicketStatus(ticketId, 'in_progress'))}
+            onClick={() => call(() => setTicketOnRoute(ticketId))}
             className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:opacity-90 disabled:opacity-50 shadow-sm"
           >
-            {pending ? <Loader2 size={14} className="animate-spin" /> : <PlayCircle size={14} />}
-            Démarrer l'intervention
+            {pending ? <Loader2 size={14} className="animate-spin" /> : <Navigation size={14} />}
+            En route
           </button>
         )}
 
-        {(currentStatus === 'in_progress' || currentStatus === 'acknowledged') && (
+        {currentStatus === 'on_route' && (
           <button
             disabled={pending}
-            onClick={() => call(() => changeTicketStatus(ticketId, 'completed'))}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-md text-sm font-semibold hover:opacity-90 disabled:opacity-50 shadow-sm"
+            onClick={() => call(() => setTicketOnSite(ticketId))}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-amber-600 text-white rounded-md text-sm font-semibold hover:opacity-90 disabled:opacity-50 shadow-sm"
           >
-            {pending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-            Clôturer
+            {pending ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
+            Sur place
           </button>
         )}
 
-        {currentStatus !== 'completed' && currentStatus !== 'cancelled' && (
+        {(currentStatus === 'acknowledged' ||
+          currentStatus === 'on_route' ||
+          currentStatus === 'on_site' ||
+          currentStatus === 'in_progress') && (
+          <InterventionReportForm ticketId={ticketId} />
+        )}
+
+        {!isClosed && (
           <button
             disabled={pending}
             onClick={() => {
@@ -100,6 +117,18 @@ export function TicketActions({
             <CheckCircle2 size={14} />
             Clôturé
           </span>
+        )}
+
+        {currentStatus === 'completed' && (
+          <button
+            disabled={pending}
+            onClick={() => call(() => resendInterventionReport(ticketId))}
+            className="inline-flex items-center gap-2 px-3 py-2 border rounded-md text-sm font-semibold hover:bg-muted/50 disabled:opacity-50"
+            title={reportSentAt ? `Dernier envoi : ${new Date(reportSentAt).toLocaleString('fr-FR')}` : undefined}
+          >
+            {pending ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+            {reportSentAt ? 'Renvoyer le compte-rendu' : 'Envoyer le compte-rendu'}
+          </button>
         )}
       </div>
 

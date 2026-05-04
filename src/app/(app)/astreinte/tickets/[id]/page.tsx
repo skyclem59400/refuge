@@ -54,6 +54,8 @@ const AUTHORITY_LABEL: Record<string, string> = {
 const STATUS_LABEL: Record<string, string> = {
   new: 'Nouveau',
   acknowledged: 'Pris en charge',
+  on_route: 'En route',
+  on_site: 'Sur place',
   in_progress: 'En cours',
   completed: 'Clôturé',
   cancelled: 'Annulé',
@@ -83,8 +85,78 @@ const EVENT_TYPE_LABEL: Record<string, string> = {
   priority_changed: 'Priorité modifiée',
   photo_added: 'Photo ajoutée',
   comment: 'Commentaire',
+  on_route: 'En route',
+  on_site: 'Sur place',
   completed: 'Clôturé',
   cancelled: 'Annulé',
+  report_sent: 'Compte-rendu envoyé',
+}
+
+const STATUS_LABEL_FR: Record<string, string> = {
+  new: 'Nouveau',
+  acknowledged: 'Pris en charge',
+  on_route: 'En route',
+  on_site: 'Sur place',
+  in_progress: 'En cours',
+  completed: 'Clôturé',
+  cancelled: 'Annulé',
+}
+
+const PRIORITY_LABEL_FR: Record<string, string> = {
+  low: 'Faible',
+  normal: 'Normale',
+  high: 'Élevée',
+  critical: 'Critique',
+}
+
+const OUTCOME_LABEL_FR: Record<string, string> = {
+  animal_recovered: 'Animal pris en charge',
+  not_found: 'Animal non trouvé',
+  refused: 'Prise en charge refusée',
+  deceased: 'Animal décédé',
+  transferred_owner: 'Restitué au propriétaire',
+  other: 'Autre',
+}
+
+const DESTINATION_LABEL_FR: Record<string, string> = {
+  refuge_sda: 'Refuge SDA',
+  veterinary: 'Vétérinaire',
+  owner_returned: 'Restitué au propriétaire',
+  euthanasia: 'Euthanasie',
+  on_site_release: 'Relâché sur place',
+  other: 'Autre',
+}
+
+function formatEventMessage(
+  eventType: string,
+  rawMessage: string | null,
+  metadata: { from?: string; to?: string; assigned_to?: string } | null,
+  performerName: string | null
+): string {
+  const statusEvents = ['acknowledged', 'on_route', 'on_site', 'completed', 'cancelled', 'status_changed']
+  if (statusEvents.includes(eventType) && metadata?.from && metadata?.to) {
+    const from = STATUS_LABEL_FR[metadata.from] ?? metadata.from
+    const to = STATUS_LABEL_FR[metadata.to] ?? metadata.to
+    return performerName
+      ? `${from} → ${to} — par ${performerName}`
+      : `${from} → ${to}`
+  }
+  if (eventType === 'priority_changed' && metadata?.from && metadata?.to) {
+    return `Priorité : ${PRIORITY_LABEL_FR[metadata.from] ?? metadata.from} → ${PRIORITY_LABEL_FR[metadata.to] ?? metadata.to}`
+  }
+  if (eventType === 'assigned') {
+    return performerName ? `Attribué à ${performerName}` : 'Attribué'
+  }
+  if (!rawMessage) return EVENT_TYPE_LABEL[eventType] ?? eventType
+  // Fallback : remplacer les clés anglaises restantes par leurs libellés français
+  return rawMessage
+    .replace(/\bnew\b/g, 'Nouveau')
+    .replace(/\backnowledged\b/g, 'Pris en charge')
+    .replace(/\bon_route\b/g, 'En route')
+    .replace(/\bon_site\b/g, 'Sur place')
+    .replace(/\bin_progress\b/g, 'En cours')
+    .replace(/\bcompleted\b/g, 'Clôturé')
+    .replace(/\bcancelled\b/g, 'Annulé')
 }
 
 interface PageProps {
@@ -151,6 +223,9 @@ export default async function TicketDetailPage({ params }: PageProps) {
       [
         ticket.assigned_to,
         ticket.acknowledged_by,
+        ticket.on_route_by,
+        ticket.on_site_by,
+        ticket.completed_by,
         ...(events ?? []).map((e) => e.performed_by),
         ...(members ?? []).map((m) => m.user_id),
       ].filter((u): u is string => Boolean(u))
@@ -226,6 +301,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
           currentPriority={ticket.priority}
           currentAssignee={ticket.assigned_to}
           assignableMembers={assignableMembers}
+          reportSentAt={ticket.report_sent_at ?? null}
         />
       </div>
 
@@ -467,25 +543,81 @@ export default async function TicketDetailPage({ params }: PageProps) {
           </Card>
 
           {/* Statut courant */}
-          <Card title="Statut courant">
-            <div className="text-sm font-semibold mb-2">
+          <Card title="Chronologie">
+            <div className="text-sm font-semibold mb-3">
               {STATUS_LABEL[ticket.status] ?? ticket.status}
             </div>
-            {ticket.acknowledged_at && (
-              <div className="text-xs text-muted mb-1">
-                Pris en charge :{' '}
-                <strong>
-                  {ticket.acknowledged_by && usersInfo[ticket.acknowledged_by]
-                    ? usersInfo[ticket.acknowledged_by].name ??
-                      usersInfo[ticket.acknowledged_by].email
-                    : 'inconnu'}
-                </strong>
-                <br />
-                {formatDateLong(ticket.acknowledged_at)}
+
+            <ul className="space-y-2 text-xs">
+              <TimelineRow label="Reçu" at={ticket.created_at} />
+              <TimelineRow
+                label="Pris en charge"
+                at={ticket.acknowledged_at}
+                by={
+                  ticket.acknowledged_by
+                    ? usersInfo[ticket.acknowledged_by]?.name ??
+                      usersInfo[ticket.acknowledged_by]?.email ??
+                      null
+                    : null
+                }
+              />
+              <TimelineRow
+                label="En route"
+                at={ticket.on_route_at}
+                by={
+                  ticket.on_route_by
+                    ? usersInfo[ticket.on_route_by]?.name ??
+                      usersInfo[ticket.on_route_by]?.email ??
+                      null
+                    : null
+                }
+              />
+              <TimelineRow
+                label="Sur place"
+                at={ticket.on_site_at}
+                by={
+                  ticket.on_site_by
+                    ? usersInfo[ticket.on_site_by]?.name ??
+                      usersInfo[ticket.on_site_by]?.email ??
+                      null
+                    : null
+                }
+              />
+              <TimelineRow
+                label="Clôturé"
+                at={ticket.completed_at}
+                by={
+                  ticket.completed_by
+                    ? usersInfo[ticket.completed_by]?.name ??
+                      usersInfo[ticket.completed_by]?.email ??
+                      null
+                    : null
+                }
+              />
+            </ul>
+
+            {(ticket.acknowledged_at && (ticket.on_site_at || ticket.completed_at)) && (
+              <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t">
+                <DurationCell
+                  label="Mobilisation"
+                  fromIso={ticket.acknowledged_at}
+                  toIso={ticket.on_site_at}
+                />
+                <DurationCell
+                  label="Sur place"
+                  fromIso={ticket.on_site_at}
+                  toIso={ticket.completed_at}
+                />
+                <DurationCell
+                  label="Total"
+                  fromIso={ticket.acknowledged_at}
+                  toIso={ticket.completed_at}
+                />
               </div>
             )}
+
             {ticket.assigned_to && (
-              <div className="text-xs text-muted mb-1">
+              <div className="text-xs text-muted mt-3 pt-3 border-t">
                 Assigné à :{' '}
                 <strong>
                   {usersInfo[ticket.assigned_to]?.name ??
@@ -494,9 +626,53 @@ export default async function TicketDetailPage({ params }: PageProps) {
                 </strong>
               </div>
             )}
-            {ticket.completed_at && (
-              <div className="text-xs text-muted">
-                Clôturé le {formatDateLong(ticket.completed_at)}
+
+            {ticket.report_sent_at && (
+              <div className="text-xs text-muted mt-3 pt-3 border-t">
+                <span className="text-green-700 dark:text-green-400 font-semibold">
+                  ✓ Compte-rendu envoyé
+                </span>
+                <br />
+                {formatDateLong(ticket.report_sent_at)}
+                {Array.isArray(ticket.report_sent_to) && ticket.report_sent_to.length > 0 && (
+                  <>
+                    <br />
+                    <span className="text-[11px]">
+                      {ticket.report_sent_to.join(', ')}
+                    </span>
+                  </>
+                )}
+                <div className="mt-1">
+                  <a
+                    href={`/api/pdf/astreinte-report/${ticket.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline text-[11px] font-semibold"
+                  >
+                    Voir le PDF ↗
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {ticket.intervention_outcome && (
+              <div className="text-xs mt-3 pt-3 border-t">
+                <div className="font-semibold mb-1">Issue de l’intervention</div>
+                <div className="text-muted">
+                  {OUTCOME_LABEL_FR[ticket.intervention_outcome] ?? ticket.intervention_outcome}
+                  {ticket.intervention_destination && (
+                    <>
+                      {' · '}
+                      {DESTINATION_LABEL_FR[ticket.intervention_destination] ??
+                        ticket.intervention_destination}
+                    </>
+                  )}
+                </div>
+                {ticket.intervention_comments && (
+                  <div className="mt-2 p-2 bg-muted/30 rounded text-[11px] whitespace-pre-line">
+                    {ticket.intervention_comments}
+                  </div>
+                )}
               </div>
             )}
           </Card>
@@ -522,15 +698,15 @@ export default async function TicketDetailPage({ params }: PageProps) {
                     )}
                   </div>
                   <div className="font-medium mt-0.5">
-                    {e.message ?? EVENT_TYPE_LABEL[e.event_type] ?? e.event_type}
+                    {formatEventMessage(
+                      e.event_type,
+                      e.message,
+                      e.metadata as { from?: string; to?: string } | null,
+                      e.performed_by && usersInfo[e.performed_by]
+                        ? usersInfo[e.performed_by].name ?? usersInfo[e.performed_by].email
+                        : null
+                    )}
                   </div>
-                  {e.performed_by && usersInfo[e.performed_by] && (
-                    <div className="text-[11px] text-muted mt-0.5">
-                      Par{' '}
-                      {usersInfo[e.performed_by].name ??
-                        usersInfo[e.performed_by].email}
-                    </div>
-                  )}
                 </li>
               ))}
             </ul>
@@ -601,4 +777,62 @@ function formatDateLong(iso: string) {
 }
 function formatDateShort(iso: string) {
   return dateShortFormatter.format(new Date(iso))
+}
+
+function TimelineRow({
+  label,
+  at,
+  by,
+}: {
+  label: string
+  at: string | null
+  by?: string | null
+}) {
+  if (!at) {
+    return (
+      <li className="flex items-baseline gap-2 text-muted/60 italic">
+        <span className="font-semibold w-24 shrink-0">{label}</span>
+        <span>—</span>
+      </li>
+    )
+  }
+  return (
+    <li className="flex items-baseline gap-2">
+      <span className="font-semibold w-24 shrink-0">{label}</span>
+      <span className="flex-1">
+        <span>{formatDateLong(at)}</span>
+        {by && <span className="text-muted"> — {by}</span>}
+      </span>
+    </li>
+  )
+}
+
+function formatDuration(fromIso: string | null, toIso: string | null): string {
+  if (!fromIso || !toIso) return '—'
+  const ms = new Date(toIso).getTime() - new Date(fromIso).getTime()
+  if (ms < 0) return '—'
+  const totalMin = Math.round(ms / 60000)
+  if (totalMin < 60) return `${totalMin} min`
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  return m === 0 ? `${h} h` : `${h} h ${m.toString().padStart(2, '0')}`
+}
+
+function DurationCell({
+  label,
+  fromIso,
+  toIso,
+}: {
+  label: string
+  fromIso: string | null
+  toIso: string | null
+}) {
+  return (
+    <div className="text-center">
+      <div className="text-[9px] uppercase tracking-wider font-bold text-muted">
+        {label}
+      </div>
+      <div className="text-sm font-bold mt-0.5">{formatDuration(fromIso, toIso)}</div>
+    </div>
+  )
 }
