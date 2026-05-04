@@ -114,6 +114,11 @@ export interface DocumensoDocumentMeta {
   timezone?: string
   dateFormat?: string
   redirectUrl?: string
+  /** Code langue ISO (ex: "fr", "en"). Détermine la langue du template d'email
+   * Documenso (boutons, textes du wrapper). Le `subject` et `message` que
+   * nous fournissons s'insèrent DANS ce template, donc sans `language: "fr"`
+   * on aurait du français inséré dans un template anglais. */
+  language?: string
 }
 
 export interface CreateDocumentParams {

@@ -109,6 +109,7 @@ export async function sendContractForSignature(contractId: string) {
         meta: {
           subject: emailSubject,
           message: emailMessage,
+          language: 'fr',
           timezone: 'Europe/Paris',
           dateFormat: 'dd/MM/yyyy HH:mm',
         },
