@@ -117,20 +117,31 @@ export async function sendContractForSignature(contractId: string) {
       return { error: 'Documenso n’a pas cree de destinataire' }
     }
 
-    // 3. Position a signature field on the last page (bottom-right area, A4)
-    try {
-      await addField(document.id, {
-        recipientId: recipient.id,
-        type: 'SIGNATURE',
-        pageNumber: 1,
-        pageX: 60,
-        pageY: 80,
-        pageWidth: 30,
-        pageHeight: 8,
-      })
-    } catch (e) {
-      // Non-blocking: the FA can still sign by adding their own signature
-      console.warn('Could not pre-position signature field:', (e as Error).message)
+    // 3. Positionner les champs Documenso sur la sigbox "Famille d'accueil"
+    //    de la dernière page (colonne droite, bas de page).
+    //    - NAME : auto-rempli avec le nom complet du recipient
+    //    - DATE : auto-rempli avec la date de signature
+    //    - SIGNATURE : champ à dessiner par le signataire
+    const lastPage = pdfResult.pageCount
+    const fieldsToAdd: Array<{ type: 'NAME' | 'DATE' | 'SIGNATURE'; pageY: number; pageHeight: number }> = [
+      { type: 'NAME', pageY: 79, pageHeight: 4 },
+      { type: 'DATE', pageY: 84, pageHeight: 4 },
+      { type: 'SIGNATURE', pageY: 89, pageHeight: 8 },
+    ]
+    for (const field of fieldsToAdd) {
+      try {
+        await addField(document.id, {
+          recipientId: recipient.id,
+          type: field.type,
+          pageNumber: lastPage,
+          pageX: 55,
+          pageY: field.pageY,
+          pageWidth: 38,
+          pageHeight: field.pageHeight,
+        })
+      } catch (e) {
+        console.warn(`[foster-contract-signature] addField ${field.type} failed:`, (e as Error).message)
+      }
     }
 
     // 4. "Envoyer" le doc Documenso SANS déclencher son email (sendEmail: false).

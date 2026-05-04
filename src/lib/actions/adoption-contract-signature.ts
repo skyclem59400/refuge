@@ -103,19 +103,28 @@ export async function sendAdoptionContractForSignature(contractId: string) {
       return { error: "Documenso n'a pas créé de destinataire" }
     }
 
-    // 4. Pre-position signature field
-    try {
-      await addField(document.id, {
-        recipientId: recipient.id,
-        type: 'SIGNATURE',
-        pageNumber: 1,
-        pageX: 60,
-        pageY: 80,
-        pageWidth: 30,
-        pageHeight: 8,
-      })
-    } catch (e) {
-      console.warn('Could not pre-position signature field:', (e as Error).message)
+    // 4. Positionner les champs Documenso sur la sigbox "Adoptant"
+    //    de la dernière page (colonne droite, bas de page).
+    const lastPage = pdfResult.pageCount
+    const fieldsToAdd: Array<{ type: 'NAME' | 'DATE' | 'SIGNATURE'; pageY: number; pageHeight: number }> = [
+      { type: 'NAME', pageY: 79, pageHeight: 4 },
+      { type: 'DATE', pageY: 84, pageHeight: 4 },
+      { type: 'SIGNATURE', pageY: 89, pageHeight: 8 },
+    ]
+    for (const field of fieldsToAdd) {
+      try {
+        await addField(document.id, {
+          recipientId: recipient.id,
+          type: field.type,
+          pageNumber: lastPage,
+          pageX: 55,
+          pageY: field.pageY,
+          pageWidth: 38,
+          pageHeight: field.pageHeight,
+        })
+      } catch (e) {
+        console.warn(`[adoption-contract-signature] addField ${field.type} failed:`, (e as Error).message)
+      }
     }
 
     // 5. Activer la signature côté Documenso SANS envoyer son email (sendEmail: false).

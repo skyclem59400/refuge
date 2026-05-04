@@ -10,6 +10,8 @@ interface BuildResult {
   buffer: Buffer
   filename: string
   contractNumber: string
+  /** Nombre de pages du PDF généré, utile pour positionner les fields Documenso sur la dernière page. */
+  pageCount: number
 }
 
 export async function buildFosterContractPdf(contractId: string): Promise<BuildResult> {
@@ -107,9 +109,22 @@ export async function buildFosterContractPdf(contractId: string): Promise<BuildR
   })
   await browser.close()
 
+  // Compter les pages du PDF généré (pour positionner les fields signature
+  // Documenso sur la dernière page, peu importe la longueur du contrat).
+  const buffer = Buffer.from(pdfBuffer)
+  let pageCount = 1
+  try {
+    const { PDFDocument } = await import('pdf-lib')
+    const pdfDoc = await PDFDocument.load(buffer)
+    pageCount = pdfDoc.getPageCount()
+  } catch (e) {
+    console.warn('[foster-contract-pdf] page count failed:', (e as Error).message)
+  }
+
   return {
-    buffer: Buffer.from(pdfBuffer),
+    buffer,
     filename: `contrat_fa_${contract.contract_number}.pdf`,
     contractNumber: contract.contract_number,
+    pageCount,
   }
 }
