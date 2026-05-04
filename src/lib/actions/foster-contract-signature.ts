@@ -298,6 +298,22 @@ export async function syncContractSignatureStatus(contractId: string) {
 
     if (error) return { error: error.message }
 
+    // Propager au mouvement lié + appliquer le changement de statut animal
+    // (équivalent du webhook Documenso, utile quand le webhook a échoué).
+    const newStatus = updateData.signature_status as SignatureStatus
+    if ((newStatus === 'signed' || newStatus === 'rejected') && contract.signature_status !== newStatus) {
+      try {
+        const { finalizeMovementOnSignature } = await import('@/lib/actions/movement-with-contract')
+        await finalizeMovementOnSignature({
+          contractId: contract.id,
+          contractType: 'foster',
+          status: newStatus,
+        })
+      } catch (e) {
+        console.error('[sync foster] finalizeMovementOnSignature failed:', (e as Error).message)
+      }
+    }
+
     revalidatePath(`/animals/${contract.animal_id}`)
     return { data: { status: updateData.signature_status, signedAt: recipient?.signedAt ?? null } }
   } catch (e) {
