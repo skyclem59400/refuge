@@ -73,6 +73,7 @@ export interface Establishment {
   logo_url: string | null
   type: EstablishmentType
   google_calendar_id: string
+  documenso_folder_id: string | null
   created_at: string
   updated_at: string
 }

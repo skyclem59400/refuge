@@ -12,8 +12,10 @@ import {
   getDocument,
   downloadSignedPdf,
   isDocumentFullySigned,
+  moveDocumentToFolder,
   type DocumensoStatus,
 } from '@/lib/documenso/client'
+import { ensureDocumensoFolder } from '@/lib/establishment/documenso-folder'
 import type { SignatureStatus } from '@/lib/types/database'
 
 // ============================================
@@ -117,6 +119,17 @@ export async function sendContractForSignature(contractId: string) {
     const recipient = (document.recipients ?? document.Recipient ?? [])[0]
     if (!recipient) {
       return { error: 'Documenso n’a pas cree de destinataire' }
+    }
+
+    // 2.5 Best-effort : ranger le document dans le dossier Documenso de l'établissement
+    try {
+      const folderId = await ensureDocumensoFolder(establishmentId, orgName)
+      if (folderId) {
+        await moveDocumentToFolder(document.id, folderId)
+      }
+    } catch (e) {
+      console.warn('[foster-contract-signature] move to folder failed:', (e as Error).message)
+      // non-bloquant : le doc reste à la racine, l'admin pourra le déplacer manuellement
     }
 
     // 3. Position a signature field on the last page (bottom-right area, A4)

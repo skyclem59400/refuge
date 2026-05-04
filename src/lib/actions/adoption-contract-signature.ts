@@ -12,8 +12,10 @@ import {
   getDocument,
   downloadSignedPdf,
   isDocumentFullySigned,
+  moveDocumentToFolder,
   type DocumensoStatus,
 } from '@/lib/documenso/client'
+import { ensureDocumensoFolder } from '@/lib/establishment/documenso-folder'
 import type { SignatureStatus } from '@/lib/types/database'
 
 function mapDocumensoStatus(status: DocumensoStatus, recipientSigned: boolean): SignatureStatus {
@@ -109,6 +111,16 @@ export async function sendAdoptionContractForSignature(contractId: string) {
     const recipient = (document.recipients ?? document.Recipient ?? [])[0]
     if (!recipient) {
       return { error: "Documenso n'a pas créé de destinataire" }
+    }
+
+    // 3.5 Best-effort : ranger le document dans le dossier Documenso de l'établissement
+    try {
+      const folderId = await ensureDocumensoFolder(establishmentId, orgName)
+      if (folderId) {
+        await moveDocumentToFolder(document.id, folderId)
+      }
+    } catch (e) {
+      console.warn('[adoption-contract-signature] move to folder failed:', (e as Error).message)
     }
 
     // 4. Pre-position signature field

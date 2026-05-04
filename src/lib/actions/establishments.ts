@@ -147,6 +147,15 @@ export async function createEstablishment(data: {
       group_id: adminGroup.id,
     })
 
+  // Best-effort : créer un dossier Documenso pour ranger les contrats signés.
+  // Dynamic import pour ne pas charger Documenso au build time.
+  try {
+    const { ensureDocumensoFolder } = await import('@/lib/establishment/documenso-folder')
+    await ensureDocumensoFolder(establishment.id, establishment.name)
+  } catch (e) {
+    console.error('[createEstablishment] documenso folder bootstrap failed:', e)
+  }
+
   revalidatePath('/')
   return { data: establishment }
 }

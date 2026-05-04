@@ -185,3 +185,69 @@ export function isDocumentFullySigned(doc: DocumensoDocument): boolean {
   const recipients = doc.recipients ?? doc.Recipient ?? []
   return recipients.length > 0 && recipients.every((r) => r.signingStatus === 'SIGNED')
 }
+
+// ============================================
+// Folders (v2-beta API)
+// L'API v1 ne gère pas les dossiers — on utilise l'API v2-beta pour
+// créer des dossiers et déplacer les documents dedans.
+// ============================================
+
+async function apiCallV2Beta<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${BASE_URL}/api/v2-beta${path}`, {
+    ...init,
+    headers: {
+      ...authHeaders(),
+      ...(init.headers || {}),
+    },
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Documenso v2-beta ${res.status} on ${path}: ${text}`)
+  }
+  return res.json() as Promise<T>
+}
+
+export interface DocumensoFolder {
+  id: string
+  name: string
+  parentId: string | null
+  type: 'DOCUMENT' | 'TEMPLATE'
+  visibility: 'EVERYONE' | 'MANAGER_AND_ABOVE' | 'ADMIN'
+  createdAt: string
+  updatedAt: string
+}
+
+interface FolderListResponse {
+  data: DocumensoFolder[]
+  count: number
+}
+
+/** Crée un dossier de documents (type=DOCUMENT par défaut). */
+export async function createFolder(name: string, parentId?: string): Promise<DocumensoFolder> {
+  const body: Record<string, unknown> = { name, type: 'DOCUMENT' }
+  if (parentId) body.parentId = parentId
+  return apiCallV2Beta<DocumensoFolder>('/folder/create', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+/** Liste les dossiers (root level). */
+export async function listFolders(): Promise<DocumensoFolder[]> {
+  const res = await apiCallV2Beta<FolderListResponse>('/folder')
+  return res.data || []
+}
+
+/**
+ * Déplace un document dans un dossier (ou retire son dossier si folderId=null).
+ * Utilise l'endpoint /document/update qui accepte folderId dans data.
+ */
+export async function moveDocumentToFolder(documentId: number, folderId: string | null): Promise<unknown> {
+  return apiCallV2Beta('/document/update', {
+    method: 'POST',
+    body: JSON.stringify({
+      documentId,
+      data: { folderId },
+    }),
+  })
+}
