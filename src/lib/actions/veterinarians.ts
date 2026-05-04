@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
 import { logActivity } from '@/lib/actions/activity-log'
 import type { Veterinarian, VeterinaryClinic, VeterinaryClinicWithVets } from '@/lib/types/database'
@@ -70,7 +70,7 @@ interface ClinicInput {
 export async function createVeterinaryClinic(input: ClinicInput) {
   try {
     const { establishmentId } = await requireVeterinariansPermission()
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data, error } = await supabase
       .from('veterinary_clinics')
@@ -106,7 +106,7 @@ export async function createVeterinaryClinic(input: ClinicInput) {
 export async function updateVeterinaryClinic(id: string, input: Partial<ClinicInput>) {
   try {
     const { establishmentId } = await requireVeterinariansPermission()
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { error } = await supabase
       .from('veterinary_clinics')
@@ -129,7 +129,7 @@ export async function updateVeterinaryClinic(id: string, input: Partial<ClinicIn
 export async function deleteVeterinaryClinic(id: string) {
   try {
     const { establishmentId } = await requireVeterinariansPermission()
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { error } = await supabase
       .from('veterinary_clinics')
@@ -173,7 +173,7 @@ interface VetInput {
 export async function createVeterinarian(input: VetInput) {
   try {
     const { establishmentId } = await requireVeterinariansPermission()
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const admin = createAdminClient()
 
     // Verify clinic belongs to this establishment
@@ -220,7 +220,7 @@ export async function createVeterinarian(input: VetInput) {
 export async function updateVeterinarian(id: string, input: Partial<VetInput>) {
   try {
     await requireVeterinariansPermission()
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { error } = await supabase
       .from('veterinarians')
@@ -242,7 +242,7 @@ export async function updateVeterinarian(id: string, input: Partial<VetInput>) {
 export async function deleteVeterinarian(id: string) {
   try {
     await requireVeterinariansPermission()
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { error } = await supabase
       .from('veterinarians')
