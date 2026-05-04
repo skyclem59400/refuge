@@ -160,7 +160,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
   if (userIds.length > 0) {
     const { data: users } = await admin.rpc('get_users_info', { user_ids: userIds })
     for (const u of users ?? []) {
-      usersInfo[u.user_id] = { email: u.email, name: u.full_name ?? null }
+      usersInfo[u.id] = { email: u.email, name: u.full_name ?? null }
     }
   }
 
