@@ -37,6 +37,7 @@ const movementsByStatus: Record<string, { value: MovementType; label: string; da
   ],
   foster_family: [
     { value: 'shelter_transfer', label: 'Retour au refuge' },
+    { value: 'foster_placement', label: 'Changement de famille d’accueil' },
     { value: 'reservation', label: 'Réservation' },
     { value: 'adoption', label: 'Adoption' },
     { value: 'return_to_owner', label: 'Restitution au proprietaire' },

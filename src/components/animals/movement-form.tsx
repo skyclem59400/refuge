@@ -68,6 +68,7 @@ const movementsByStatus: Record<string, { value: MovementType; label: string }[]
   ],
   foster_family: [
     { value: 'shelter_transfer', label: 'Retour au refuge' },
+    { value: 'foster_placement', label: 'Changement de famille d’accueil' },
     { value: 'adoption', label: 'Adoption' },
     { value: 'return_to_owner', label: 'Restitution au proprietaire' },
     { value: 'transfer_out', label: 'Transfert vers autre refuge' },
@@ -76,6 +77,7 @@ const movementsByStatus: Record<string, { value: MovementType; label: string }[]
   ],
   boarding: [
     { value: 'shelter_transfer', label: 'Retour au refuge' },
+    { value: 'foster_placement', label: 'Placement en famille d’accueil' },
     { value: 'return_to_owner', label: 'Restitution au proprietaire' },
     { value: 'death', label: 'Deces' },
   ],
