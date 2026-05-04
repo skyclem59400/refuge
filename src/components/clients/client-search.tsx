@@ -4,8 +4,17 @@ import { useState, useEffect, useRef, useTransition } from 'react'
 import { Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
-import { createClientAction } from '@/lib/actions/clients'
+import { createClientAction, updateClientAction } from '@/lib/actions/clients'
 import type { Client, ContactCategory } from '@/lib/types/database'
+
+const categoryLabels: Record<ContactCategory, string> = {
+  client: 'Client',
+  member: 'Adhérent',
+  volunteer: 'Bénévole',
+  board_member: 'CA',
+  foster_family: 'Famille d’accueil',
+  veterinarian: 'Vétérinaire',
+}
 
 interface ClientSearchProps {
   readonly onSelect: (client: Client | null) => void
@@ -54,14 +63,23 @@ export function ClientSearch({ onSelect, selected, establishmentId, category, pl
 
   async function loadClients() {
     if (loaded) return allClients
-    let q = supabase
+    // Load every contact for this establishment regardless of category — the
+    // user may want to convert an existing contact (e.g. a "client") into a
+    // foster family on the fly. We sort by category match first, then by name.
+    const { data } = await supabase
       .from('clients')
       .select('*')
       .eq('establishment_id', establishmentId)
       .order('name')
-    if (category) q = q.eq('type', category)
-    const { data } = await q
     const clients = (data as Client[]) || []
+    if (category) {
+      clients.sort((a, b) => {
+        const aMatch = a.type === category ? 0 : 1
+        const bMatch = b.type === category ? 0 : 1
+        if (aMatch !== bMatch) return aMatch - bMatch
+        return a.name.localeCompare(b.name)
+      })
+    }
     setAllClients(clients)
     setLoaded(true)
     return clients
@@ -98,6 +116,25 @@ export function ClientSearch({ onSelect, selected, establishmentId, category, pl
   }, [])
 
   function handleSelect(client: Client) {
+    // If a target category is set and the contact has another category, promote
+    // it (e.g. promote an existing client to foster_family before linking).
+    if (category && client.type !== category) {
+      startCreating(async () => {
+        const result = await updateClientAction(client.id, { type: category })
+        if (result.error) {
+          toast.error(`Impossible de convertir le contact : ${result.error}`)
+          return
+        }
+        const promoted: Client = { ...client, type: category }
+        setAllClients((prev) => prev.map((c) => (c.id === client.id ? promoted : c)))
+        toast.success(`${client.name} transformé en ${categoryLabels[category].toLowerCase()}`)
+        onSelect(promoted)
+        setQuery('')
+        setIsOpen(false)
+        setResults([])
+      })
+      return
+    }
     onSelect(client)
     setQuery('')
     setIsOpen(false)
@@ -148,24 +185,36 @@ export function ClientSearch({ onSelect, selected, establishmentId, category, pl
       {isOpen && (results.length > 0 || enableQuickCreate) && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border rounded-lg shadow-xl z-20 max-h-72 overflow-y-auto">
           {results.length > 0 ? (
-            results.map((client) => (
-              <button
-                key={client.id}
-                type="button"
-                onClick={() => handleSelect(client)}
-                className="w-full text-left px-4 py-2.5 hover:bg-surface-hover transition-colors flex items-center gap-3"
-              >
-                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-                  {client.name[0].toUpperCase()}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{client.name}</p>
-                  <p className="text-xs text-muted truncate">
-                    {[client.email, client.city].filter(Boolean).join(' - ')}
-                  </p>
-                </div>
-              </button>
-            ))
+            results.map((client) => {
+              const needsConversion = !!category && client.type !== category
+              const currentCategoryLabel = client.type ? categoryLabels[client.type as ContactCategory] : 'Sans catégorie'
+              return (
+                <button
+                  key={client.id}
+                  type="button"
+                  onClick={() => handleSelect(client)}
+                  className="w-full text-left px-4 py-2.5 hover:bg-surface-hover transition-colors flex items-center gap-3"
+                >
+                  <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                    {client.name[0].toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium truncate">{client.name}</p>
+                      <span className={`shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${needsConversion ? 'bg-amber-500/15 text-amber-600' : 'bg-primary/15 text-primary'}`}>
+                        {currentCategoryLabel}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted truncate">
+                      {[client.email, client.city].filter(Boolean).join(' - ') || (needsConversion && category ? `Sera converti en ${categoryLabels[category].toLowerCase()}` : '—')}
+                    </p>
+                    {needsConversion && category && [client.email, client.city].filter(Boolean).length > 0 && (
+                      <p className="text-[10px] text-amber-600 mt-0.5">→ sera converti en {categoryLabels[category].toLowerCase()} au clic</p>
+                    )}
+                  </div>
+                </button>
+              )
+            })
           ) : (
             <p className="text-sm text-muted text-center px-3 py-2.5">Aucun contact trouvé</p>
           )}
