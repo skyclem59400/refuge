@@ -307,6 +307,7 @@ export function AnimalDetailTabs({
             canManageMovements={canManageMovements}
             showForm={showMovementForm}
             onToggleForm={() => setShowMovementForm(!showMovementForm)}
+            isAdmin={isAdmin}
           />
         )}
 
@@ -809,6 +810,7 @@ function MovementsTab({
   canManageMovements,
   showForm,
   onToggleForm,
+  isAdmin,
 }: Readonly<{
   animal: Animal
   movements: AnimalMovement[]
@@ -816,6 +818,7 @@ function MovementsTab({
   canManageMovements: boolean
   showForm: boolean
   onToggleForm: () => void
+  isAdmin: boolean
 }>) {
   const movableStatuses: AnimalStatus[] = ['pound', 'shelter', 'foster_family', 'boarding', 'adopted', 'returned', 'transferred']
   const canAddMovement = canManageMovements && movableStatuses.includes(animal.status)
@@ -856,7 +859,7 @@ function MovementsTab({
             <p className="text-xs text-muted mt-0.5">{movements.length} mouvement{movements.length > 1 ? 's' : ''}</p>
           </div>
         </div>
-        <MovementsTimeline movements={movements} userNames={userNames} />
+        <MovementsTimeline movements={movements} userNames={userNames} isAdmin={isAdmin} />
       </div>
     </div>
   )

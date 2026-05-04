@@ -399,6 +399,69 @@ export async function markMovementSignedManually(params: {
 }
 
 // ============================================
+// Admin delete : remove any movement (active or pending) and its linked
+// contract if any. Reserved to administrators of the establishment.
+// Does NOT roll back the animal's current status — the admin is expected to
+// manually fix the status afterwards if needed.
+// ============================================
+
+export async function deleteMovementAsAdmin(movementId: string) {
+  try {
+    const ctx = await requirePermission('manage_movements')
+    if (!ctx.groups?.some((g) => g.is_system && g.name === 'Administrateur')) {
+      return { error: 'Suppression réservée aux administrateurs de l\'établissement' }
+    }
+
+    const admin = createAdminClient()
+    const supabase = await createClient()
+
+    const { data: movement } = await admin
+      .from('animal_movements')
+      .select('id, animal_id, type, related_contract_id, related_contract_type')
+      .eq('id', movementId)
+      .single()
+
+    if (!movement) return { error: 'Mouvement introuvable' }
+
+    const { data: animal } = await admin
+      .from('animals')
+      .select('id, establishment_id')
+      .eq('id', movement.animal_id)
+      .single()
+    if (!animal || animal.establishment_id !== ctx.establishmentId) {
+      return { error: 'Mouvement hors de votre établissement' }
+    }
+
+    // Delete the linked contract row (the storage PDF stays as orphan,
+    // Supabase blocks direct storage.objects deletes).
+    if (movement.related_contract_id && movement.related_contract_type) {
+      const contractTable = movement.related_contract_type === 'adoption' ? 'adoption_contracts' : 'foster_contracts'
+      await admin.from(contractTable).delete().eq('id', movement.related_contract_id)
+    }
+
+    const { error: delErr } = await supabase
+      .from('animal_movements')
+      .delete()
+      .eq('id', movementId)
+
+    if (delErr) return { error: delErr.message }
+
+    revalidatePath(`/animals/${movement.animal_id}`)
+    logActivity({
+      action: 'delete',
+      entityType: 'movement',
+      entityId: movementId,
+      parentType: 'animal',
+      parentId: movement.animal_id,
+      details: { reason: 'admin_manual_delete', type: movement.type },
+    })
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ============================================
 // Cancel a pending movement (deletes the contract too)
 // ============================================
 

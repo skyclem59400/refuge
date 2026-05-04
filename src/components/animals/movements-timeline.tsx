@@ -26,11 +26,12 @@ import {
   Loader2,
   AlertTriangle,
   Upload,
+  Trash2,
 } from 'lucide-react'
 import { getMovementLabel } from '@/lib/sda-utils'
 import { sendContractForSignature, syncContractSignatureStatus } from '@/lib/actions/foster-contract-signature'
 import { sendAdoptionContractForSignature, syncAdoptionContractSignatureStatus } from '@/lib/actions/adoption-contract-signature'
-import { cancelPendingMovement, markMovementSignedManually } from '@/lib/actions/movement-with-contract'
+import { cancelPendingMovement, markMovementSignedManually, deleteMovementAsAdmin } from '@/lib/actions/movement-with-contract'
 import type { AnimalMovement, MovementType } from '@/lib/types/database'
 
 interface MovementWithRelations extends AnimalMovement {
@@ -40,6 +41,7 @@ interface MovementWithRelations extends AnimalMovement {
 interface MovementsTimelineProps {
   movements: MovementWithRelations[]
   userNames: Record<string, string>
+  isAdmin?: boolean
 }
 
 // Per-type visual config: icon + accent color (Tailwind tokens already in globals)
@@ -112,7 +114,7 @@ const signatureBadgeStyles: Record<string, { label: string; className: string }>
   not_required: { label: '',                        className: '' },
 }
 
-export function MovementsTimeline({ movements, userNames }: Readonly<MovementsTimelineProps>) {
+export function MovementsTimeline({ movements, userNames, isAdmin = false }: Readonly<MovementsTimelineProps>) {
   const router = useRouter()
   const [actingId, setActingId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -150,6 +152,24 @@ export function MovementsTimeline({ movements, userNames }: Readonly<MovementsTi
       setActingId(null)
       if (res.error) toast.error(res.error)
       else { toast.success('Mouvement et contrat annulés'); router.refresh() }
+    })
+  }
+
+  function handleAdminDelete(mv: MovementWithRelations) {
+    if (!window.confirm(
+      'Supprimer définitivement ce mouvement ?\n\n' +
+      'Cette action :\n' +
+      '— supprime la ligne mouvement\n' +
+      '— supprime le contrat lié si applicable\n' +
+      '— ne change PAS le statut actuel de l\'animal (à corriger manuellement si besoin)\n\n' +
+      'Action réservée aux administrateurs.'
+    )) return
+    setActingId(mv.id)
+    startTransition(async () => {
+      const res = await deleteMovementAsAdmin(mv.id)
+      setActingId(null)
+      if (res.error) toast.error(res.error)
+      else { toast.success('Mouvement supprimé'); router.refresh() }
     })
   }
 
@@ -380,10 +400,26 @@ export function MovementsTimeline({ movements, userNames }: Readonly<MovementsTi
                 </div>
               )}
 
-              {/* Footer: saisi par */}
-              {submittedBy && (
-                <div className="mt-3 pt-3 border-t border-border/50 text-[11px] text-muted">
-                  Saisi par <span className="font-medium text-text">{submittedBy}</span>
+              {/* Footer: saisi par + admin delete */}
+              {(submittedBy || isAdmin) && (
+                <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between gap-3">
+                  {submittedBy ? (
+                    <div className="text-[11px] text-muted">
+                      Saisi par <span className="font-medium text-text">{submittedBy}</span>
+                    </div>
+                  ) : <span />}
+                  {isAdmin && !isPendingSig && (
+                    <button
+                      type="button"
+                      onClick={() => handleAdminDelete(mv)}
+                      disabled={isPending && isActing}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-muted hover:bg-red-500/10 hover:text-red-500 transition-colors disabled:opacity-50"
+                      title="Supprimer le mouvement (admin)"
+                    >
+                      {isPending && isActing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      Supprimer
+                    </button>
+                  )}
                 </div>
               )}
             </div>
