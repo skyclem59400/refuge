@@ -298,7 +298,11 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
           return
         }
         if (res.data?.warning) {
-          toast.warning(res.data.warning)
+          // Loud, persistent warning: a discreet toast disappears after a few
+          // seconds and was repeatedly missed by users (resulting in pending
+          // movements with no email actually sent).
+          toast.warning(res.data.warning, { duration: 30_000 })
+          window.alert(res.data.warning)
         } else if (skipSignature) {
           toast.success('Placement FA enregistré (signature papier — animal placé immédiatement)')
         } else {
@@ -328,7 +332,11 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
           return
         }
         if (res.data?.warning) {
-          toast.warning(res.data.warning)
+          // Loud, persistent warning: a discreet toast disappears after a few
+          // seconds and was repeatedly missed by users (resulting in pending
+          // movements with no email actually sent).
+          toast.warning(res.data.warning, { duration: 30_000 })
+          window.alert(res.data.warning)
         } else if (skipSignature) {
           toast.success('Adoption enregistrée (signature papier — animal cédé immédiatement)')
         } else {

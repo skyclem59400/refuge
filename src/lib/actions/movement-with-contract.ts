@@ -101,19 +101,17 @@ export async function recordFosterPlacementWithContract(input: FosterPlacementIn
     if (wantsSignature) {
       const sendRes = await sendContractForSignature(contract.id)
       if (sendRes.error) {
-        // Movement + contract are persisted; return a soft warning so the
-        // user can manually retry the signature send from the UI.
+        // Movement + contract were persisted with signature_status='pending',
+        // but Documenso send failed so the contract has no documenso_document_id.
+        // Surface this loudly to the user so they can retry from the timeline.
         return {
           data: {
             movementId: movementRes.data.id,
             contractId: contract.id,
-            warning: `Le mouvement et le contrat sont enregistrés en attente, mais l'envoi pour signature a échoué : ${sendRes.error}. Vous pouvez relancer l'envoi depuis l'onglet Famille d'accueil.`,
+            warning: `⚠️ Le mouvement et le contrat ont été créés mais l'envoi pour signature a échoué : ${sendRes.error}\n\nLe mouvement reste en attente. Cliquez sur "Renvoyer email" sur la timeline pour relancer la signature, ou "Annuler" pour supprimer le tout.`,
           },
         }
       }
-    } else {
-      // Paper fallback: mark as not_required, the animal status was already
-      // applied by recordMovement when signature_status='not_required'.
     }
 
     revalidatePath(`/animals/${input.animalId}`)
@@ -218,7 +216,7 @@ export async function recordAdoptionWithContract(input: AdoptionInput) {
           data: {
             movementId: movementRes.data.id,
             contractId: contract.id,
-            warning: `Mouvement et contrat enregistrés mais envoi signature échoué : ${sendRes.error}. Relancez depuis l'onglet Adoption.`,
+            warning: `⚠️ Le mouvement et le contrat d'adoption ont été créés mais l'envoi pour signature a échoué : ${sendRes.error}\n\nLe mouvement reste en attente. Cliquez sur "Renvoyer email" sur la timeline pour relancer, ou "Annuler" pour supprimer le tout.`,
           },
         }
       }
