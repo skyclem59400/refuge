@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
 import { recordMovement } from '@/lib/actions/animals'
+import { recordFosterPlacementWithContract, recordAdoptionWithContract } from '@/lib/actions/movement-with-contract'
 import { searchAllClients, createClientAction, updateClientAction } from '@/lib/actions/clients'
 import { DatePicker } from '@/components/ui/date-picker'
 import {
@@ -124,13 +125,31 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
   const [isCreatingClient, startCreatingClient] = useTransition()
   const clientPickerRef = useRef<HTMLDivElement>(null)
 
+  // Contract fields (only used for foster_placement & adoption)
+  const [contractFee, setContractFee] = useState<string>('')
+  const [expectedEndDate, setExpectedEndDate] = useState<string>('')
+  const [vetCovered, setVetCovered] = useState(true)
+  const [foodProvided, setFoodProvided] = useState(false)
+  const [insuranceRequired, setInsuranceRequired] = useState(false)
+  const [householdConsent, setHouseholdConsent] = useState(false)
+  const [sterilizationRequired, setSterilizationRequired] = useState(true)
+  const [sterilizationDeadline, setSterilizationDeadline] = useState<string>('')
+  const [sterilizationDeposit, setSterilizationDeposit] = useState<string>('')
+  const [signedAtLocation, setSignedAtLocation] = useState<string>('')
+  const [skipSignature, setSkipSignature] = useState(false)
+
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
   const isDeathOrEuthanasia = type === 'death' || type === 'euthanasia'
   const isTransferOut = type === 'transfer_out'
+  const isFosterPlacement = type === 'foster_placement'
+  const isAdoption = type === 'adoption'
+  const requiresContract = isFosterPlacement || isAdoption
   const clientCategory: ContactCategory | null | undefined = type ? clientCategoryByType[type] : undefined
   const showClientPicker = !!clientCategory
+  const selectedClientEmail = clientOptions.find((c) => c.id === relatedClientId)?.email
+    ?? (personContact?.includes('@') ? personContact : null)
 
   // Reset client selection when switching to a movement type that does not need it
   useEffect(() => {
@@ -240,7 +259,85 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
       return
     }
 
+    // FA / Adoption: must select a contact (not just a free-text name) and
+    // that contact must have an email (unless paper-signature mode)
+    if (requiresContract) {
+      if (!relatedClientId) {
+        toast.error('Sélectionnez un contact dans le répertoire (un contrat va être généré)')
+        return
+      }
+      if (!skipSignature && !selectedClientEmail) {
+        toast.error("Email obligatoire pour la signature électronique. Renseignez-le dans le répertoire ou cochez « signature papier ».")
+        return
+      }
+    }
+
     startTransition(async () => {
+      // FA / Adoption : route to the unified workflow that creates the
+      // contract, sends it for signature, and parks the movement in pending.
+      if (isFosterPlacement && relatedClientId) {
+        const res = await recordFosterPlacementWithContract({
+          animalId,
+          date,
+          notes: notes || null,
+          icadStatus,
+          fosterClientId: relatedClientId,
+          startDate: date,
+          expectedEndDate: expectedEndDate || null,
+          vetCostsCoveredByShelter: vetCovered,
+          foodProvidedByShelter: foodProvided,
+          insuranceRequired,
+          householdConsent,
+          signedAtLocation: signedAtLocation || null,
+          skipElectronicSignature: skipSignature,
+        })
+        if (res.error) {
+          toast.error(res.error)
+          return
+        }
+        if (res.data?.warning) {
+          toast.warning(res.data.warning)
+        } else if (skipSignature) {
+          toast.success('Placement FA enregistré (signature papier — animal placé immédiatement)')
+        } else {
+          toast.success(`Contrat envoyé pour signature à ${selectedClientEmail}. L'animal restera "au refuge" jusqu'à la signature.`)
+        }
+        onClose?.()
+        router.refresh()
+        return
+      }
+
+      if (isAdoption && relatedClientId) {
+        const res = await recordAdoptionWithContract({
+          animalId,
+          date,
+          notes: notes || null,
+          icadStatus,
+          adopterClientId: relatedClientId,
+          adoptionFee: contractFee.trim() ? Number(contractFee) : 0,
+          sterilizationRequired,
+          sterilizationDeadline: sterilizationRequired && sterilizationDeadline ? sterilizationDeadline : null,
+          sterilizationDeposit: sterilizationRequired && sterilizationDeposit.trim() ? Number(sterilizationDeposit) : null,
+          signedAtLocation: signedAtLocation || null,
+          skipElectronicSignature: skipSignature,
+        })
+        if (res.error) {
+          toast.error(res.error)
+          return
+        }
+        if (res.data?.warning) {
+          toast.warning(res.data.warning)
+        } else if (skipSignature) {
+          toast.success('Adoption enregistrée (signature papier — animal cédé immédiatement)')
+        } else {
+          toast.success(`Contrat d'adoption envoyé à ${selectedClientEmail}. L'animal sera marqué adopté à la signature.`)
+        }
+        onClose?.()
+        router.refresh()
+        return
+      }
+
+      // Other movement types — direct path, no contract
       const result = await recordMovement(animalId, {
         type,
         date,
@@ -439,6 +536,72 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
             placeholder="Nom du refuge ou adresse de destination"
             className={inputClass}
           />
+        </div>
+      )}
+
+      {/* Contract fields — foster placement & adoption */}
+      {requiresContract && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-4">
+          <div className="flex items-start gap-2">
+            <div className="text-primary text-base">📝</div>
+            <div className="text-xs text-muted">
+              Un contrat va être généré et {skipSignature ? 'imprimé pour signature papier' : `envoyé pour signature électronique à ${selectedClientEmail || '— email manquant —'}`}.
+              <br />
+              {skipSignature
+                ? "L'animal sera marqué dans son nouveau statut immédiatement."
+                : "L'animal restera dans son statut actuel jusqu'à la réception de la signature."}
+            </div>
+          </div>
+
+          {isFosterPlacement && (
+            <>
+              <div>
+                <label htmlFor="ct-end-date" className={labelClass}>Fin prévisionnelle du placement</label>
+                <DatePicker id="ct-end-date" value={expectedEndDate} onChange={(v) => setExpectedEndDate(v ?? '')} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={vetCovered} onChange={(e) => setVetCovered(e.target.checked)} className="mt-0.5" /><span>Frais vétérinaires pris en charge par le refuge</span></label>
+                <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={foodProvided} onChange={(e) => setFoodProvided(e.target.checked)} className="mt-0.5" /><span>Alimentation fournie par le refuge</span></label>
+                <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={insuranceRequired} onChange={(e) => setInsuranceRequired(e.target.checked)} className="mt-0.5" /><span>Assurance RC requise pour le foyer</span></label>
+                <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={householdConsent} onChange={(e) => setHouseholdConsent(e.target.checked)} className="mt-0.5" /><span>Accord du foyer obtenu</span></label>
+              </div>
+            </>
+          )}
+
+          {isAdoption && (
+            <>
+              <div>
+                <label htmlFor="ct-fee" className={labelClass}>Frais d'adoption (€)</label>
+                <input id="ct-fee" type="number" step="0.01" min="0" value={contractFee} onChange={(e) => setContractFee(e.target.value)} placeholder="0.00" className={inputClass} />
+              </div>
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" checked={sterilizationRequired} onChange={(e) => setSterilizationRequired(e.target.checked)} className="mt-0.5" />
+                <span>Stérilisation obligatoire si l'animal n'est pas déjà stérilisé</span>
+              </label>
+              {sterilizationRequired && (
+                <div className="ml-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="ct-ster-deadline" className={labelClass}>Échéance stérilisation</label>
+                    <DatePicker id="ct-ster-deadline" value={sterilizationDeadline} onChange={(v) => setSterilizationDeadline(v ?? '')} />
+                  </div>
+                  <div>
+                    <label htmlFor="ct-ster-deposit" className={labelClass}>Caution (€)</label>
+                    <input id="ct-ster-deposit" type="number" step="0.01" min="0" value={sterilizationDeposit} onChange={(e) => setSterilizationDeposit(e.target.value)} placeholder="50.00" className={inputClass} />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          <div>
+            <label htmlFor="ct-signed-location" className={labelClass}>Lieu de signature</label>
+            <input id="ct-signed-location" type="text" value={signedAtLocation} onChange={(e) => setSignedAtLocation(e.target.value)} placeholder="Cambrai" className={inputClass} />
+          </div>
+
+          <label className="flex items-start gap-2 text-sm pt-2 border-t border-primary/20">
+            <input type="checkbox" checked={skipSignature} onChange={(e) => setSkipSignature(e.target.checked)} className="mt-0.5" />
+            <span>Signature papier (mode dégradé) — pas d'envoi d'email, le contrat sera signé physiquement et l'animal changera de statut immédiatement</span>
+          </label>
         </div>
       )}
 

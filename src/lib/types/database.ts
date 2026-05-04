@@ -278,6 +278,9 @@ export interface AnimalPhoto {
   created_at: string
 }
 
+export type MovementSignatureStatus = 'not_required' | 'pending' | 'signed' | 'rejected' | 'cancelled'
+export type MovementRelatedContractType = 'foster' | 'adoption'
+
 export interface AnimalMovement {
   id: string
   animal_id: string
@@ -290,6 +293,9 @@ export interface AnimalMovement {
   icad_status: IcadStatus
   related_client_id: string | null
   related_client?: { id: string; name: string } | null
+  signature_status: MovementSignatureStatus | null
+  related_contract_id: string | null
+  related_contract_type: MovementRelatedContractType | null
   created_by: string | null
   created_at: string
 }

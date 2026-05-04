@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { createAdminClient } from '@/lib/supabase/server'
 import { downloadSignedPdf } from '@/lib/documenso/client'
+import { finalizeMovementOnSignature } from '@/lib/actions/movement-with-contract'
 import type { SignatureStatus } from '@/lib/types/database'
 
 // Documenso webhook events we care about:
@@ -175,6 +176,25 @@ export async function POST(request: NextRequest) {
   if (error) {
     console.error('Webhook update error:', error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Propagate to the linked animal_movement (if any) so its signature_status
+  // matches the contract and the deferred animal status change is applied.
+  // Only on terminal events: document.completed (full signature) or
+  // document.rejected. Don't fire on partial document.signed when there are
+  // multiple recipients, even though FA/adoption only have one in practice.
+  const propagate =
+    payload.event === 'document.completed' ||
+    payload.event === 'document.rejected' ||
+    (payload.event === 'document.signed' && finalEvent)
+  if (propagate) {
+    await finalizeMovementOnSignature({
+      contractId: contract.id,
+      contractType: isAdoption ? 'adoption' : 'foster',
+      status: newStatus === 'signed' ? 'signed' : 'rejected',
+    }).catch((err) => {
+      console.error('Webhook: finalizeMovementOnSignature failed', err)
+    })
   }
 
   return NextResponse.json({ ok: true, contractId: contract.id, type: isAdoption ? 'adoption' : 'foster', newStatus })

@@ -458,6 +458,9 @@ export async function recordMovement(animalId: string, data: {
   destination?: string | null
   icad_status?: IcadStatus
   related_client_id?: string | null
+  signature_status?: 'not_required' | 'pending' | 'signed' | 'rejected' | 'cancelled' | null
+  related_contract_id?: string | null
+  related_contract_type?: 'foster' | 'adoption' | null
 }) {
   try {
     const { establishmentId, userId } = await requirePermission('manage_movements')
@@ -488,6 +491,9 @@ export async function recordMovement(animalId: string, data: {
         destination: data.destination ?? null,
         icad_status: data.icad_status ?? 'pending',
         related_client_id: data.related_client_id ?? null,
+        signature_status: data.signature_status ?? 'not_required',
+        related_contract_id: data.related_contract_id ?? null,
+        related_contract_type: data.related_contract_type ?? null,
         created_by: userId,
       })
       .select()
@@ -508,16 +514,23 @@ export async function recordMovement(animalId: string, data: {
       euthanasia: 'euthanized',
     }
 
+    // Only apply the animal status change when the movement is "active":
+    // either it doesn't require a signature, or it is already signed. A
+    // movement awaiting a signature must NOT change the animal status — this
+    // is what gives the contract its legal weight (e.g. "foster_family"
+    // status only after the foster signed the convention electronically).
+    const isActive = data.signature_status === 'not_required'
+      || data.signature_status === 'signed'
+      || data.signature_status == null
+
     const newStatus = statusMap[data.type]
-    if (newStatus) {
+    if (newStatus && isActive) {
       const updateData: Record<string, string | null> = { status: newStatus }
 
-      // Set shelter_entry_date for shelter transfer
       if (data.type === 'shelter_transfer') {
         updateData.shelter_entry_date = data.date
       }
 
-      // Set exit_date for exit movements
       const exitTypes: MovementType[] = ['adoption', 'return_to_owner', 'transfer_out', 'death', 'euthanasia']
       if (exitTypes.includes(data.type)) {
         updateData.exit_date = data.date

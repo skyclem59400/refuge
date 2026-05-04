@@ -1,5 +1,8 @@
 'use client'
 
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import {
   Truck,
   Home,
@@ -15,8 +18,19 @@ import {
   MapPin,
   StickyNote,
   Clock,
+  Send,
+  RefreshCw,
+  XCircle,
+  FileDown,
+  CheckCircle2,
+  Loader2,
+  AlertTriangle,
+  Upload,
 } from 'lucide-react'
 import { getMovementLabel } from '@/lib/sda-utils'
+import { sendContractForSignature, syncContractSignatureStatus } from '@/lib/actions/foster-contract-signature'
+import { sendAdoptionContractForSignature, syncAdoptionContractSignatureStatus } from '@/lib/actions/adoption-contract-signature'
+import { cancelPendingMovement, markMovementSignedManually } from '@/lib/actions/movement-with-contract'
 import type { AnimalMovement, MovementType } from '@/lib/types/database'
 
 interface MovementWithRelations extends AnimalMovement {
@@ -90,7 +104,104 @@ function avatarInitials(name: string): string {
     .join('') || '?'
 }
 
+const signatureBadgeStyles: Record<string, { label: string; className: string }> = {
+  pending:      { label: 'En attente de signature', className: 'bg-amber-500/15 text-amber-600 border-amber-500/30' },
+  signed:       { label: 'Signé',                   className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' },
+  rejected:     { label: 'Refusé',                  className: 'bg-red-500/15 text-red-500 border-red-500/30' },
+  cancelled:    { label: 'Annulé',                  className: 'bg-muted/15 text-muted border-muted/30' },
+  not_required: { label: '',                        className: '' },
+}
+
 export function MovementsTimeline({ movements, userNames }: Readonly<MovementsTimelineProps>) {
+  const router = useRouter()
+  const [actingId, setActingId] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  function handleResend(mv: MovementWithRelations) {
+    if (!mv.related_contract_id || !mv.related_contract_type) return
+    if (!window.confirm('Renvoyer le contrat pour signature électronique ?')) return
+    setActingId(mv.id)
+    startTransition(async () => {
+      const fn = mv.related_contract_type === 'adoption' ? sendAdoptionContractForSignature : sendContractForSignature
+      const res = await fn(mv.related_contract_id!)
+      setActingId(null)
+      if (res.error) toast.error(res.error)
+      else { toast.success('Contrat renvoyé pour signature'); router.refresh() }
+    })
+  }
+
+  function handleSync(mv: MovementWithRelations) {
+    if (!mv.related_contract_id || !mv.related_contract_type) return
+    setActingId(mv.id)
+    startTransition(async () => {
+      const fn = mv.related_contract_type === 'adoption' ? syncAdoptionContractSignatureStatus : syncContractSignatureStatus
+      const res = await fn(mv.related_contract_id!)
+      setActingId(null)
+      if (res.error) toast.error(res.error)
+      else { toast.success(`Statut Documenso : ${res.data?.status}`); router.refresh() }
+    })
+  }
+
+  function handleCancel(mv: MovementWithRelations) {
+    if (!window.confirm('Annuler ce mouvement en attente ? Le contrat lié sera supprimé. (Le mouvement n\'avait pas encore d\'effet juridique.)')) return
+    setActingId(mv.id)
+    startTransition(async () => {
+      const res = await cancelPendingMovement(mv.id)
+      setActingId(null)
+      if (res.error) toast.error(res.error)
+      else { toast.success('Mouvement et contrat annulés'); router.refresh() }
+    })
+  }
+
+  function handleMarkSignedManually(mv: MovementWithRelations) {
+    const choice = window.prompt(
+      "Marquer ce mouvement comme signé manuellement (signature papier) ?\n\n" +
+      "Tapez OK pour valider sans uploader, ou tapez UPLOAD pour téléverser le PDF scanné.",
+      'OK'
+    )
+    if (!choice) return
+    const upload = choice.trim().toUpperCase() === 'UPLOAD'
+
+    if (!upload) {
+      setActingId(mv.id)
+      startTransition(async () => {
+        const res = await markMovementSignedManually({ movementId: mv.id })
+        setActingId(null)
+        if (res.error) toast.error(res.error)
+        else { toast.success('Mouvement marqué signé manuellement'); router.refresh() }
+      })
+      return
+    }
+
+    // Upload flow
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'application/pdf'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      if (file.size > 10 * 1024 * 1024) { toast.error('PDF trop volumineux (10 Mo max)'); return }
+      setActingId(mv.id)
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = String(reader.result || '')
+        const base64 = result.split(',')[1] || ''
+        startTransition(async () => {
+          const res = await markMovementSignedManually({
+            movementId: mv.id,
+            scannedPdfBase64: base64,
+            scannedPdfFileName: file.name,
+          })
+          setActingId(null)
+          if (res.error) toast.error(res.error)
+          else { toast.success('PDF scanné uploadé et mouvement marqué signé'); router.refresh() }
+        })
+      }
+      reader.readAsDataURL(file)
+    }
+    input.click()
+  }
+
   if (movements.length === 0) {
     return <div className="bg-surface rounded-xl border border-border p-8 text-center text-sm text-muted">Aucun mouvement enregistré</div>
   }
@@ -103,6 +214,14 @@ export function MovementsTimeline({ movements, userNames }: Readonly<MovementsTi
         const linkedName = mv.related_client?.name || mv.person_name
         const submittedBy = (mv.created_by && userNames[mv.created_by]) || null
         const isLast = idx === movements.length - 1
+        const sigStatus = mv.signature_status
+        const isPendingSig = sigStatus === 'pending'
+        const isRejected = sigStatus === 'rejected'
+        const sigBadge = sigStatus && sigStatus !== 'not_required' ? signatureBadgeStyles[sigStatus] : null
+        const isActing = actingId === mv.id
+        const pdfHref = mv.related_contract_id && mv.related_contract_type
+          ? `/api/pdf/${mv.related_contract_type === 'adoption' ? 'adoption-contract' : 'foster-contract'}/${mv.related_contract_id}`
+          : null
 
         return (
           <li key={mv.id} className="relative flex gap-4">
@@ -130,10 +249,20 @@ export function MovementsTimeline({ movements, userNames }: Readonly<MovementsTi
                     {formatElapsed(mv.date)}
                   </div>
                 </div>
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${visual.badge}`}>
-                  <Icon className="w-3.5 h-3.5" />
-                  {getMovementLabel(mv.type)}
-                </span>
+                <div className="flex flex-col items-end gap-1.5">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${visual.badge}`}>
+                    <Icon className="w-3.5 h-3.5" />
+                    {getMovementLabel(mv.type)}
+                  </span>
+                  {sigBadge && (
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${sigBadge.className}`}>
+                      {isPendingSig && <Clock className="w-3 h-3" />}
+                      {sigStatus === 'signed' && <CheckCircle2 className="w-3 h-3" />}
+                      {isRejected && <AlertTriangle className="w-3 h-3" />}
+                      {sigBadge.label}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Linked person block */}
@@ -175,6 +304,82 @@ export function MovementsTimeline({ movements, userNames }: Readonly<MovementsTi
                 </div>
               )}
 
+              {/* Pending signature warning + actions */}
+              {isPendingSig && (
+                <div className="mt-3 pt-3 border-t border-amber-500/20 space-y-2">
+                  <p className="text-xs text-amber-600 flex items-start gap-2">
+                    <Clock className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>Statut animal en attente : il sera appliqué dès que le contrat sera signé.</span>
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {pdfHref && (
+                      <a
+                        href={pdfHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-surface-dark hover:bg-surface-hover text-muted hover:text-text transition-colors"
+                        title="Aperçu du contrat (PDF non signé)"
+                      >
+                        <FileDown className="w-3.5 h-3.5" /> Voir le contrat
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleResend(mv)}
+                      disabled={isPending && isActing}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-primary/10 hover:bg-primary/20 text-primary transition-colors disabled:opacity-50"
+                    >
+                      {isPending && isActing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                      Renvoyer email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSync(mv)}
+                      disabled={isPending && isActing}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-surface-dark hover:bg-surface-hover text-muted hover:text-text transition-colors disabled:opacity-50"
+                      title="Synchroniser le statut avec Documenso"
+                    >
+                      {isPending && isActing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                      Sync
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMarkSignedManually(mv)}
+                      disabled={isPending && isActing}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 transition-colors disabled:opacity-50"
+                      title="Signature papier — marquer comme signé manuellement et uploader le PDF scanné"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Signature papier
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCancel(mv)}
+                      disabled={isPending && isActing}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors disabled:opacity-50"
+                      title="Annuler ce mouvement et son contrat"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Signed contract download (when finalised) */}
+              {sigStatus === 'signed' && pdfHref && (
+                <div className="mt-3 pt-3 border-t border-emerald-500/20 flex flex-wrap gap-1.5">
+                  <a
+                    href={pdfHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 transition-colors"
+                  >
+                    <FileDown className="w-3.5 h-3.5" /> Voir le contrat signé
+                  </a>
+                </div>
+              )}
+
               {/* Footer: saisi par */}
               {submittedBy && (
                 <div className="mt-3 pt-3 border-t border-border/50 text-[11px] text-muted">
@@ -188,3 +393,4 @@ export function MovementsTimeline({ movements, userNames }: Readonly<MovementsTi
     </ol>
   )
 }
+
