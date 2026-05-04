@@ -21,6 +21,8 @@ import {
   Inbox,
   Stethoscope,
   Wallet,
+  MapPin,
+  KeyRound,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -82,6 +84,14 @@ const shelterSections: NavSection[] = [
       { href: '/planning', label: 'Planning', Icon: CalendarDays, permission: 'canManageEstablishment' },
       { href: '/espace-collaborateur', label: 'Mon espace', Icon: Briefcase, permission: 'canViewOwnLeaves', roles: ['admin', 'salarie'] },
       { href: '/admin/conges', label: 'Congés', Icon: CalendarCheck, permission: 'canManageLeaves' },
+    ],
+  },
+  {
+    label: 'Astreinte',
+    items: [
+      { href: '/astreinte/tickets', label: 'Tickets', Icon: Inbox, permission: 'canManageEstablishment' },
+      { href: '/astreinte/communes', label: 'Communes', Icon: MapPin, permission: 'canManageEstablishment' },
+      { href: '/astreinte/acces', label: 'Accès portail', Icon: KeyRound, permission: 'canManageEstablishment' },
     ],
   },
   {
