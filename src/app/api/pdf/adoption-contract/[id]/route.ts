@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { buildAdoptionContractPdf } from '@/lib/pdf/adoption-contract-pdf'
 
 export async function GET(
@@ -13,6 +13,19 @@ export async function GET(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+
+    // Si le contrat a déjà un PDF signé Documenso (post-scellage), on le sert.
+    // Sinon, on régénère le PDF non signé via Puppeteer (preview avant signature).
+    const admin = createAdminClient()
+    const { data: contract } = await admin
+      .from('adoption_contracts')
+      .select('signed_pdf_url')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (contract?.signed_pdf_url) {
+      return NextResponse.redirect(contract.signed_pdf_url, 302)
     }
 
     const { buffer, filename } = await buildAdoptionContractPdf(id)
