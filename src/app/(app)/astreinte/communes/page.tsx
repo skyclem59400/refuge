@@ -38,13 +38,22 @@ export default async function CommunesPage({
       .order('name'),
   ])
 
-  // Filtres côté serveur
+  // Filtres côté serveur — par défaut on n'affiche que les communes conventionnées
+  // (active + pending). L'utilisateur peut explicitement demander toutes les communes
+  // via ?status=all (utile pour l'admin lors de l'ajout de nouvelles conventions).
   let filtered = communes ?? []
   if (params.epci) {
     filtered = filtered.filter((c) => c.epci_code_siren === params.epci)
   }
-  if (params.status) {
+  if (params.status === 'all') {
+    // pas de filtre — afficher toutes
+  } else if (params.status) {
     filtered = filtered.filter((c) => c.convention_status === params.status)
+  } else {
+    // Défaut : uniquement les communes conventionnées (active ou pending)
+    filtered = filtered.filter(
+      (c) => c.convention_status === 'active' || c.convention_status === 'pending'
+    )
   }
   if (params.q) {
     const q = params.q.toLowerCase()

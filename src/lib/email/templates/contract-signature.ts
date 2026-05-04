@@ -40,13 +40,16 @@ export interface ContractEmailParams {
   establishmentWebsite?: string | null
 }
 
-const PRIMARY = '#0d9488' // teal-600 (logo SDA)
-const PRIMARY_DARK = '#0f766e' // teal-700
-const TEXT = '#1f2937' // grey-800
-const TEXT_MUTED = '#6b7280' // grey-500
-const BORDER = '#e5e7eb' // grey-200
-const BG = '#f9fafb' // grey-50
+// === Charte SDA officielle (cf. src/lib/pdf/sda-brand.ts) ===
+const PRIMARY = '#5ba8a0'      // teal SDA
+const PRIMARY_DARK = '#1e3a5f' // bleu marine SDA (texte fort, CTA dark)
+const ORANGE = '#c96b3c'       // orange terracotta SDA (accent)
+const TEXT = '#1e3a5f'         // texte = bleu marine SDA
+const TEXT_MUTED = '#6b7f96'   // muted SDA
+const BORDER = '#d9e6ed'       // bordure SDA
+const BG = '#f0f7fa'           // fond doux SDA
 const SURFACE = '#ffffff'
+const FOOTER_GRADIENT = 'linear-gradient(90deg, #c96b3c 0%, #5ba8a0 50%, #1e3a5f 100%)'
 
 function buildSubject(p: ContractEmailParams): string {
   if (p.kind === 'foster') {
@@ -97,9 +100,23 @@ export function buildContractSignatureEmail(p: ContractEmailParams): { subject: 
     ? `${escapeHtml(speciesLabel(p.animalSpecies))} · ${escapeHtml(p.animalBreed.trim())}`
     : escapeHtml(speciesLabel(p.animalSpecies))
 
-  const logoBlock = p.establishmentLogoUrl
-    ? `<img src="${escapeHtml(p.establishmentLogoUrl)}" alt="${orgName}" width="120" style="display:block;height:auto;max-width:120px;border:0;outline:none;text-decoration:none;" />`
-    : `<span style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:18px;font-weight:600;color:${PRIMARY};letter-spacing:0.5px;">${orgName.toUpperCase()}</span>`
+  const logoImg = p.establishmentLogoUrl
+    ? `<img src="${escapeHtml(p.establishmentLogoUrl)}" alt="${orgName}" width="64" style="display:block;height:auto;max-width:64px;border:0;outline:none;text-decoration:none;flex-shrink:0;" />`
+    : ''
+  const logoBlock = `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        ${logoImg ? `<td style="padding-right:14px;vertical-align:middle;">${logoImg}</td>` : ''}
+        <td style="vertical-align:middle;">
+          <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:20px;font-weight:700;color:${PRIMARY_DARK};letter-spacing:0.5px;line-height:1.1;">
+            <span style="color:${PRIMARY};">SDA</span> ${orgName === 'SDA' ? "d'Estourmel" : escapeHtml(p.establishmentName)}
+          </div>
+          <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:9px;color:${PRIMARY};font-weight:600;text-transform:uppercase;letter-spacing:1.8px;margin-top:3px;">
+            Défendons les animaux
+          </div>
+        </td>
+      </tr>
+    </table>`
 
   const photoBlock = p.animalPhotoUrl
     ? `<tr>
@@ -152,6 +169,9 @@ export function buildContractSignatureEmail(p: ContractEmailParams): { subject: 
 
         <!-- Card -->
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" class="container" style="max-width:600px;background:${SURFACE};border:1px solid ${BORDER};border-radius:8px;overflow:hidden;">
+          <tr>
+            <td style="padding:0;line-height:0;height:4px;background:${FOOTER_GRADIENT};">&nbsp;</td>
+          </tr>
           ${photoBlock}
           <tr>
             <td class="px-mobile" style="padding:32px 40px 8px 40px;">
@@ -170,7 +190,7 @@ export function buildContractSignatureEmail(p: ContractEmailParams): { subject: 
             <td class="px-mobile" align="center" style="padding:32px 40px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td style="background:${PRIMARY};border-radius:6px;">
+                  <td style="background:${PRIMARY_DARK};border-radius:6px;">
                     <a href="${escapeHtml(p.signingUrl)}" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:${SURFACE};text-decoration:none;border-radius:6px;">
                       ${escapeHtml(ctaLabel)} →
                     </a>

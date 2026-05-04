@@ -48,9 +48,11 @@ export default async function AstreinteTicketsPage({
     .order('created_at', { ascending: false })
     .limit(200)
 
+  // Uniquement les communes conventionnées (CAC + CA2C + Sud-Artois + indépendantes 2026 + Denain)
   const { data: communes } = await admin
     .from('astreinte_municipalities')
     .select('code_insee, name')
+    .eq('convention_status', 'active')
     .order('name')
 
   // Stats globales

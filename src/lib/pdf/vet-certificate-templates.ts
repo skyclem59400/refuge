@@ -93,31 +93,42 @@ function animalIdentityBlock(animal: Animal): string {
 }
 
 function commonStyles(): string {
+  // === Charte SDA officielle ===
+  const NAVY = '#1e3a5f'
+  const TEAL = '#5ba8a0'
+  const ORANGE = '#c96b3c'
+  const MUTED = '#6b7f96'
+  const BORDER = '#d9e6ed'
+  const SURFACE = '#f0f7fa'
   return `
     @page { size: A4; margin: 14mm 14mm; }
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color:#111; font-size:10pt; margin:0; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color:${NAVY}; font-size:10pt; margin:0; }
     .hdr { width:100%; border-collapse:separate; border-spacing:8px; margin-bottom:18px; }
-    .hdr-cell { width:50%; padding:10px; border:1px solid #999; border-radius:4px; vertical-align:top; }
-    .hdr-title { font-weight:700; background:#e5e7eb; padding:4px 8px; margin:-10px -10px 8px -10px; border-radius:4px 4px 0 0; font-size:10pt; }
+    .hdr-cell { width:50%; padding:10px; border:1px solid ${BORDER}; border-radius:6px; vertical-align:top; background:white; }
+    .hdr-title { font-weight:700; background:${SURFACE}; color:${NAVY}; padding:5px 10px; margin:-10px -10px 8px -10px; border-radius:6px 6px 0 0; font-size:9pt; text-transform:uppercase; letter-spacing:1.5px; border-bottom:2px solid ${TEAL}; }
     .hdr-content { line-height:1.55; }
     .kv { width:100%; }
     .kv td { padding:2px 0; vertical-align:top; }
-    .kv td:first-child { width:90px; color:#444; }
-    h1 { font-size:22pt; font-weight:600; margin:18px 0 14px 0; }
-    h2 { font-size:16pt; font-weight:600; margin:18px 0 10px 0; }
-    .identity { display:grid; grid-template-columns: 1fr 1fr; gap:4px 24px; padding:10px; border:1px solid #999; border-radius:4px; margin-bottom:16px; line-height:1.6; }
+    .kv td:first-child { width:90px; color:${MUTED}; }
+    h1 { font-size:22pt; font-weight:600; margin:18px 0 14px 0; color:${NAVY}; letter-spacing:-0.3pt; }
+    h2 { font-size:16pt; font-weight:600; margin:18px 0 10px 0; color:${NAVY}; }
+    h2.section { padding-bottom:6px; border-bottom:2px solid ${TEAL}; }
+    .identity { display:grid; grid-template-columns: 1fr 1fr; gap:4px 24px; padding:12px 14px; border:1px solid ${BORDER}; border-left:4px solid ${TEAL}; border-radius:6px; margin-bottom:16px; line-height:1.6; background:#fafbfc; }
     .identity div { font-size:10pt; }
     .photo-row { display:flex; gap:14px; align-items:flex-start; margin-bottom:14px; }
-    .photo { width:160px; height:160px; object-fit:cover; border:1px solid #ddd; border-radius:4px; flex-shrink:0; }
+    .photo { width:160px; height:160px; object-fit:cover; border:3px solid ${SURFACE}; border-radius:8px; flex-shrink:0; }
     .table { width:100%; border-collapse:collapse; margin-top:6px; }
-    .table th, .table td { border:1px solid #999; padding:8px; vertical-align:top; font-size:9.5pt; }
-    .table th { background:#d4f0d4; text-align:left; font-weight:600; }
-    .signature-box { margin-top:32px; padding:14px; border:1px solid #999; border-radius:4px; min-height:120px; }
-    .signature-box .label { font-weight:600; margin-bottom:6px; }
-    .footer { position:fixed; bottom:5mm; left:14mm; right:14mm; font-size:8pt; color:#9ca3af; }
+    .table th, .table td { border:1px solid ${BORDER}; padding:8px 10px; vertical-align:top; font-size:9.5pt; }
+    .table th { background:${SURFACE}; color:${NAVY}; text-align:left; font-weight:700; font-size:9pt; text-transform:uppercase; letter-spacing:0.5pt; }
+    .signature-box { margin-top:32px; padding:16px; border:1px solid ${BORDER}; border-left:4px solid ${ORANGE}; border-radius:6px; min-height:120px; background:white; }
+    .signature-box .label { font-weight:700; margin-bottom:8px; color:${ORANGE}; font-size:9pt; text-transform:uppercase; letter-spacing:1pt; }
+    .footer { position:fixed; bottom:5mm; left:14mm; right:14mm; font-size:8pt; color:${MUTED}; }
+    .footer-accent { height:3px; background:linear-gradient(90deg, ${ORANGE} 0%, ${TEAL} 50%, ${NAVY} 100%); border-radius:2px; margin-bottom:4px; }
     .small { font-size:9pt; }
-    .legal { font-style:italic; font-size:9pt; color:#444; text-align:center; margin-bottom:12px; }
+    .legal { font-style:italic; font-size:9pt; color:${MUTED}; text-align:center; margin-bottom:12px; }
+    /* SDA brand strip — bordure orange-teal-bleu en haut de chaque page */
+    .sda-strip { height:4px; background:linear-gradient(90deg, ${ORANGE} 0%, ${TEAL} 50%, ${NAVY} 100%); border-radius:2px; margin-bottom:14px; }
   `
 }
 
@@ -146,6 +157,7 @@ export function buildMedicalFollowupHtml(args: CertificateBaseArgs & {
 <title>Fiche de suivi médical — ${animal.name}</title>
 <style>${commonStyles()}</style>
 </head><body>
+<div class="sda-strip"></div>
 ${buildHeader(args)}
 <h2 style="text-align:center;">Fiche de suivi médical de ${animal.name}</h2>
 <div class="photo-row">
@@ -159,7 +171,7 @@ ${buildHeader(args)}
   <thead><tr><th style="width:90px;">Date</th><th style="width:150px;">Type</th><th>Description</th><th style="width:140px;">Vétérinaire</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>
-<div class="footer">${fmtDateTimeFr(generatedAt)}</div>
+<div class="footer"><div class="footer-accent"></div>${fmtDateTimeFr(generatedAt)} — SDA d'Estourmel · Défendons les animaux</div>
 </body></html>`
 }
 
@@ -183,6 +195,7 @@ export function buildSterilizationCertificateHtml(args: CertificateBaseArgs & {
   .row { margin: 10px 0; font-size:11pt; line-height:1.7; }
 </style>
 </head><body>
+<div class="sda-strip"></div>
 <div class="center">
   ${logoBase64 ? `<img src="${logoBase64}" alt="Logo SDA" style="height:90px;margin-bottom:10px;" />` : ''}
 </div>
@@ -201,7 +214,7 @@ export function buildSterilizationCertificateHtml(args: CertificateBaseArgs & {
   ${vetSig}
 </div>
 
-<div class="footer">${fmtDateTimeFr(generatedAt)}</div>
+<div class="footer"><div class="footer-accent"></div>${fmtDateTimeFr(generatedAt)} — SDA d'Estourmel · Défendons les animaux</div>
 </body></html>`
 }
 
@@ -230,6 +243,7 @@ export function buildCessionCertificateHtml(args: CertificateBaseArgs & {
 <title>Certificat vétérinaire avant cession — ${animal.name}</title>
 <style>${commonStyles()}</style>
 </head><body>
+<div class="sda-strip"></div>
 <h1 style="text-align:center;">Certificat vétérinaire avant cession</h1>
 <div class="legal">
   Code rural L. 214-8 et D. 214-32-2<br/>
@@ -261,7 +275,7 @@ ${animalIdentityBlock(animal)}
   <div class="signature-box" style="margin-top:8px;height:90px;"></div>
 </div>
 
-<div class="footer">${fmtDateTimeFr(generatedAt)}</div>
+<div class="footer"><div class="footer-accent"></div>${fmtDateTimeFr(generatedAt)} — SDA d'Estourmel · Défendons les animaux</div>
 </body></html>`
 }
 

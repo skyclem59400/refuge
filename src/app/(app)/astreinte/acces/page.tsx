@@ -26,9 +26,11 @@ export default async function AccessPage() {
         'email, scope_type, full_name, role, organization_label, municipality_code_insee, active, notes, created_at, validated_at'
       )
       .order('created_at', { ascending: false }),
+    // Uniquement les communes conventionnées
     admin
       .from('astreinte_municipalities')
       .select('code_insee, name, postal_codes, epci_code_siren')
+      .eq('convention_status', 'active')
       .order('name'),
   ])
 

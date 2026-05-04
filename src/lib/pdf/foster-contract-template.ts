@@ -33,12 +33,15 @@ interface FosterPdfClient {
   city: string | null
 }
 
-const PRIMARY = '#1d9997'
-const PRIMARY_DARK = '#0F6B69'
-const PRIMARY_LIGHT = '#E6F5F4'
-const INK = '#0A0A0A'
-const STONE_500 = '#8A8678'
-const STONE_300 = '#C9C4B6'
+// === Charte SDA officielle (cf. src/lib/pdf/sda-brand.ts) ===
+const PRIMARY = '#5ba8a0'        // teal SDA
+const PRIMARY_DARK = '#1e3a5f'   // bleu marine SDA
+const PRIMARY_LIGHT = '#f0f7fa'  // fond doux
+const INK = '#1e3a5f'            // texte fort = bleu marine
+const STONE_500 = '#6b7f96'      // muted = bleu gris
+const STONE_300 = '#d9e6ed'      // bordure = bleu très clair
+const ORANGE = '#c96b3c'         // orange terracotta SDA (highlight, sections)
+const ORANGE_BG = '#fdf4ee'      // fond orange clair
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '____ / ____ / _______'
@@ -150,7 +153,7 @@ export function buildFosterContractHtml(
       justify-content: center;
       width: 22pt; height: 22pt;
       border-radius: 50%;
-      background: ${PRIMARY};
+      background: ${ORANGE};
       color: white;
       font-size: 11pt;
       font-weight: 700;
@@ -181,16 +184,17 @@ export function buildFosterContractHtml(
     .clause-title .check { display: inline-flex; align-items: center; justify-content: center; width: 14pt; height: 14pt; border-radius: 50%; background: ${PRIMARY}; color: white; font-size: 9pt; font-weight: 700; }
     .clause-body { font-size: 9.5pt; margin-top: 3pt; color: #2d2d2d; }
 
-    .note-block { padding: 8pt 12pt; background: #fff8e6; border-left: 4px solid #d4a800; border-radius: 6pt; font-size: 9.5pt; }
-    .note-block strong { color: #846a00; }
+    .note-block { padding: 8pt 12pt; background: linear-gradient(135deg, ${ORANGE_BG} 0%, #fef9f5 100%); border-left: 4px solid ${ORANGE}; border-radius: 0 6pt 6pt 0; font-size: 9.5pt; color: ${INK}; }
+    .note-block strong { color: ${ORANGE}; }
 
     .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 18pt; margin-top: 28pt; }
     .sigbox { border: 1px solid ${STONE_300}; border-radius: 10pt; padding: 12pt 14pt; min-height: 110pt; font-size: 9pt; background: white; page-break-inside: avoid; }
-    .sigbox .who { display: inline-block; padding: 3pt 8pt; background: ${PRIMARY}; color: white; border-radius: 4pt; font-size: 8.5pt; font-weight: 700; letter-spacing: 0.4pt; text-transform: uppercase; margin-bottom: 8pt; }
+    .sigbox .who { display: inline-block; padding: 3pt 8pt; background: ${PRIMARY_DARK}; color: white; border-radius: 4pt; font-size: 8.5pt; font-weight: 700; letter-spacing: 0.4pt; text-transform: uppercase; margin-bottom: 8pt; }
     .sigbox .meta { color: ${STONE_500}; font-size: 9pt; margin-bottom: 22pt; }
     .sigbox .hint { color: ${STONE_500}; font-size: 8.5pt; font-style: italic; }
 
-    .footer { margin-top: 22pt; padding-top: 8pt; border-top: 1px solid ${STONE_300}; font-size: 8pt; color: ${STONE_500}; text-align: center; }
+    .footer { margin-top: 22pt; padding-top: 8pt; border-top: 2px solid ${PRIMARY_DARK}; font-size: 8pt; color: ${STONE_500}; text-align: center; }
+    .footer-accent { height: 3px; background: linear-gradient(90deg, ${ORANGE} 0%, ${PRIMARY} 50%, ${PRIMARY_DARK} 100%); margin-top: 4pt; border-radius: 2pt; }
   </style>
 </head>
 <body>
@@ -312,6 +316,7 @@ export function buildFosterContractHtml(
 
     <div class="footer">
       Convention établie le ${formatDate(new Date().toISOString())} — ${companyName} — N° ${contract.contract_number}
+      <div class="footer-accent"></div>
     </div>
   </div>
 </body>
