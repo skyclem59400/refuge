@@ -34,6 +34,40 @@ export async function searchClientsByCategory(category: ContactCategory, search?
   }
 }
 
+/**
+ * Search across ALL contacts of the establishment regardless of their category.
+ * Useful for pickers that allow on-the-fly category conversion (e.g. promote
+ * an existing client into a foster_family when linking a movement).
+ * Each result includes its current `type` so the caller can display a badge
+ * and decide whether to convert.
+ */
+export async function searchAllClients(search?: string) {
+  try {
+    const { establishmentId } = await requireEstablishment()
+    const supabase = createAdminClient()
+
+    let query = supabase
+      .from('clients')
+      .select('id, name, email, phone, city, type')
+      .eq('establishment_id', establishmentId)
+
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`
+      query = query.or(`name.ilike.${term},email.ilike.${term},city.ilike.${term}`)
+    }
+
+    const { data, error } = await query.order('name', { ascending: true }).limit(30)
+
+    if (error) {
+      return { error: error.message }
+    }
+
+    return { data: data ?? [] }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
 export async function createClientAction(data: {
   name: string
   email?: string | null

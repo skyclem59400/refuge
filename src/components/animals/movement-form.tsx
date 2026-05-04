@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
 import { recordMovement } from '@/lib/actions/animals'
-import { searchClientsByCategory, createClientAction } from '@/lib/actions/clients'
+import { searchAllClients, createClientAction, updateClientAction } from '@/lib/actions/clients'
 import { DatePicker } from '@/components/ui/date-picker'
 import {
   Select,
@@ -30,6 +30,16 @@ interface ClientOption {
   email: string | null
   phone: string | null
   city: string | null
+  type: ContactCategory | null
+}
+
+const categoryLabels: Record<ContactCategory, string> = {
+  client: 'Client',
+  member: 'Adhérent',
+  volunteer: 'Bénévole',
+  board_member: 'CA',
+  foster_family: 'Famille d’accueil',
+  veterinarian: 'Vétérinaire',
 }
 
 interface MovementFormProps {
@@ -131,12 +141,22 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
     }
   }, [showClientPicker])
 
-  // Debounced search
+  // Debounced search across ALL contacts (the picker will convert categories on the fly).
   useEffect(() => {
     if (!showClientPicker || !clientCategory) return
     const timer = setTimeout(async () => {
-      const result = await searchClientsByCategory(clientCategory, clientSearch)
-      if (result.data) setClientOptions(result.data as ClientOption[])
+      const result = await searchAllClients(clientSearch)
+      if (result.data) {
+        const options = result.data as ClientOption[]
+        // Sort: contacts already in the target category first
+        options.sort((a, b) => {
+          const aMatch = a.type === clientCategory ? 0 : 1
+          const bMatch = b.type === clientCategory ? 0 : 1
+          if (aMatch !== bMatch) return aMatch - bMatch
+          return a.name.localeCompare(b.name)
+        })
+        setClientOptions(options)
+      }
     }, 200)
     return () => clearTimeout(timer)
   }, [clientSearch, showClientPicker, clientCategory])
@@ -153,6 +173,23 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
   }, [])
 
   function selectClient(opt: ClientOption) {
+    // If the contact has a different category, promote it on the fly.
+    if (clientCategory && opt.type !== clientCategory) {
+      startCreatingClient(async () => {
+        const result = await updateClientAction(opt.id, { type: clientCategory })
+        if (result.error) {
+          toast.error(`Impossible de convertir le contact : ${result.error}`)
+          return
+        }
+        toast.success(`${opt.name} transformé en ${categoryLabels[clientCategory].toLowerCase()}`)
+        setRelatedClientId(opt.id)
+        setClientSearch(opt.name)
+        setPersonName(opt.name)
+        setPersonContact(opt.email || opt.phone || '')
+        setShowClientDropdown(false)
+      })
+      return
+    }
     setRelatedClientId(opt.id)
     setClientSearch(opt.name)
     setPersonName(opt.name)
@@ -306,19 +343,32 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
             {showClientDropdown && (
               <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
                 {clientOptions.length > 0 ? (
-                  clientOptions.map((opt) => (
-                    <button
-                      type="button"
-                      key={opt.id}
-                      onClick={() => selectClient(opt)}
-                      className="block w-full text-left px-3 py-2 hover:bg-surface-hover text-sm"
-                    >
-                      <div className="font-medium">{opt.name}</div>
-                      <div className="text-xs text-muted">
-                        {[opt.city, opt.email || opt.phone].filter(Boolean).join(' · ') || '—'}
-                      </div>
-                    </button>
-                  ))
+                  clientOptions.map((opt) => {
+                    const needsConversion = !!clientCategory && opt.type !== clientCategory
+                    const currentLabel = opt.type ? categoryLabels[opt.type] : 'Sans catégorie'
+                    return (
+                      <button
+                        type="button"
+                        key={opt.id}
+                        onClick={() => selectClient(opt)}
+                        disabled={isCreatingClient}
+                        className="block w-full text-left px-3 py-2 hover:bg-surface-hover text-sm disabled:opacity-50"
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium">{opt.name}</span>
+                          <span className={`shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${needsConversion ? 'bg-amber-500/15 text-amber-600' : 'bg-primary/15 text-primary'}`}>
+                            {currentLabel}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted mt-0.5">
+                          {[opt.city, opt.email || opt.phone].filter(Boolean).join(' · ') || '—'}
+                        </div>
+                        {needsConversion && clientCategory && (
+                          <div className="text-[10px] text-amber-600 mt-0.5">→ sera converti en {categoryLabels[clientCategory].toLowerCase()} au clic</div>
+                        )}
+                      </button>
+                    )
+                  })
                 ) : (
                   <div className="px-3 py-2 text-sm text-muted">Aucun contact trouvé</div>
                 )}
