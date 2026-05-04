@@ -128,11 +128,12 @@ export default async function TicketDetailPage({ params }: PageProps) {
             .eq('code_insee', ticket.municipality_code_insee)
             .single()
         : Promise.resolve({ data: null }),
-      // Membres assignables : tous les utilisateurs de l'établissement
+      // Membres assignables : agents d'astreinte uniquement
       admin
         .from('establishment_members')
         .select('user_id')
-        .eq('establishment_id', ctx.establishment.id),
+        .eq('establishment_id', ctx.establishment.id)
+        .eq('is_astreinte_agent', true),
     ])
 
   // Photos signed URLs (1h)
