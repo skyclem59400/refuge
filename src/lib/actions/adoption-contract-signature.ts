@@ -15,6 +15,8 @@ import {
   type DocumensoStatus,
 } from '@/lib/documenso/client'
 import { ensureDocumensoFolder } from '@/lib/establishment/documenso-folder'
+import { sendEmail } from '@/lib/email/client'
+import { buildContractSignatureEmail } from '@/lib/email/templates/contract-signature'
 import type { SignatureStatus } from '@/lib/types/database'
 
 function mapDocumensoStatus(status: DocumensoStatus, recipientSigned: boolean): SignatureStatus {
@@ -30,10 +32,10 @@ export async function sendAdoptionContractForSignature(contractId: string) {
     const supabase = await createClient()
     const admin = createAdminClient()
 
-    // Fetch contract + adopter + animal info
+    // Fetch contract + adopter + animal info (animal photo + breed pour l'email)
     const { data: contract, error } = await admin
       .from('adoption_contracts')
-      .select('*, adopter:clients!adopter_client_id(id, name, email), animal:animals!animal_id(id, name, species)')
+      .select('*, adopter:clients!adopter_client_id(id, name, email), animal:animals!animal_id(id, name, species, breed, breed_cross, photo_url)')
       .eq('id', contractId)
       .eq('establishment_id', establishmentId)
       .single()
@@ -52,7 +54,7 @@ export async function sendAdoptionContractForSignature(contractId: string) {
 
     const { data: establishment } = await admin
       .from('establishments')
-      .select('name, email')
+      .select('name, email, logo_url, website')
       .eq('id', establishmentId)
       .single()
 
@@ -64,20 +66,9 @@ export async function sendAdoptionContractForSignature(contractId: string) {
       return { error: `Erreur génération PDF : ${(e as Error).message}` }
     }
 
-    // 2. Customised email content
     const animalName = contract.animal?.name ?? 'votre futur compagnon'
     const adopterFirstName = contract.adopter.name.split(' ')[0]
     const orgName = establishment?.name?.trim() || 'le refuge'
-    const orgEmail = establishment?.email?.trim() || ''
-
-    const emailSubject = `Contrat d'adoption — ${animalName} | ${orgName}`
-    const contactLine = orgEmail ? `Pour toute question : ${orgEmail}\n\n` : ''
-    const emailMessage =
-      `Bonjour ${adopterFirstName},\n\n` +
-      `Félicitations pour l'adoption de ${animalName} ! Vous trouverez ci-joint le contrat d'adoption.\n\n` +
-      `Merci de le signer électroniquement pour finaliser la cession.\n\n` +
-      contactLine +
-      `L'équipe ${orgName}`
 
     // 3. Create the Documenso document (PDF uploadé sur S3 par v2-beta)
     const folderId = await ensureDocumensoFolder(establishmentId, orgName)
@@ -96,9 +87,8 @@ export async function sendAdoptionContractForSignature(contractId: string) {
             role: 'SIGNER',
           },
         ],
+        // Pas de meta.subject/message ici : email envoyé par Optimus en HTML branded SDA.
         meta: {
-          subject: emailSubject,
-          message: emailMessage,
           language: 'fr',
           timezone: 'Europe/Paris',
           dateFormat: 'dd/MM/yyyy HH:mm',
@@ -128,18 +118,68 @@ export async function sendAdoptionContractForSignature(contractId: string) {
       console.warn('Could not pre-position signature field:', (e as Error).message)
     }
 
-    // 5. Send for signing
+    // 5. Activer la signature côté Documenso SANS envoyer son email (sendEmail: false).
+    //    Optimus enverra ensuite son propre HTML branded SDA.
     try {
-      await sendDocument(document.id, { sendEmail: true })
+      await sendDocument(document.id, { sendEmail: false })
     } catch (e) {
-      return { error: `Erreur envoi pour signature : ${(e as Error).message}` }
+      return { error: `Erreur activation signature Documenso : ${(e as Error).message}` }
+    }
+
+    // 5.5 Re-fetch document pour récupérer le signingUrl actualisé
+    let signingUrl: string | null = recipient.signingUrl ?? null
+    try {
+      const refreshed = await getDocument(document.id)
+      const refreshedRecipient = (refreshed.recipients ?? refreshed.Recipient ?? [])[0]
+      if (refreshedRecipient?.signingUrl) {
+        signingUrl = refreshedRecipient.signingUrl
+      } else if (refreshedRecipient?.token) {
+        const base = process.env.DOCUMENSO_BASE_URL || 'https://signature.optimus-services.fr'
+        signingUrl = `${base}/sign/${refreshedRecipient.token}`
+      }
+    } catch (e) {
+      console.warn('Could not refresh signing URL:', (e as Error).message)
+    }
+
+    if (!signingUrl) {
+      return { error: 'Impossible de générer l’URL de signature Documenso' }
+    }
+
+    // 5.7 Envoyer notre email branded SDA via Brevo SMTP
+    try {
+      const breed = (contract.animal?.breed_cross || contract.animal?.breed || '').trim() || null
+      const { subject, html } = buildContractSignatureEmail({
+        kind: 'adoption',
+        signingUrl,
+        recipientFirstName: adopterFirstName,
+        recipientName: contract.adopter.name,
+        animalName,
+        animalSpecies: contract.animal?.species || '',
+        animalBreed: breed,
+        animalPhotoUrl: contract.animal?.photo_url ?? null,
+        contractNumber: contract.contract_number,
+        establishmentName: orgName,
+        establishmentEmail: establishment?.email ?? null,
+        establishmentLogoUrl: establishment?.logo_url ?? null,
+        establishmentWebsite: establishment?.website ?? null,
+      })
+      await sendEmail({
+        to: contract.adopter.email,
+        toName: contract.adopter.name,
+        subject,
+        html,
+        fromName: orgName,
+        replyTo: establishment?.email ?? undefined,
+      })
+    } catch (e) {
+      console.error('[adoption-contract-signature] email send failed:', (e as Error).message)
     }
 
     // 6. Update contract record
     const updateData = {
       documenso_document_id: document.id,
       documenso_recipient_id: recipient.id,
-      documenso_signing_url: recipient.signingUrl ?? null,
+      documenso_signing_url: signingUrl,
       signature_status: 'pending' as SignatureStatus,
       signature_sent_at: new Date().toISOString(),
     }
