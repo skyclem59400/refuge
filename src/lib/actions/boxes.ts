@@ -19,7 +19,7 @@ export async function getBoxes() {
     // Fetch boxes for this establishment
     const { data: boxes, error } = await supabase
       .from('boxes')
-      .select('*')
+      .select('*, zone:box_zones(id, name, parent_id, parent:box_zones!parent_id(id, name))')
       .eq('establishment_id', establishmentId)
       .order('name')
 
@@ -75,6 +75,7 @@ export async function createBox(data: {
   species_type: BoxSpecies
   capacity: number
   status?: BoxStatus
+  zone_id?: string | null
 }) {
   try {
     const { establishmentId } = await requirePermission('manage_boxes')
@@ -88,6 +89,7 @@ export async function createBox(data: {
         capacity: data.capacity,
         status: data.status || 'available',
         establishment_id: establishmentId,
+        zone_id: data.zone_id ?? null,
       })
       .select()
       .single()
@@ -109,6 +111,7 @@ export async function updateBox(id: string, data: {
   species_type?: BoxSpecies
   capacity?: number
   status?: BoxStatus
+  zone_id?: string | null
 }) {
   try {
     const { establishmentId } = await requirePermission('manage_boxes')

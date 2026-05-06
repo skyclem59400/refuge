@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { Package, Printer } from 'lucide-react'
 import { getBoxes } from '@/lib/actions/boxes'
+import { listBoxZones, type BoxZone } from '@/lib/actions/box-zones'
 import { getEstablishmentContext } from '@/lib/establishment/context'
+import { ZonesManager } from '@/components/boxes/zones-manager'
 import type { Box, BoxSpecies, BoxStatus } from '@/lib/types/database'
 
 // ---------------------------------------------------------------------------
@@ -17,6 +19,13 @@ interface BoxAnimal {
 type EnrichedBox = Box & {
   animals: BoxAnimal[]
   animal_count: number
+  zone?: {
+    id: string
+    name: string
+    parent_id: string | null
+    parent?: { id: string; name: string } | null
+  } | null
+  zone_id?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -66,8 +75,15 @@ export default async function BoxesPage() {
   if (!ctx) throw new Error('Establishment context required')
   const canManageBoxes = ctx.permissions.canManageBoxes
 
-  const { data: rawBoxes, error } = await getBoxes()
+  const [{ data: rawBoxes, error }, { data: zones }] = await Promise.all([
+    getBoxes(),
+    listBoxZones(),
+  ])
   const boxes = (rawBoxes as EnrichedBox[] | undefined)
+  const allZones = (zones ?? []) as BoxZone[]
+
+  // Group boxes by zone path
+  const groups = groupBoxesByZone(boxes ?? [], allZones)
 
   return (
     <div className="animate-fade-up">
@@ -94,13 +110,14 @@ export default async function BoxesPage() {
             <Printer className="w-4 h-4" />
             Imprimer la liste
           </a>
+          <ZonesManager zones={allZones} canManage={canManageBoxes} />
           {canManageBoxes && (
             <details className="relative">
               <summary className="cursor-pointer px-4 py-2 rounded-lg font-semibold text-white text-sm gradient-primary hover:opacity-90 transition-opacity shadow-lg shadow-primary/25 list-none flex items-center gap-2">
                 + Nouveau box
               </summary>
               <div className="absolute right-0 top-full mt-2 z-50 w-80 bg-surface rounded-xl border border-border shadow-xl p-4">
-                <BoxForm />
+                <BoxForm zones={allZones} />
               </div>
             </details>
           )}
@@ -113,15 +130,24 @@ export default async function BoxesPage() {
         </div>
       )}
 
-      {/* Grid */}
+      {/* Groupes (zones / sous-zones / sans zone) */}
       {!boxes || boxes.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-8 text-center">
           <Package className="w-10 h-10 text-muted mx-auto mb-3" />
           <p className="text-muted text-sm">Aucun box enregistre</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {boxes.map((box) => (
+        <div className="space-y-6">
+          {groups.map((group) => (
+            <section key={group.key}>
+              <h2 className="text-xs uppercase tracking-[0.2em] font-bold text-muted mb-3">
+                {group.label}{' '}
+                <span className="text-muted/60 font-normal normal-case tracking-normal">
+                  · {group.boxes.length} box
+                </span>
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {group.boxes.map((box) => (
             <div
               key={box.id}
               className="bg-surface rounded-xl border border-border p-4 hover:border-primary/30 transition-colors"
@@ -188,6 +214,9 @@ export default async function BoxesPage() {
                 Imprimer la fiche
               </a>
             </div>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}
@@ -196,21 +225,74 @@ export default async function BoxesPage() {
 }
 
 // ---------------------------------------------------------------------------
+// Group helper
+// ---------------------------------------------------------------------------
+
+interface BoxGroup {
+  key: string
+  label: string
+  boxes: EnrichedBox[]
+}
+
+function groupBoxesByZone(boxes: EnrichedBox[], zones: BoxZone[]): BoxGroup[] {
+  const zoneById = new Map<string, BoxZone>()
+  for (const z of zones) zoneById.set(z.id, z)
+
+  const groups = new Map<string, BoxGroup>()
+  for (const box of boxes) {
+    if (!box.zone_id) {
+      const k = '__none'
+      if (!groups.has(k)) groups.set(k, { key: k, label: 'Sans zone', boxes: [] })
+      groups.get(k)!.boxes.push(box)
+      continue
+    }
+    const zone = zoneById.get(box.zone_id)
+    if (!zone) {
+      const k = '__none'
+      if (!groups.has(k)) groups.set(k, { key: k, label: 'Sans zone', boxes: [] })
+      groups.get(k)!.boxes.push(box)
+      continue
+    }
+    const parent = zone.parent_id ? zoneById.get(zone.parent_id) : null
+    const label = parent ? `${parent.name} › ${zone.name}` : zone.name
+    if (!groups.has(zone.id)) groups.set(zone.id, { key: zone.id, label, boxes: [] })
+    groups.get(zone.id)!.boxes.push(box)
+  }
+
+  return Array.from(groups.values()).sort((a, b) => {
+    if (a.key === '__none') return 1
+    if (b.key === '__none') return -1
+    return a.label.localeCompare(b.label)
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Inline form component (server action based)
 // ---------------------------------------------------------------------------
 
-function BoxForm() {
+function BoxForm({ zones }: { zones: BoxZone[] }) {
   async function handleCreate(formData: FormData) {
     'use server'
     const { createBox } = await import('@/lib/actions/boxes')
     const name = formData.get('name') as string
     const species_type = formData.get('species_type') as BoxSpecies
     const capacity = parseInt(formData.get('capacity') as string, 10)
+    const zone_id = (formData.get('zone_id') as string) || null
 
     if (!name || !species_type || isNaN(capacity)) return
 
-    await createBox({ name, species_type, capacity })
+    await createBox({ name, species_type, capacity, zone_id })
   }
+
+  const zoneOptions = zones
+    .map((z) => {
+      const parent = z.parent_id ? zones.find((p) => p.id === z.parent_id) : null
+      return {
+        id: z.id,
+        label: parent ? `${parent.name} › ${z.name}` : z.name,
+      }
+    })
+    .sort((a, b) => a.label.localeCompare(b.label))
 
   return (
     <form action={handleCreate} className="space-y-3">
@@ -226,6 +308,23 @@ function BoxForm() {
           placeholder="Ex: Box A1"
           className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
         />
+      </div>
+      <div>
+        <label htmlFor="box-zone" className="block text-xs font-medium text-muted mb-1">
+          Zone (optionnel)
+        </label>
+        <select
+          id="box-zone"
+          name="zone_id"
+          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+        >
+          <option value="">— Aucune zone —</option>
+          {zoneOptions.map((z) => (
+            <option key={z.id} value={z.id}>
+              {z.label}
+            </option>
+          ))}
+        </select>
       </div>
       <div>
         <label htmlFor="box-species" className="block text-xs font-medium text-muted mb-1">
