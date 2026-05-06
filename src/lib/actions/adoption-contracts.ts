@@ -118,6 +118,16 @@ export async function createAdoptionContract(data: AdoptionContractInput) {
 
     if (error) return { error: error.message }
 
+    // Si le contrat est créé directement en 'active', on déclenche tout
+    // de suite l'étiquetage + facture + reçu fiscal.
+    if (contract.status === 'active') {
+      const { finalizeAdoption } = await import('./adoption-finalize')
+      const finalize = await finalizeAdoption(contract.id)
+      if (finalize.warnings.length) {
+        console.warn('[adoption.create] finalize warnings:', finalize.warnings)
+      }
+    }
+
     revalidatePath(`/animals/${data.animal_id}`)
     logActivity({
       action: 'create',
@@ -155,6 +165,16 @@ export async function updateAdoptionContract(id: string, data: Partial<AdoptionC
       .eq('establishment_id', establishmentId)
 
     if (error) return { error: error.message }
+
+    // Transition draft → active : déclencher étiquetage + facture + CERFA.
+    const becameActive = current.status !== 'active' && data.status === 'active'
+    if (becameActive) {
+      const { finalizeAdoption } = await import('./adoption-finalize')
+      const finalize = await finalizeAdoption(id)
+      if (finalize.warnings.length) {
+        console.warn('[adoption.update] finalize warnings:', finalize.warnings)
+      }
+    }
 
     const changes = trackChanges(current, data)
     revalidatePath(`/animals/${current.animal_id}`)

@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
 import { recordMovement } from '@/lib/actions/animals'
 import { recordFosterPlacementWithContract, recordAdoptionWithContract } from '@/lib/actions/movement-with-contract'
-import { searchAllClients, createClientAction, updateClientAction } from '@/lib/actions/clients'
+import { searchAllClients, createClientAction } from '@/lib/actions/clients'
 import { DatePicker } from '@/components/ui/date-picker'
 import {
   Select,
@@ -32,15 +32,28 @@ interface ClientOption {
   phone: string | null
   city: string | null
   type: ContactCategory | null
+  is_adopter?: boolean
+  is_foster?: boolean
+  is_member?: boolean
 }
 
-const categoryLabels: Record<ContactCategory, string> = {
-  client: 'Client',
-  member: 'Adhérent',
-  volunteer: 'Bénévole',
-  board_member: 'CA',
-  foster_family: 'Famille d’accueil',
-  veterinarian: 'Vétérinaire',
+interface ContactTag {
+  label: string
+  className: string
+}
+
+function getContactTags(opt: ClientOption): ContactTag[] {
+  const tags: ContactTag[] = []
+  if (opt.is_adopter) {
+    tags.push({ label: 'Adoptant', className: 'bg-primary/15 text-primary' })
+  }
+  if (opt.is_foster) {
+    tags.push({ label: 'Famille d’accueil', className: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' })
+  }
+  if (opt.is_member) {
+    tags.push({ label: 'Adhérent', className: 'bg-green-500/15 text-green-600 dark:text-green-400' })
+  }
+  return tags
 }
 
 interface MovementFormProps {
@@ -194,23 +207,6 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
   }, [])
 
   function selectClient(opt: ClientOption) {
-    // If the contact has a different category, promote it on the fly.
-    if (clientCategory && opt.type !== clientCategory) {
-      startCreatingClient(async () => {
-        const result = await updateClientAction(opt.id, { type: clientCategory })
-        if (result.error) {
-          toast.error(`Impossible de convertir le contact : ${result.error}`)
-          return
-        }
-        toast.success(`${opt.name} transformé en ${categoryLabels[clientCategory].toLowerCase()}`)
-        setRelatedClientId(opt.id)
-        setClientSearch(opt.name)
-        setPersonName(opt.name)
-        setPersonContact(opt.email || opt.phone || '')
-        setShowClientDropdown(false)
-      })
-      return
-    }
     setRelatedClientId(opt.id)
     setClientSearch(opt.name)
     setPersonName(opt.name)
@@ -451,8 +447,7 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
               <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
                 {clientOptions.length > 0 ? (
                   clientOptions.map((opt) => {
-                    const needsConversion = !!clientCategory && opt.type !== clientCategory
-                    const currentLabel = opt.type ? categoryLabels[opt.type] : 'Sans catégorie'
+                    const tags = getContactTags(opt)
                     return (
                       <button
                         type="button"
@@ -463,16 +458,18 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
                       >
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium">{opt.name}</span>
-                          <span className={`shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${needsConversion ? 'bg-amber-500/15 text-amber-600' : 'bg-primary/15 text-primary'}`}>
-                            {currentLabel}
-                          </span>
+                          {tags.map((t) => (
+                            <span
+                              key={t.label}
+                              className={`shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${t.className}`}
+                            >
+                              {t.label}
+                            </span>
+                          ))}
                         </div>
                         <div className="text-xs text-muted mt-0.5">
                           {[opt.city, opt.email || opt.phone].filter(Boolean).join(' · ') || '—'}
                         </div>
-                        {needsConversion && clientCategory && (
-                          <div className="text-[10px] text-amber-600 mt-0.5">→ sera converti en {categoryLabels[clientCategory].toLowerCase()} au clic</div>
-                        )}
                       </button>
                     )
                   })

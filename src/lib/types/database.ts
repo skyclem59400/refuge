@@ -21,6 +21,10 @@ export interface Client {
   postal_code: string | null
   city: string | null
   type: ContactCategory | null
+  is_adopter: boolean
+  is_foster: boolean
+  is_member: boolean
+  member_since: string | null
   notes: string | null
   establishment_id: string
   created_at: string

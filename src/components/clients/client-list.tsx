@@ -55,9 +55,13 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
     startTransition(() => deleteClientHandler(id, name))
   }
 
-  const displayed = categoryFilter
-    ? clients.filter((c) => c.type === categoryFilter)
-    : clients
+  const displayed = (() => {
+    if (!categoryFilter) return clients
+    if (categoryFilter === 'foster_family') return clients.filter((c) => c.is_foster)
+    if (categoryFilter === 'member') return clients.filter((c) => c.is_member)
+    if (categoryFilter === 'client') return clients.filter((c) => c.is_adopter)
+    return clients.filter((c) => c.type === categoryFilter)
+  })()
 
   return (
     <div>
@@ -120,11 +124,26 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
                   <td className="px-4 py-3 text-muted">{client.phone || '-'}</td>
                   <td className="px-4 py-3 text-muted">{client.city || '-'}</td>
                   <td className="px-4 py-3">
-                    {client.type && (
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getCategoryColor(client.type)}`}>
-                        {getCategoryLabel(client.type)}
-                      </span>
-                    )}
+                    <div className="flex flex-wrap gap-1">
+                      {client.is_adopter && (
+                        <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-primary/15 text-primary">
+                          Adoptant
+                        </span>
+                      )}
+                      {client.is_foster && (
+                        <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                          Famille d’accueil
+                        </span>
+                      )}
+                      {client.is_member && (
+                        <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-500/15 text-green-600 dark:text-green-400">
+                          Adhérent
+                        </span>
+                      )}
+                      {!client.is_adopter && !client.is_foster && !client.is_member && (
+                        <span className="text-xs text-muted">—</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">

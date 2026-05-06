@@ -48,7 +48,7 @@ export async function searchAllClients(search?: string) {
 
     let query = supabase
       .from('clients')
-      .select('id, name, email, phone, city, type')
+      .select('id, name, email, phone, city, type, is_adopter, is_foster, is_member, member_since')
       .eq('establishment_id', establishmentId)
 
     if (search && search.trim()) {
