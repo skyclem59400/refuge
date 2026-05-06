@@ -309,6 +309,25 @@ export async function finalizeMovementOnSignature(params: {
     })
   }
 
+  // Adoption signée → activer le contrat + déclencher étiquetage / facture / CERFA
+  if (params.contractType === 'adoption' && params.status === 'signed') {
+    try {
+      await admin
+        .from('adoption_contracts')
+        .update({ status: 'active' })
+        .eq('id', params.contractId)
+        .eq('status', 'draft')
+
+      const { finalizeAdoption } = await import('./adoption-finalize')
+      const result = await finalizeAdoption(params.contractId)
+      if (result.warnings.length) {
+        console.warn('[adoption.signed] finalize warnings:', result.warnings)
+      }
+    } catch (err) {
+      console.error('[adoption.signed] finalize error:', err)
+    }
+  }
+
   return { ok: true, processed: movements.length }
 }
 
