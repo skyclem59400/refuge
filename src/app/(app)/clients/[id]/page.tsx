@@ -85,21 +85,16 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const typedAdoptions = (adoptions as unknown as AdoptionRow[]) || []
   const typedFosters = (fosters as unknown as FosterRow[]) || []
 
-  // Donations : on relie par email + nom (pas de FK client_id)
-  let typedDonations: DonationRow[] = []
-  if (typedClient.email || typedClient.name) {
-    let q = admin
-      .from('donations')
-      .select('id, amount, date, payment_method, cerfa_number, cerfa_generated, source, notes')
-      .eq('establishment_id', estabId)
-    if (typedClient.email) {
-      q = q.eq('donor_email', typedClient.email)
-    } else {
-      q = q.eq('donor_name', typedClient.name)
-    }
-    const { data: dons } = await q.order('date', { ascending: false })
-    typedDonations = (dons as DonationRow[]) || []
-  }
+  // Donations : lien direct via client_id (les anciennes lignes ont été
+  // backfillées par migration 20260506e). On évite ainsi le matching par
+  // email qui contaminait les fiches de couples partageant la même adresse.
+  const { data: dons } = await admin
+    .from('donations')
+    .select('id, amount, date, payment_method, cerfa_number, cerfa_generated, source, notes')
+    .eq('establishment_id', estabId)
+    .eq('client_id', id)
+    .order('date', { ascending: false })
+  const typedDonations = (dons as DonationRow[]) || []
 
   const totalCA = typedDocs
     .filter((d) => d.type === 'facture' && d.status === 'paid')

@@ -127,13 +127,17 @@ export async function finalizeAdoption(
 
   // 3. Facture (2 lignes : adoption + adhésion 30 €)
   try {
-    // Idempotence : déjà existante pour ce contrat ?
-    const { data: existingDoc } = await admin
+    // Idempotence stricte : la colonne adoption_contract_id porte un index
+    // UNIQUE partiel — un seul document par contrat. On préfère .limit(1)
+    // pour rester tolérant si jamais des doublons historiques existent en base.
+    const { data: existingDocs } = await admin
       .from('documents')
       .select('id, numero')
       .eq('establishment_id', contract.establishment_id)
-      .like('notes', `%${ADOPTION_REF_TAG}:${contract.id}%`)
-      .maybeSingle()
+      .eq('adoption_contract_id', contract.id)
+      .limit(1)
+
+    const existingDoc = existingDocs?.[0]
 
     if (existingDoc) {
       result.invoiceId = existingDoc.id
@@ -181,6 +185,7 @@ export async function finalizeAdoption(
           total: adoptionFee,
           status: 'draft',
           line_items: lineItems,
+          adoption_contract_id: contract.id,
           created_by: contract.created_by,
           notes: `Adoption automatique [${ADOPTION_REF_TAG}:${contract.id}] — ${contract.contract_number}`,
         })
@@ -188,11 +193,29 @@ export async function finalizeAdoption(
         .single<{ id: string; numero: string }>()
 
       if (docError || !doc) {
-        throw new Error(docError?.message ?? 'Insert facture échoué')
+        // Si la contrainte UNIQUE rejette l'insert (race avec un appel
+        // parallèle qui vient d'insérer), on relit la ligne existante.
+        if (docError?.code === '23505') {
+          const { data: race } = await admin
+            .from('documents')
+            .select('id, numero')
+            .eq('establishment_id', contract.establishment_id)
+            .eq('adoption_contract_id', contract.id)
+            .limit(1)
+            .maybeSingle()
+          if (race) {
+            result.invoiceId = race.id
+            result.invoiceNumber = race.numero
+          } else {
+            throw new Error('Insert facture rejeté par contrainte unique mais ligne introuvable')
+          }
+        } else {
+          throw new Error(docError?.message ?? 'Insert facture échoué')
+        }
+      } else {
+        result.invoiceId = doc.id
+        result.invoiceNumber = doc.numero
       }
-
-      result.invoiceId = doc.id
-      result.invoiceNumber = doc.numero
     }
   } catch (err) {
     console.error('[adoption] create invoice failed:', err)
@@ -201,13 +224,15 @@ export async function finalizeAdoption(
 
   // 4. Donation (30 € adhésion) → génère le CERFA
   try {
-    // Idempotence : déjà existante ?
-    const { data: existingDonation } = await admin
+    // Idempotence : index UNIQUE partiel sur adoption_contract_id
+    const { data: existingDonations } = await admin
       .from('donations')
       .select('id, cerfa_number')
       .eq('establishment_id', contract.establishment_id)
-      .like('notes', `%${ADOPTION_REF_TAG}:${contract.id}%`)
-      .maybeSingle()
+      .eq('adoption_contract_id', contract.id)
+      .limit(1)
+
+    const existingDonation = existingDonations?.[0]
 
     if (existingDonation) {
       result.donationId = existingDonation.id
@@ -225,6 +250,8 @@ export async function finalizeAdoption(
         .from('donations')
         .insert({
           establishment_id: contract.establishment_id,
+          client_id: contact.id,
+          adoption_contract_id: contract.id,
           donor_name: contact.name,
           donor_email: contact.email,
           donor_phone: contact.phone,
@@ -246,11 +273,28 @@ export async function finalizeAdoption(
         .single<{ id: string; cerfa_number: string }>()
 
       if (donationError || !donation) {
-        throw new Error(donationError?.message ?? 'Insert donation échoué')
+        if (donationError?.code === '23505') {
+          // Race : un autre appel a inséré entre temps. On relit.
+          const { data: race } = await admin
+            .from('donations')
+            .select('id, cerfa_number')
+            .eq('establishment_id', contract.establishment_id)
+            .eq('adoption_contract_id', contract.id)
+            .limit(1)
+            .maybeSingle()
+          if (race) {
+            result.donationId = race.id
+            result.donationCerfaNumber = race.cerfa_number
+          } else {
+            throw new Error('Insert donation rejeté par contrainte unique mais ligne introuvable')
+          }
+        } else {
+          throw new Error(donationError?.message ?? 'Insert donation échoué')
+        }
+      } else {
+        result.donationId = donation.id
+        result.donationCerfaNumber = donation.cerfa_number
       }
-
-      result.donationId = donation.id
-      result.donationCerfaNumber = donation.cerfa_number
     }
   } catch (err) {
     console.error('[adoption] create donation/cerfa failed:', err)

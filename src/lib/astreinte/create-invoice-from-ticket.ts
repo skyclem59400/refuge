@@ -156,13 +156,19 @@ export async function createInvoiceFromTicket(
     }
   }
 
-  // Find-or-create client
-  const { data: existingClient } = await admin
+  // Find-or-create client. On tolère les éventuels doublons de nom en
+  // base (cas pratique : une "Mairie de X" créée plusieurs fois manuellement)
+  // en prenant le premier résultat trié par date de création — au pire on
+  // facture sur la fiche la plus ancienne, ce qui est cohérent.
+  const { data: existingClients } = await admin
     .from('clients')
     .select('id')
     .eq('establishment_id', establishmentId)
     .eq('name', target.name)
-    .maybeSingle()
+    .order('created_at', { ascending: true })
+    .limit(1)
+
+  const existingClient = existingClients?.[0]
 
   let clientId: string
   if (existingClient) {

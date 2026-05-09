@@ -97,6 +97,18 @@ export async function recordFosterPlacementWithContract(input: FosterPlacementIn
       return { error: `Création du mouvement impossible : ${movementRes.error}` }
     }
 
+    // 2b. Signature papier : on tague directement le contact comme FA puisque
+    // le mouvement est immédiatement actif (recordMovement a appliqué le
+    // changement de statut animal). Pour la signature électronique on attend
+    // le webhook (cf. finalizeMovementOnSignature plus bas).
+    if (!wantsSignature) {
+      await admin
+        .from('clients')
+        .update({ is_foster: true })
+        .eq('id', input.fosterClientId)
+        .eq('establishment_id', establishmentId)
+    }
+
     // 3. Send the contract for electronic signature (if not skipped)
     if (wantsSignature) {
       const sendRes = await sendContractForSignature(contract.id)
@@ -207,6 +219,26 @@ export async function recordAdoptionWithContract(input: AdoptionInput) {
     if (movementRes.error || !movementRes.data) {
       await admin.from('adoption_contracts').delete().eq('id', contract.id)
       return { error: `Création du mouvement impossible : ${movementRes.error}` }
+    }
+
+    // Signature papier : on active le contrat tout de suite et on déclenche
+    // l'étiquetage Adoptant/Adhérent + facture + reçu fiscal (le webhook ne
+    // sera jamais appelé puisqu'on ne passe pas par Documenso).
+    if (!wantsSignature) {
+      await admin
+        .from('adoption_contracts')
+        .update({ status: 'active' })
+        .eq('id', contract.id)
+        .eq('status', 'draft')
+      try {
+        const { finalizeAdoption } = await import('./adoption-finalize')
+        const finalize = await finalizeAdoption(contract.id)
+        if (finalize.warnings.length) {
+          console.warn('[adoption.paper] finalize warnings:', finalize.warnings)
+        }
+      } catch (err) {
+        console.error('[adoption.paper] finalize error:', err)
+      }
     }
 
     if (wantsSignature) {
@@ -325,6 +357,27 @@ export async function finalizeMovementOnSignature(params: {
       }
     } catch (err) {
       console.error('[adoption.signed] finalize error:', err)
+    }
+  }
+
+  // Foster signé → tagger le contact comme FA active
+  if (params.contractType === 'foster' && params.status === 'signed') {
+    try {
+      const { data: foster } = await admin
+        .from('foster_contracts')
+        .select('foster_client_id, establishment_id')
+        .eq('id', params.contractId)
+        .maybeSingle()
+
+      if (foster?.foster_client_id) {
+        await admin
+          .from('clients')
+          .update({ is_foster: true })
+          .eq('id', foster.foster_client_id)
+          .eq('establishment_id', foster.establishment_id)
+      }
+    } catch (err) {
+      console.error('[foster.signed] tag is_foster error:', err)
     }
   }
 

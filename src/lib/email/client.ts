@@ -1,16 +1,22 @@
 import nodemailer, { type Transporter } from 'nodemailer'
 
 /**
- * Client SMTP Brevo pour l'envoi d'emails depuis Optimus.
+ * Client SMTP Brevo pour l'envoi d'emails transactionnels depuis Optimus.
  *
  * Configuration via env vars :
  * - BREVO_SMTP_USER     — login technique SMTP (ex: a97868001@smtp-brevo.com)
  * - BREVO_SMTP_KEY      — clé SMTP générée dans Brevo
  * - BREVO_FROM_ADDRESS  — adresse d'expédition par défaut (doit être domaine vérifié Brevo)
  *
- * Documenso continue d'utiliser ces mêmes credentials pour ses propres emails
- * (rappels de signature, notifications de complétion). On envoie depuis Optimus
- * uniquement le mail INITIAL qui invite à signer (pour avoir le branding SDA + photo animal).
+ * Cas d'usage actuels :
+ *   - mail INITIAL d'invitation à signer un contrat d'adoption / FA (pour
+ *     avoir le branding SDA + photo de l'animal — Documenso s'occupe ensuite
+ *     des relances et notifications via les mêmes credentials)
+ *   - compte-rendu d'intervention astreinte (PDF en pièce jointe + copie
+ *     à fourriere@sda-nord.com)
+ *
+ * Pour ajouter un nouveau type d'email, mettre à jour cette liste et le
+ * `fromName` par défaut si le branding doit changer.
  */
 
 const SMTP_HOST = 'smtp-relay.brevo.com'
