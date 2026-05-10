@@ -4,7 +4,6 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  Plus,
   Pencil,
   Trash2,
   FileDown,
@@ -20,6 +19,7 @@ import {
   Mail,
   Clock,
   Euro,
+  Info,
 } from 'lucide-react'
 import { AdoptionContractForm } from '@/components/adoption-contracts/adoption-contract-form'
 import { deleteAdoptionContract } from '@/lib/actions/adoption-contracts'
@@ -82,11 +82,6 @@ export function AdoptionContractsTab({ animalId, contracts, canManage }: Readonl
     setShowForm(true)
   }
 
-  function handleNewContract() {
-    setEditingContract(null)
-    setShowForm(true)
-  }
-
   function handleClose() {
     setShowForm(false)
     setEditingContract(null)
@@ -142,27 +137,24 @@ export function AdoptionContractsTab({ animalId, contracts, canManage }: Readonl
 
   return (
     <div className="space-y-4">
-      {canManage && !showForm && (
-        <div>
-          <button
-            type="button"
-            onClick={handleNewContract}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold gradient-primary text-white hover:opacity-90 transition-opacity"
-          >
-            <Plus className="w-4 h-4" />
-            Nouveau contrat d'adoption
-          </button>
+      {!showForm && (
+        <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-info/10 border border-info/20 text-xs text-info">
+          <Info className="w-4 h-4 shrink-0 mt-0.5" />
+          <p>
+            Pour créer un nouveau contrat d&apos;adoption, ouvrez l&apos;onglet <strong>Mouvements</strong> et
+            enregistrez une adoption : le contrat est généré et envoyé pour signature en une seule étape.
+          </p>
         </div>
       )}
 
-      {showForm && canManage && (
+      {showForm && canManage && editingContract && (
         <div className="bg-surface rounded-xl border border-border p-5">
           <h3 className="text-sm font-semibold mb-4">
-            {editingContract ? `Modifier le contrat ${editingContract.contract_number}` : "Nouveau contrat d'adoption"}
+            Modifier le contrat {editingContract.contract_number}
           </h3>
           <AdoptionContractForm
             animalId={animalId}
-            contract={editingContract || undefined}
+            contract={editingContract}
             onClose={handleClose}
           />
         </div>
@@ -171,10 +163,10 @@ export function AdoptionContractsTab({ animalId, contracts, canManage }: Readonl
       {contracts.length === 0 && !showForm ? (
         <div className="bg-surface rounded-xl border border-border p-8 text-center">
           <Heart className="w-8 h-8 text-muted/30 mx-auto mb-3" />
-          <p className="text-sm text-muted">Aucun contrat d'adoption enregistré.</p>
-          {!canManage && (
-            <p className="text-xs text-muted mt-1">Vous n'avez pas la permission de créer un contrat.</p>
-          )}
+          <p className="text-sm text-muted">Aucun contrat d&apos;adoption enregistré.</p>
+          <p className="text-xs text-muted mt-1">
+            Les contrats apparaissent ici lorsqu&apos;une adoption est enregistrée depuis l&apos;onglet Mouvements.
+          </p>
         </div>
       ) : (
         <div className="space-y-3">

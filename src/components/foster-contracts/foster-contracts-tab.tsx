@@ -4,7 +4,6 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  Plus,
   Pencil,
   Trash2,
   FileDown,
@@ -19,6 +18,7 @@ import {
   Eye,
   Mail,
   Clock,
+  Info,
 } from 'lucide-react'
 import { FosterContractForm } from '@/components/foster-contracts/foster-contract-form'
 import { deleteFosterContract } from '@/lib/actions/foster-contracts'
@@ -78,11 +78,6 @@ export function FosterContractsTab({ animalId, contracts, canManage }: Readonly<
     setShowForm(true)
   }
 
-  function handleNewContract() {
-    setEditingContract(null)
-    setShowForm(true)
-  }
-
   function handleClose() {
     setShowForm(false)
     setEditingContract(null)
@@ -138,27 +133,24 @@ export function FosterContractsTab({ animalId, contracts, canManage }: Readonly<
 
   return (
     <div className="space-y-4">
-      {canManage && !showForm && (
-        <div>
-          <button
-            type="button"
-            onClick={handleNewContract}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold gradient-primary text-white hover:opacity-90 transition-opacity"
-          >
-            <Plus className="w-4 h-4" />
-            Nouveau contrat FA
-          </button>
+      {!showForm && (
+        <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-info/10 border border-info/20 text-xs text-info">
+          <Info className="w-4 h-4 shrink-0 mt-0.5" />
+          <p>
+            Pour créer un nouveau contrat FA, ouvrez l&apos;onglet <strong>Mouvements</strong> et enregistrez
+            un placement en famille d&apos;accueil : le contrat est généré et envoyé pour signature en une seule étape.
+          </p>
         </div>
       )}
 
-      {showForm && canManage && (
+      {showForm && canManage && editingContract && (
         <div className="bg-surface rounded-xl border border-border p-5">
           <h3 className="text-sm font-semibold mb-4">
-            {editingContract ? `Modifier le contrat ${editingContract.contract_number}` : 'Nouveau contrat FA'}
+            Modifier le contrat {editingContract.contract_number}
           </h3>
           <FosterContractForm
             animalId={animalId}
-            contract={editingContract || undefined}
+            contract={editingContract}
             onClose={handleClose}
           />
         </div>
@@ -167,10 +159,10 @@ export function FosterContractsTab({ animalId, contracts, canManage }: Readonly<
       {contracts.length === 0 && !showForm ? (
         <div className="bg-surface rounded-xl border border-border p-8 text-center">
           <Home className="w-8 h-8 text-muted/30 mx-auto mb-3" />
-          <p className="text-sm text-muted">Aucun contrat de placement en famille d’accueil enregistre.</p>
-          {!canManage && (
-            <p className="text-xs text-muted mt-1">Vous n’avez pas la permission de creer un contrat.</p>
-          )}
+          <p className="text-sm text-muted">Aucun contrat de placement en famille d&apos;accueil enregistré.</p>
+          <p className="text-xs text-muted mt-1">
+            Les contrats apparaissent ici lorsqu&apos;un placement FA est enregistré depuis l&apos;onglet Mouvements.
+          </p>
         </div>
       ) : (
         <div className="space-y-3">

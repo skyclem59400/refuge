@@ -76,9 +76,20 @@ interface AdoptionContractInput {
   notes?: string | null
 }
 
+/**
+ * @internal Creates an adoption contract row.
+ *
+ * **Do not call from UI components.** The unified workflow goes through
+ * `recordAdoptionWithContract` in `movement-with-contract.ts`, which creates
+ * the linked movement, sends the contract for signature, and triggers
+ * `finalizeAdoption` (tagging, invoice, CERFA) once signed.
+ *
+ * Calling this function on its own produces an orphan contract (no movement,
+ * no invoice, no tagging) — see the May 2026 audit finding.
+ */
 export async function createAdoptionContract(data: AdoptionContractInput) {
   try {
-    const { establishmentId, userId } = await requirePermission('manage_animals')
+    const { establishmentId, userId } = await requirePermission('manage_movements')
     const supabase = await createClient()
     const admin = createAdminClient()
 

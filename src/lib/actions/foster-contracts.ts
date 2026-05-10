@@ -80,9 +80,20 @@ interface FosterContractInput {
   notes?: string | null
 }
 
+/**
+ * @internal Creates a foster contract row.
+ *
+ * **Do not call from UI components.** The unified workflow goes through
+ * `recordFosterPlacementWithContract` in `movement-with-contract.ts`, which
+ * creates the linked movement, sends the contract for signature, and ensures
+ * the animal status / repertoire tagging stay in sync with the contract.
+ *
+ * Calling this function on its own produces an orphan contract (no movement,
+ * no signature, no tagging) — see the May 2026 audit finding.
+ */
 export async function createFosterContract(data: FosterContractInput) {
   try {
-    const { establishmentId, userId } = await requirePermission('manage_animals')
+    const { establishmentId, userId } = await requirePermission('manage_movements')
     const supabase = await createClient()
     const admin = createAdminClient()
 

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Loader2, Plus } from 'lucide-react'
-import { createFosterContract, updateFosterContract } from '@/lib/actions/foster-contracts'
+import { updateFosterContract } from '@/lib/actions/foster-contracts'
 import { searchClientsByCategory, createClientAction } from '@/lib/actions/clients'
 import type { FosterContract, FosterContractStatus } from '@/lib/types/database'
 
@@ -17,12 +17,13 @@ interface FosterFamilyOption {
 
 interface FosterContractFormProps {
   animalId: string
-  contract?: FosterContract
+  // Edition-only form. Contract creation now goes through the unified
+  // movement workflow (cf. movement-with-contract.ts).
+  contract: FosterContract
   onClose?: () => void
 }
 
 export function FosterContractForm({ animalId, contract, onClose }: Readonly<FosterContractFormProps>) {
-  const isEditing = !!contract
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -127,27 +128,16 @@ export function FosterContractForm({ animalId, contract, onClose }: Readonly<Fos
         notes: notes.trim() || null,
       }
 
-      if (isEditing && contract) {
-        const result = await updateFosterContract(contract.id, {
-          ...baseData,
-          actual_end_date: actualEndDate || null,
-        })
-        if (result.error) {
-          toast.error(result.error)
-        } else {
-          toast.success('Contrat FA mis a jour')
-          router.refresh()
-          onClose?.()
-        }
+      const result = await updateFosterContract(contract.id, {
+        ...baseData,
+        actual_end_date: actualEndDate || null,
+      })
+      if (result.error) {
+        toast.error(result.error)
       } else {
-        const result = await createFosterContract(baseData)
-        if (result.error) {
-          toast.error(result.error)
-        } else {
-          toast.success('Contrat FA cree')
-          router.refresh()
-          onClose?.()
-        }
+        toast.success('Contrat FA mis a jour')
+        router.refresh()
+        onClose?.()
       }
     })
   }
@@ -221,12 +211,10 @@ export function FosterContractForm({ animalId, contract, onClose }: Readonly<Fos
           <label htmlFor="fc-expected-end" className={labelClass}>Fin previsionnelle</label>
           <input id="fc-expected-end" type="date" value={expectedEndDate} onChange={(e) => setExpectedEndDate(e.target.value)} className={inputClass} />
         </div>
-        {isEditing && (
-          <div>
-            <label htmlFor="fc-actual-end" className={labelClass}>Fin reelle</label>
-            <input id="fc-actual-end" type="date" value={actualEndDate} onChange={(e) => setActualEndDate(e.target.value)} className={inputClass} />
-          </div>
-        )}
+        <div>
+          <label htmlFor="fc-actual-end" className={labelClass}>Fin reelle</label>
+          <input id="fc-actual-end" type="date" value={actualEndDate} onChange={(e) => setActualEndDate(e.target.value)} className={inputClass} />
+        </div>
       </div>
 
       {/* Status */}
@@ -297,7 +285,7 @@ export function FosterContractForm({ animalId, contract, onClose }: Readonly<Fos
         )}
         <button type="submit" disabled={isPending} className="gradient-primary hover:opacity-90 transition-opacity text-white px-4 py-2 rounded-lg font-semibold text-sm disabled:opacity-50 inline-flex items-center gap-2">
           {isPending && <Loader2 className="w-3 h-3 animate-spin" />}
-          {isEditing ? 'Mettre a jour' : 'Creer le contrat'}
+          Mettre a jour
         </button>
       </div>
 

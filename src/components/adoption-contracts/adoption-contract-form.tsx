@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Loader2, Plus } from 'lucide-react'
-import { createAdoptionContract, updateAdoptionContract } from '@/lib/actions/adoption-contracts'
+import { updateAdoptionContract } from '@/lib/actions/adoption-contracts'
 import { searchClientsByCategory, createClientAction } from '@/lib/actions/clients'
 import type { AdoptionContract, AdoptionContractStatus } from '@/lib/types/database'
 
@@ -17,12 +17,13 @@ interface AdopterOption {
 
 interface AdoptionContractFormProps {
   animalId: string
-  contract?: AdoptionContract
+  // Edition-only form. Contract creation now goes through the unified
+  // movement workflow (cf. movement-with-contract.ts).
+  contract: AdoptionContract
   onClose?: () => void
 }
 
 export function AdoptionContractForm({ animalId, contract, onClose }: Readonly<AdoptionContractFormProps>) {
-  const isEditing = !!contract
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -129,24 +130,13 @@ export function AdoptionContractForm({ animalId, contract, onClose }: Readonly<A
         notes: notes.trim() || null,
       }
 
-      if (isEditing && contract) {
-        const result = await updateAdoptionContract(contract.id, baseData)
-        if (result.error) {
-          toast.error(result.error)
-        } else {
-          toast.success("Contrat d'adoption mis à jour")
-          router.refresh()
-          onClose?.()
-        }
+      const result = await updateAdoptionContract(contract.id, baseData)
+      if (result.error) {
+        toast.error(result.error)
       } else {
-        const result = await createAdoptionContract(baseData)
-        if (result.error) {
-          toast.error(result.error)
-        } else {
-          toast.success("Contrat d'adoption créé")
-          router.refresh()
-          onClose?.()
-        }
+        toast.success("Contrat d'adoption mis à jour")
+        router.refresh()
+        onClose?.()
       }
     })
   }
@@ -297,7 +287,7 @@ export function AdoptionContractForm({ animalId, contract, onClose }: Readonly<A
         )}
         <button type="submit" disabled={isPending} className="gradient-primary hover:opacity-90 transition-opacity text-white px-4 py-2 rounded-lg font-semibold text-sm disabled:opacity-50 inline-flex items-center gap-2">
           {isPending && <Loader2 className="w-3 h-3 animate-spin" />}
-          {isEditing ? 'Mettre à jour' : 'Créer le contrat'}
+          Mettre à jour
         </button>
       </div>
 
