@@ -172,13 +172,24 @@ export function AssignAnimalsPopover({
             <div className="py-12 flex items-center justify-center">
               <Loader2 className="w-5 h-5 animate-spin text-muted" />
             </div>
+          ) : error ? (
+            <div className="py-10 px-4 text-center">
+              <AlertCircle className="w-8 h-8 text-error mx-auto mb-2 opacity-70" />
+              <p className="text-sm text-error">{error}</p>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="py-10 px-4 text-center">
-              <p className="text-sm text-muted italic">
+              <p className="text-sm text-muted italic mb-2">
                 {animals.length === 0
                   ? 'Aucun animal au refuge à assigner.'
                   : 'Aucun résultat pour cette recherche.'}
               </p>
+              {animals.length === 0 && (
+                <p className="text-[11px] text-muted">
+                  Seuls les animaux au statut <strong>refuge</strong> ou <strong>fourrière</strong>,
+                  compatibles avec l&apos;espèce du box, apparaissent ici.
+                </p>
+              )}
             </div>
           ) : (
             <ul className="space-y-0.5">
