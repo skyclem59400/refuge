@@ -49,7 +49,9 @@ export async function listAssignableAnimals(
          box:boxes(id, name)`
       )
       .eq('establishment_id', establishmentId)
-      .neq('box_id', boxId)
+      // box_id != boxId OU box_id IS NULL (animaux sans box). Note PostgREST :
+      // .neq('box_id', boxId) seul exclurait les NULL car null != value vaut null en SQL.
+      .or(`box_id.neq.${boxId},box_id.is.null`)
       // exclut les animaux sortis (adopted, transferred, deceased, etc.)
       .in('status', ['shelter', 'pound', 'foster_family', 'boarding'])
 
