@@ -19,7 +19,14 @@ export async function buildFosterContractPdf(contractId: string): Promise<BuildR
 
   const { data: contract, error } = await admin
     .from('foster_contracts')
-    .select('*, animals!inner(id, name, species, breed, sex, birth_date, chip_number, animal_photos(url, is_primary)), foster:clients!foster_client_id(name, email, phone, address, postal_code, city)')
+    .select(`*,
+      animals!inner(
+        id, name, name_secondary, species, breed, sex, birth_date,
+        chip_number, color, sterilized, tattoo_number, medal_number,
+        loof_number,
+        animal_photos(url, is_primary)
+      ),
+      foster:clients!foster_client_id(name, email, phone, address, postal_code, city)`)
     .eq('id', contractId)
     .single()
 

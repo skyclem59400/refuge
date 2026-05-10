@@ -18,7 +18,14 @@ export async function buildAdoptionContractPdf(contractId: string): Promise<Buil
 
   const { data: contract, error } = await admin
     .from('adoption_contracts')
-    .select('*, animals!inner(id, name, species, breed, sex, birth_date, chip_number, animal_photos(url, is_primary)), adopter:clients!adopter_client_id(name, email, phone, address, postal_code, city)')
+    .select(`*,
+      animals!inner(
+        id, name, name_secondary, species, breed, sex, birth_date,
+        chip_number, color, sterilized, tattoo_number, medal_number,
+        loof_number, pound_entry_date, description,
+        animal_photos(url, is_primary)
+      ),
+      adopter:clients!adopter_client_id(name, email, phone, address, postal_code, city)`)
     .eq('id', contractId)
     .single()
 
