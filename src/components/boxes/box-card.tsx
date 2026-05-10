@@ -214,11 +214,16 @@ export function BoxCard({ box, color, canManage, allBoxes }: BoxCardProps) {
         )}
 
         <div className="absolute top-2 left-2 right-2 flex items-center justify-between gap-2 pointer-events-none">
-          <span
-            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider backdrop-blur-md shadow-sm ${boxStatusColor(box.status)}`}
-          >
-            {boxStatusLabel(box.status)}
-          </span>
+          {/* On masque le pill "Disponible" quand le box est vide : le hero l'indique deja */}
+          {!(isEmpty && box.status === 'available') ? (
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider backdrop-blur-md shadow-sm ${boxStatusColor(box.status)}`}
+            >
+              {boxStatusLabel(box.status)}
+            </span>
+          ) : (
+            <span aria-hidden />
+          )}
           <span
             className={`px-2 py-0.5 rounded-full text-[11px] font-bold backdrop-blur-md shadow-sm ${
               isFull

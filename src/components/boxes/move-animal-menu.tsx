@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, X, Move, Check } from 'lucide-react'
+import { Loader2, X, Move, AlertCircle, Trash2 } from 'lucide-react'
 import { moveAnimalToBox } from '@/lib/actions/box-assignments'
 import type { BoxSummary } from './types'
 
@@ -28,7 +28,15 @@ export function MoveAnimalMenu({
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
 
-  // Box compatibles (espece + capacite + pas le box actuel)
+  // Esc pour fermer
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   const candidates = allBoxes.filter((b) => {
     if (b.id === currentBoxId) return false
     if (b.species_type !== 'mixed' && b.species_type !== animalSpecies) return false
@@ -51,85 +59,112 @@ export function MoveAnimalMenu({
 
   return (
     <div
-      className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-1 w-72 rounded-xl border border-border bg-surface shadow-2xl backdrop-blur-md p-3 animate-fade-up ring-1 ring-white/5"
-      onClick={(e) => e.stopPropagation()}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-up"
+      onClick={onClose}
     >
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          <Move className="w-3.5 h-3.5 text-primary" />
-          <span className="text-xs font-bold">Déplacer {animalName}</span>
+      <div
+        className="w-full max-w-sm max-h-[80vh] flex flex-col rounded-2xl border border-border bg-surface shadow-2xl ring-1 ring-white/5 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary/15 text-primary shrink-0">
+              <Move className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold truncate">Déplacer {animalName}</h3>
+              <p className="text-[11px] text-muted">
+                {candidates.length} box compatible{candidates.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            type="button"
+            className="text-muted hover:text-text shrink-0 p-1 rounded-lg hover:bg-surface-hover"
+            aria-label="Fermer"
+          >
+            <X size={16} />
+          </button>
         </div>
-        <button
-          onClick={onClose}
-          type="button"
-          className="text-muted hover:text-text"
-        >
-          <X size={14} />
-        </button>
+
+        {/* Search */}
+        <div className="px-5 pt-3 pb-2">
+          <input
+            type="text"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Chercher un box..."
+            autoFocus
+            className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </div>
+
+        {/* List */}
+        <div className="flex-1 overflow-y-auto px-2 py-2">
+          {candidates.length === 0 ? (
+            <p className="text-xs text-muted py-6 text-center italic">
+              Aucun box compatible disponible.
+            </p>
+          ) : (
+            <ul className="space-y-0.5">
+              {candidates.map((b) => {
+                const remaining = b.capacity - b.current_count
+                return (
+                  <li key={b.id}>
+                    <button
+                      onClick={() => move(b.id)}
+                      disabled={pending}
+                      type="button"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-hover text-left disabled:opacity-50 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold truncate">{b.name}</div>
+                        {b.zone_label && (
+                          <div className="text-[11px] text-muted truncate">
+                            {b.zone_label}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[11px] font-mono text-muted">
+                          {b.current_count}/{b.capacity}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-success/15 text-success">
+                          +{remaining}
+                        </span>
+                      </div>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-border/50 space-y-2">
+          <button
+            onClick={() => move(null)}
+            disabled={pending}
+            type="button"
+            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-border hover:bg-error/10 hover:text-error hover:border-error/40 transition-colors disabled:opacity-50"
+          >
+            {pending ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Trash2 size={12} />
+            )}
+            Retirer du box
+          </button>
+          {error && (
+            <p className="text-[11px] text-error flex items-center gap-1.5">
+              <AlertCircle size={11} /> {error}
+            </p>
+          )}
+        </div>
       </div>
-
-      <input
-        type="text"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        placeholder="Chercher un box..."
-        className="w-full mb-2 rounded-md border border-border bg-surface px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
-      />
-
-      <div className="max-h-60 overflow-y-auto space-y-0.5">
-        {candidates.length === 0 ? (
-          <p className="text-[11px] text-muted py-3 text-center italic">
-            Aucun box compatible disponible.
-          </p>
-        ) : (
-          candidates.map((b) => {
-            const remaining = b.capacity - b.current_count
-            return (
-              <button
-                key={b.id}
-                onClick={() => move(b.id)}
-                disabled={pending}
-                type="button"
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-hover text-left disabled:opacity-50"
-              >
-                <span className="flex-1 min-w-0">
-                  <span className="block text-xs font-semibold truncate">
-                    {b.name}
-                  </span>
-                  {b.zone_label && (
-                    <span className="block text-[10px] text-muted truncate">
-                      {b.zone_label}
-                    </span>
-                  )}
-                </span>
-                <span className="text-[10px] font-mono text-muted shrink-0">
-                  {b.current_count}/{b.capacity}
-                </span>
-                <span className="text-[10px] text-success font-semibold shrink-0">
-                  +{remaining}
-                </span>
-              </button>
-            )
-          })
-        )}
-      </div>
-
-      {/* Retirer du box */}
-      <div className="mt-2 pt-2 border-t border-border/40">
-        <button
-          onClick={() => move(null)}
-          disabled={pending}
-          type="button"
-          className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] font-semibold border border-border hover:bg-error/10 hover:text-error hover:border-error/40 transition-colors disabled:opacity-50"
-        >
-          {pending ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-          Retirer du box
-        </button>
-      </div>
-
-      {error && (
-        <p className="mt-2 text-[10px] text-error">{error}</p>
-      )}
     </div>
   )
 }
