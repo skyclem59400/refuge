@@ -30,7 +30,7 @@ export async function getBoxes() {
     // Fetch animal counts per box
     const { data: animals, error: animalsError } = await supabase
       .from('animals')
-      .select('id, name, box_id, species')
+      .select('id, name, box_id, species, sex, status, photo_url, birth_date, sterilized, adoptable, reserved')
       .eq('establishment_id', establishmentId)
       .not('box_id', 'is', null)
 
@@ -39,7 +39,19 @@ export async function getBoxes() {
     }
 
     // Group animals by box_id
-    const animalsByBox: Record<string, { id: string; name: string; species: string }[]> = {}
+    interface AnimalInBox {
+      id: string
+      name: string
+      species: string
+      sex: string | null
+      status: string | null
+      photo_url: string | null
+      birth_date: string | null
+      sterilized: boolean | null
+      adoptable: boolean | null
+      reserved: boolean | null
+    }
+    const animalsByBox: Record<string, AnimalInBox[]> = {}
     for (const animal of animals || []) {
       if (animal.box_id) {
         if (!animalsByBox[animal.box_id]) {
@@ -49,6 +61,13 @@ export async function getBoxes() {
           id: animal.id,
           name: animal.name,
           species: animal.species,
+          sex: animal.sex,
+          status: animal.status,
+          photo_url: animal.photo_url,
+          birth_date: animal.birth_date,
+          sterilized: animal.sterilized,
+          adoptable: animal.adoptable,
+          reserved: animal.reserved,
         })
       }
     }
