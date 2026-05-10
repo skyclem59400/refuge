@@ -109,6 +109,7 @@ export default async function BoxesPage() {
               group={group}
               canManage={canManageBoxes}
               allBoxes={allBoxesSummary}
+              zones={allZones}
             />
           ))}
         </div>
@@ -125,10 +126,12 @@ function RootZoneSection({
   group,
   canManage,
   allBoxes,
+  zones,
 }: {
   group: RootZoneGroup
   canManage: boolean
   allBoxes: BoxSummary[]
+  zones: BoxZone[]
 }) {
   const { zone, color, directBoxes, subzones, totalBoxes } = group
   const isNone = zone === null
@@ -189,6 +192,7 @@ function RootZoneSection({
                 color={color}
                 canManage={canManage}
                 allBoxes={allBoxes}
+                zones={zones}
               />
             ))}
           </div>
@@ -201,6 +205,7 @@ function RootZoneSection({
             color={color}
             canManage={canManage}
             allBoxes={allBoxes}
+            zones={zones}
           />
         ))}
 
@@ -217,11 +222,13 @@ function SubZoneSection({
   color,
   canManage,
   allBoxes,
+  zones,
 }: {
   sub: SubZoneGroup
   color: ZoneColor
   canManage: boolean
   allBoxes: BoxSummary[]
+  zones: BoxZone[]
 }) {
   return (
     <div className={`relative rounded-xl border ${color.borderSoft} ${color.bgSofter} overflow-hidden`}>
@@ -248,6 +255,7 @@ function SubZoneSection({
                 color={color}
                 canManage={canManage}
                 allBoxes={allBoxes}
+                zones={zones}
               />
             ))}
           </div>

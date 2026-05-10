@@ -3,12 +3,14 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Printer, Plus, GripVertical, Move, Loader2 } from 'lucide-react'
+import { Printer, Plus, GripVertical, Move, Loader2, Settings } from 'lucide-react'
 import type { ZoneColor } from '@/lib/zone-colors'
+import type { BoxZone } from '@/lib/actions/box-zones'
 import type { BoxAnimal, EnrichedBox, BoxSummary } from './types'
 import { moveAnimalToBox } from '@/lib/actions/box-assignments'
 import { AssignAnimalsPopover } from './assign-animals-popover'
 import { MoveAnimalMenu } from './move-animal-menu'
+import { EditBoxDrawer } from './edit-box-drawer'
 
 const DRAG_MIME = 'application/x-sda-animal'
 
@@ -105,14 +107,16 @@ interface BoxCardProps {
   color: ZoneColor
   canManage: boolean
   allBoxes: BoxSummary[]
+  zones: BoxZone[]
 }
 
-export function BoxCard({ box, color, canManage, allBoxes }: BoxCardProps) {
+export function BoxCard({ box, color, canManage, allBoxes, zones }: BoxCardProps) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [isDragOver, setIsDragOver] = useState(false)
   const [dropError, setDropError] = useState<string | null>(null)
   const [showAssign, setShowAssign] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
   const [hoveredAnimalId, setHoveredAnimalId] = useState<string | null>(null)
   const [moveMenuFor, setMoveMenuFor] = useState<string | null>(null)
 
@@ -249,15 +253,25 @@ export function BoxCard({ box, color, canManage, allBoxes }: BoxCardProps) {
             </div>
           </div>
 
-          {canManage && !isFull && (
-            <div className="relative">
+          {canManage && (
+            <div className="flex items-center gap-1 shrink-0">
+              {!isFull && (
+                <button
+                  onClick={() => setShowAssign(true)}
+                  type="button"
+                  title={`Assigner un animal (${remainingCapacity} place${remainingCapacity > 1 ? 's' : ''})`}
+                  className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors"
+                >
+                  <Plus size={14} />
+                </button>
+              )}
               <button
-                onClick={() => setShowAssign((v) => !v)}
+                onClick={() => setShowEdit(true)}
                 type="button"
-                title={`Assigner un animal (${remainingCapacity} place${remainingCapacity > 1 ? 's' : ''})`}
-                className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors"
+                title="Modifier le box"
+                className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-muted/15 text-muted hover:bg-muted/30 hover:text-text transition-colors opacity-0 group-hover:opacity-100"
               >
-                <Plus size={14} />
+                <Settings size={13} />
               </button>
               {showAssign && (
                 <AssignAnimalsPopover
@@ -266,6 +280,13 @@ export function BoxCard({ box, color, canManage, allBoxes }: BoxCardProps) {
                   boxSpeciesType={box.species_type}
                   remainingCapacity={remainingCapacity}
                   onClose={() => setShowAssign(false)}
+                />
+              )}
+              {showEdit && (
+                <EditBoxDrawer
+                  box={box}
+                  zones={zones}
+                  onClose={() => setShowEdit(false)}
                 />
               )}
             </div>
