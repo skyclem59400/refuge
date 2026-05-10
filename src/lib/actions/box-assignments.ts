@@ -79,11 +79,30 @@ export async function listAssignableAnimals(
       box: { id: string; name: string }[] | { id: string; name: string } | null
     }
 
+    // Recupere les photos primary depuis animal_photos (table separee)
+    const rows = (data as unknown as Row[] | null) ?? []
+    const animalIds = rows.map((r) => r.id)
+    const primaryPhotoByAnimal: Record<string, string> = {}
+    if (animalIds.length > 0) {
+      const { data: photos } = await admin
+        .from('animal_photos')
+        .select('animal_id, url, is_primary')
+        .in('animal_id', animalIds)
+        .order('is_primary', { ascending: false })
+
+      for (const p of photos || []) {
+        const photo = p as { animal_id: string; url: string; is_primary: boolean }
+        if (!primaryPhotoByAnimal[photo.animal_id] || photo.is_primary) {
+          primaryPhotoByAnimal[photo.animal_id] = photo.url
+        }
+      }
+    }
+
     const speciesOk = (s: string) =>
       targetBox.species_type === 'mixed' || s === targetBox.species_type
     const statusOk = (s: string | null) => s === 'shelter' || s === 'pound'
 
-    const result: AssignableAnimal[] = ((data as unknown as Row[] | null) ?? []).map((a) => {
+    const result: AssignableAnimal[] = rows.map((a) => {
       const boxRel = Array.isArray(a.box) ? a.box[0] : a.box
       const sOk = speciesOk(a.species)
       const stOk = statusOk(a.status)
@@ -97,7 +116,8 @@ export async function listAssignableAnimals(
         species: a.species,
         sex: a.sex,
         status: a.status,
-        photo_url: a.photo_url,
+        // Priorite : animal_photos primary, fallback sur animals.photo_url
+        photo_url: primaryPhotoByAnimal[a.id] || a.photo_url,
         birth_date: a.birth_date,
         current_box_id: a.box_id,
         current_box_name: boxRel?.name ?? null,

@@ -38,6 +38,25 @@ export async function getBoxes() {
       return { error: animalsError.message }
     }
 
+    // Recupere les photos primary depuis la table animal_photos (separee).
+    // Beaucoup d'animaux ont photo_url=NULL mais une photo dans cette table.
+    const animalIds = (animals || []).map((a: { id: string }) => a.id)
+    const primaryPhotoByAnimal: Record<string, string> = {}
+    if (animalIds.length > 0) {
+      const { data: photos } = await supabase
+        .from('animal_photos')
+        .select('animal_id, url, is_primary')
+        .in('animal_id', animalIds)
+        .order('is_primary', { ascending: false })
+
+      for (const p of photos || []) {
+        const photo = p as { animal_id: string; url: string; is_primary: boolean }
+        if (!primaryPhotoByAnimal[photo.animal_id] || photo.is_primary) {
+          primaryPhotoByAnimal[photo.animal_id] = photo.url
+        }
+      }
+    }
+
     // Group animals by box_id
     interface AnimalInBox {
       id: string
@@ -63,7 +82,8 @@ export async function getBoxes() {
           species: animal.species,
           sex: animal.sex,
           status: animal.status,
-          photo_url: animal.photo_url,
+          // Priorite : animal_photos primary, fallback sur animals.photo_url
+          photo_url: primaryPhotoByAnimal[animal.id] || animal.photo_url,
           birth_date: animal.birth_date,
           sterilized: animal.sterilized,
           adoptable: animal.adoptable,
