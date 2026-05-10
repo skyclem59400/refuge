@@ -52,8 +52,10 @@ export async function listAssignableAnimals(
       // box_id != boxId OU box_id IS NULL (animaux sans box). Note PostgREST :
       // .neq('box_id', boxId) seul exclurait les NULL car null != value vaut null en SQL.
       .or(`box_id.neq.${boxId},box_id.is.null`)
-      // exclut les animaux sortis (adopted, transferred, deceased, etc.)
-      .in('status', ['shelter', 'pound', 'foster_family', 'boarding'])
+      // Seuls les animaux physiquement presents au refuge ou en fourriere
+      // peuvent etre dans un box. Les animaux en famille d'accueil (FA) ou
+      // en pension (boarding) sont chez quelqu'un d'autre par definition.
+      .in('status', ['shelter', 'pound'])
 
     if (targetBox.species_type !== 'mixed') {
       query = query.eq('species', targetBox.species_type)
@@ -127,22 +129,25 @@ export async function assignAnimalsToBox(boxId: string, animalIds: string[]) {
       }
     }
 
-    // Filtrer les animaux compatibles
+    // Filtrer les animaux compatibles (espece + statut physiquement present)
     const { data: animals } = await admin
       .from('animals')
-      .select('id, name, species')
+      .select('id, name, species, status')
       .in('id', animalIds)
       .eq('establishment_id', establishmentId)
 
     const validIds: string[] = []
     for (const a of animals ?? []) {
-      if (box.species_type === 'mixed' || a.species === box.species_type) {
-        validIds.push(a.id)
-      }
+      const speciesOk = box.species_type === 'mixed' || a.species === box.species_type
+      const statusOk = a.status === 'shelter' || a.status === 'pound'
+      if (speciesOk && statusOk) validIds.push(a.id)
     }
 
     if (validIds.length === 0) {
-      return { error: 'Aucun animal compatible avec l’espece du box.' }
+      return {
+        error:
+          'Aucun animal compatible : verifiez espece et statut (un animal en famille d’accueil ne peut pas etre dans un box).',
+      }
     }
 
     const { error } = await supabase
@@ -180,13 +185,21 @@ export async function moveAnimalToBox(animalId: string, newBoxId: string | null)
     // Verifie que l'animal appartient a l'etablissement
     const { data: animal } = await admin
       .from('animals')
-      .select('id, name, species, box_id')
+      .select('id, name, species, box_id, status')
       .eq('id', animalId)
       .eq('establishment_id', establishmentId)
       .single()
     if (!animal) return { error: 'Animal introuvable.' }
 
     if (newBoxId) {
+      // Un animal en famille d'accueil ou en pension n'a logiquement pas
+      // a etre dans un box (il est chez quelqu'un d'autre).
+      if (animal.status !== 'shelter' && animal.status !== 'pound') {
+        return {
+          error: `${animal.name} a le statut « ${animal.status} » et ne peut pas etre place dans un box. Changez d'abord son statut.`,
+        }
+      }
+
       // Verifie box destination + capacite + espece
       const { data: box } = await admin
         .from('boxes')
