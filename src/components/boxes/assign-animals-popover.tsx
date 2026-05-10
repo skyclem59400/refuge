@@ -13,13 +13,28 @@ import {
 interface Props {
   boxId: string
   boxName: string
+  boxSpeciesType: string
   remainingCapacity: number
   onClose: () => void
+}
+
+function speciesLabel(s: string): string {
+  if (s === 'cat') return 'Chats'
+  if (s === 'dog') return 'Chiens'
+  if (s === 'mixed') return 'Mixte'
+  return s
+}
+
+function ineligibilityLabel(reason: string | null, boxSpecies: string): string {
+  if (reason === 'species_mismatch') return `Box réservé aux ${speciesLabel(boxSpecies).toLowerCase()}`
+  if (reason === 'wrong_status') return 'En famille d’accueil ou pension'
+  return ''
 }
 
 export function AssignAnimalsPopover({
   boxId,
   boxName,
+  boxSpeciesType,
   remainingCapacity,
   onClose,
 }: Props) {
@@ -84,6 +99,9 @@ export function AssignAnimalsPopover({
       return next
     })
   }
+
+  const eligibleCount = animals.filter((a) => a.eligible).length
+  const ineligibleCount = animals.length - eligibleCount
 
   function submit() {
     if (selected.size === 0) return
@@ -159,8 +177,11 @@ export function AssignAnimalsPopover({
             />
           </div>
           <p className="mt-2 text-[11px] text-muted">
-            {animals.length} animal{animals.length !== 1 ? 'x' : ''} au refuge
-            {filter && filtered.length !== animals.length && (
+            <span className="text-success">{eligibleCount} compatible{eligibleCount !== 1 ? 's' : ''}</span>
+            {ineligibleCount > 0 && (
+              <> · <span className="text-warning">{ineligibleCount} non éligible{ineligibleCount !== 1 ? 's' : ''}</span></>
+            )}
+            {filter && (
               <> · {filtered.length} résultat{filtered.length !== 1 ? 's' : ''}</>
             )}
           </p>
@@ -179,38 +200,41 @@ export function AssignAnimalsPopover({
             </div>
           ) : filtered.length === 0 ? (
             <div className="py-10 px-4 text-center">
-              <p className="text-sm text-muted italic mb-2">
+              <p className="text-sm text-muted italic">
                 {animals.length === 0
-                  ? 'Aucun animal au refuge à assigner.'
+                  ? 'Aucun animal au refuge.'
                   : 'Aucun résultat pour cette recherche.'}
               </p>
-              {animals.length === 0 && (
-                <p className="text-[11px] text-muted">
-                  Seuls les animaux au statut <strong>refuge</strong> ou <strong>fourrière</strong>,
-                  compatibles avec l&apos;espèce du box, apparaissent ici.
-                </p>
-              )}
             </div>
           ) : (
             <ul className="space-y-0.5">
               {filtered.map((a) => {
                 const isSelected = selected.has(a.id)
-                const isDisabled = !isSelected && limitReached
+                const limitForCheckbox = !isSelected && limitReached
+                // Non-eligible : non cliquable mais visible avec raison
+                const isClickable = a.eligible && !limitForCheckbox
                 const inOtherBox = a.current_box_id !== null
+                const reasonLabel = ineligibilityLabel(a.ineligibility_reason, boxSpeciesType)
                 return (
                   <li key={a.id}>
                     <button
-                      onClick={() => toggle(a.id)}
-                      disabled={isDisabled}
+                      onClick={() => isClickable && toggle(a.id)}
+                      disabled={!isClickable}
                       type="button"
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
                         isSelected
                           ? 'bg-primary/10 ring-1 ring-primary/40'
-                          : 'hover:bg-surface-hover'
-                      } ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                          : a.eligible
+                            ? 'hover:bg-surface-hover'
+                            : 'bg-muted/5 cursor-not-allowed'
+                      } ${limitForCheckbox ? 'opacity-40 cursor-not-allowed' : ''}`}
                     >
                       {/* Avatar */}
-                      <div className="relative w-10 h-10 rounded-full overflow-hidden bg-muted/15 shrink-0">
+                      <div
+                        className={`relative w-10 h-10 rounded-full overflow-hidden bg-muted/15 shrink-0 ${
+                          !a.eligible ? 'grayscale opacity-60' : ''
+                        }`}
+                      >
                         {a.photo_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -228,7 +252,11 @@ export function AssignAnimalsPopover({
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-semibold truncate">
+                          <span
+                            className={`text-sm font-semibold truncate ${
+                              !a.eligible ? 'text-muted' : ''
+                            }`}
+                          >
                             {a.name}
                           </span>
                           {a.sex === 'male' && (
@@ -238,7 +266,12 @@ export function AssignAnimalsPopover({
                             <span className="text-pink-500 text-sm font-bold">♀</span>
                           )}
                         </div>
-                        {inOtherBox ? (
+                        {!a.eligible ? (
+                          <span className="block text-[11px] text-warning truncate flex items-center gap-1">
+                            <AlertCircle size={10} />
+                            {reasonLabel}
+                          </span>
+                        ) : inOtherBox ? (
                           <span className="block text-[11px] text-amber-600 dark:text-amber-400 truncate flex items-center gap-1">
                             <AlertCircle size={10} />
                             Actuellement dans « {a.current_box_name} »
@@ -248,16 +281,22 @@ export function AssignAnimalsPopover({
                         )}
                       </div>
 
-                      {/* Checkbox */}
-                      <span
-                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
-                          isSelected
-                            ? 'bg-primary border-primary'
-                            : 'border-border bg-surface'
-                        }`}
-                      >
-                        {isSelected && <Check size={12} className="text-white" />}
-                      </span>
+                      {/* Checkbox / lock */}
+                      {a.eligible ? (
+                        <span
+                          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
+                            isSelected
+                              ? 'bg-primary border-primary'
+                              : 'border-border bg-surface'
+                          }`}
+                        >
+                          {isSelected && <Check size={12} className="text-white" />}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-muted shrink-0">
+                          —
+                        </span>
+                      )}
                     </button>
                   </li>
                 )

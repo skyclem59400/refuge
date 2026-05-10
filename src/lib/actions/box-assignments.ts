@@ -5,6 +5,11 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/establishment/permissions'
 import { logActivity } from '@/lib/actions/activity-log'
 
+export type IneligibilityReason =
+  | 'species_mismatch'
+  | 'wrong_status'
+  | null
+
 export interface AssignableAnimal {
   id: string
   name: string
@@ -15,12 +20,18 @@ export interface AssignableAnimal {
   birth_date: string | null
   current_box_id: string | null
   current_box_name: string | null
+  // Eligibilite calculee cote serveur. Le client affiche tout, mais grise
+  // les non-eligibles avec la raison pour que l'utilisateur comprenne.
+  eligible: boolean
+  ineligibility_reason: IneligibilityReason
+  box_species_type: string
 }
 
 /**
- * Liste les animaux candidats pour un box (compatibles espece, non encore
- * dans ce box). Inclut les animaux libres ET ceux assignes ailleurs (badge
- * "actuellement dans X").
+ * Liste TOUS les animaux du refuge (statuts vivants), avec l'eligibilite
+ * pour le box cible calculee cote serveur. Les non-eligibles sont retournes
+ * aussi pour que le client puisse afficher la raison ("espece incompatible",
+ * "en famille d'accueil", etc.).
  */
 export async function listAssignableAnimals(
   boxId: string
@@ -29,7 +40,6 @@ export async function listAssignableAnimals(
     const { establishmentId } = await requirePermission('manage_boxes')
     const admin = createAdminClient()
 
-    // 1. Recuperer l'espece du box cible
     const { data: targetBox } = await admin
       .from('boxes')
       .select('id, species_type')
@@ -39,10 +49,7 @@ export async function listAssignableAnimals(
 
     if (!targetBox) return { error: 'Box introuvable.' }
 
-    // species_type sur boxes : 'cat' | 'dog' | 'mixed'
-    // animals.species : 'cat' | 'dog' (et autres rares)
-    // Si box est mixed -> tous les animaux ; sinon match exact
-    let query = admin
+    const { data, error } = await admin
       .from('animals')
       .select(
         `id, name, species, sex, status, photo_url, birth_date, box_id,
@@ -50,18 +57,14 @@ export async function listAssignableAnimals(
       )
       .eq('establishment_id', establishmentId)
       // box_id != boxId OU box_id IS NULL (animaux sans box). Note PostgREST :
-      // .neq('box_id', boxId) seul exclurait les NULL car null != value vaut null en SQL.
+      // .neq seul exclurait les NULL car null != value vaut null en SQL.
       .or(`box_id.neq.${boxId},box_id.is.null`)
-      // Seuls les animaux physiquement presents au refuge ou en fourriere
-      // peuvent etre dans un box. Les animaux en famille d'accueil (FA) ou
-      // en pension (boarding) sont chez quelqu'un d'autre par definition.
-      .in('status', ['shelter', 'pound'])
+      // Statuts "vivants" : on exclut adopted/deceased/transferred/returned
+      // car ils ne reviendront pas dans un box. Mais on inclut foster_family
+      // et boarding (et on les marquera comme non-eligibles cote client).
+      .in('status', ['shelter', 'pound', 'foster_family', 'boarding'])
+      .order('name')
 
-    if (targetBox.species_type !== 'mixed') {
-      query = query.eq('species', targetBox.species_type)
-    }
-
-    const { data, error } = await query.order('name')
     if (error) return { error: error.message }
 
     interface Row {
@@ -76,8 +79,18 @@ export async function listAssignableAnimals(
       box: { id: string; name: string }[] | { id: string; name: string } | null
     }
 
+    const speciesOk = (s: string) =>
+      targetBox.species_type === 'mixed' || s === targetBox.species_type
+    const statusOk = (s: string | null) => s === 'shelter' || s === 'pound'
+
     const result: AssignableAnimal[] = ((data as unknown as Row[] | null) ?? []).map((a) => {
       const boxRel = Array.isArray(a.box) ? a.box[0] : a.box
+      const sOk = speciesOk(a.species)
+      const stOk = statusOk(a.status)
+      let reason: IneligibilityReason = null
+      if (!stOk) reason = 'wrong_status'
+      else if (!sOk) reason = 'species_mismatch'
+
       return {
         id: a.id,
         name: a.name,
@@ -88,7 +101,16 @@ export async function listAssignableAnimals(
         birth_date: a.birth_date,
         current_box_id: a.box_id,
         current_box_name: boxRel?.name ?? null,
+        eligible: sOk && stOk,
+        ineligibility_reason: reason,
+        box_species_type: targetBox.species_type,
       }
+    })
+
+    // Tri : eligibles d'abord, puis non-eligibles
+    result.sort((a, b) => {
+      if (a.eligible !== b.eligible) return a.eligible ? -1 : 1
+      return a.name.localeCompare(b.name)
     })
 
     return { data: result }

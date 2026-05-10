@@ -263,6 +263,7 @@ export function BoxCard({ box, color, canManage, allBoxes }: BoxCardProps) {
                 <AssignAnimalsPopover
                   boxId={box.id}
                   boxName={box.name}
+                  boxSpeciesType={box.species_type}
                   remainingCapacity={remainingCapacity}
                   onClose={() => setShowAssign(false)}
                 />
