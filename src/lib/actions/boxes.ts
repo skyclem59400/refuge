@@ -16,12 +16,14 @@ export async function getBoxes() {
     const { establishmentId } = await requireEstablishment()
     const supabase = createAdminClient()
 
-    // Fetch boxes for this establishment
+    // Fetch boxes for this establishment, trie par sort_order (drag-and-drop)
+    // puis par name (fallback stable).
     const { data: boxes, error } = await supabase
       .from('boxes')
       .select('*, zone:box_zones(id, name, parent_id, parent:box_zones!parent_id(id, name))')
       .eq('establishment_id', establishmentId)
-      .order('name')
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true })
 
     if (error) {
       return { error: error.message }
@@ -169,6 +171,40 @@ export async function updateBox(id: string, data: {
     revalidatePath('/boxes')
     logActivity({ action: 'update', entityType: 'box', entityId: id, entityName: data.name, details: data })
     return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+/**
+ * Reordonne les box dans un groupe (zone/sous-zone) en mettant a jour leur
+ * sort_order. orderedBoxIds est la liste des ids dans l'ordre desire.
+ * Ne touche pas a l'appartenance a la zone, juste a l'ordre.
+ */
+export async function reorderBoxes(orderedBoxIds: string[]) {
+  try {
+    const { establishmentId } = await requirePermission('manage_boxes')
+    const supabase = await createClient()
+
+    if (orderedBoxIds.length === 0) return { success: true }
+
+    // Update parallele : chaque box recoit sort_order = (index + 1) * 10
+    // Les *10 laissent de la place pour des inserts intermediaires.
+    const results = await Promise.all(
+      orderedBoxIds.map((id, idx) =>
+        supabase
+          .from('boxes')
+          .update({ sort_order: (idx + 1) * 10 })
+          .eq('id', id)
+          .eq('establishment_id', establishmentId)
+      )
+    )
+
+    const firstError = results.find((r) => r.error)
+    if (firstError?.error) return { error: firstError.error.message }
+
+    revalidatePath('/boxes')
+    return { success: true, reordered: orderedBoxIds.length }
   } catch (e) {
     return { error: (e as Error).message }
   }

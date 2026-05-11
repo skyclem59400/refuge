@@ -3,7 +3,7 @@ import { getBoxes } from '@/lib/actions/boxes'
 import { listBoxZones, type BoxZone } from '@/lib/actions/box-zones'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { ZonesManager } from '@/components/boxes/zones-manager'
-import { BoxCard } from '@/components/boxes/box-card'
+import { BoxesGroupGrid } from '@/components/boxes/boxes-group-grid'
 import type { EnrichedBox, BoxSummary } from '@/components/boxes/types'
 import { getZoneColor, NONE_ZONE_COLOR, type ZoneColor } from '@/lib/zone-colors'
 import type { BoxSpecies } from '@/lib/types/database'
@@ -184,18 +184,14 @@ function RootZoneSection({
 
       <div className="p-5 space-y-5">
         {directBoxes.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {directBoxes.map((box) => (
-              <BoxCard
-                key={box.id}
-                box={box}
-                color={color}
-                canManage={canManage}
-                allBoxes={allBoxes}
-                zones={zones}
-              />
-            ))}
-          </div>
+          <BoxesGroupGrid
+            boxes={directBoxes}
+            color={color}
+            canManage={canManage}
+            allBoxes={allBoxes}
+            zones={zones}
+            groupKey={`root:${zone?.id ?? '__none'}`}
+          />
         )}
 
         {subzones.map((sub) => (
@@ -247,18 +243,14 @@ function SubZoneSection({
         {sub.boxes.length === 0 ? (
           <p className={`text-xs ${color.text} opacity-60 italic`}>Aucun box dans cette sous-zone.</p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {sub.boxes.map((box) => (
-              <BoxCard
-                key={box.id}
-                box={box}
-                color={color}
-                canManage={canManage}
-                allBoxes={allBoxes}
-                zones={zones}
-              />
-            ))}
-          </div>
+          <BoxesGroupGrid
+            boxes={sub.boxes}
+            color={color}
+            canManage={canManage}
+            allBoxes={allBoxes}
+            zones={zones}
+            groupKey={`sub:${sub.zone.id}`}
+          />
         )}
       </div>
     </div>

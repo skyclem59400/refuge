@@ -13,6 +13,7 @@ import { MoveAnimalMenu } from './move-animal-menu'
 import { EditBoxDrawer } from './edit-box-drawer'
 
 const DRAG_MIME = 'application/x-sda-animal'
+const BOX_DRAG_MIME = 'application/x-sda-box'
 
 // ---------------------------------------------------------------------------
 // Helpers (locaux, non shared)
@@ -108,12 +109,25 @@ interface BoxCardProps {
   canManage: boolean
   allBoxes: BoxSummary[]
   zones: BoxZone[]
+  /** Groupe de réorganisation (zone+sous-zone). Si fourni, active le drag-and-drop box. */
+  groupKey?: string
+  /** Callback appelé quand un autre box du même groupe est déposé sur cette carte. */
+  onReorderTarget?: (sourceBoxId: string) => void
 }
 
-export function BoxCard({ box, color, canManage, allBoxes, zones }: BoxCardProps) {
+export function BoxCard({
+  box,
+  color,
+  canManage,
+  allBoxes,
+  zones,
+  groupKey,
+  onReorderTarget,
+}: BoxCardProps) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [isDragOver, setIsDragOver] = useState(false)
+  const [isBoxDragOver, setIsBoxDragOver] = useState(false)
   const [dropError, setDropError] = useState<string | null>(null)
   const [showAssign, setShowAssign] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
@@ -127,42 +141,85 @@ export function BoxCard({ box, color, canManage, allBoxes, zones }: BoxCardProps
   const otherAnimals = box.animals.slice(1)
 
   function handleDragOver(e: React.DragEvent) {
-    if (!canManage || isFull) return
-    if (!Array.from(e.dataTransfer.types).includes(DRAG_MIME)) return
-    e.preventDefault()
-    setIsDragOver(true)
+    if (!canManage) return
+    const types = Array.from(e.dataTransfer.types)
+    // Drop d'un animal (existant)
+    if (types.includes(DRAG_MIME) && !isFull) {
+      e.preventDefault()
+      setIsDragOver(true)
+      return
+    }
+    // Drop d'un autre box (réorganisation)
+    if (types.includes(BOX_DRAG_MIME) && groupKey && onReorderTarget) {
+      e.preventDefault()
+      setIsBoxDragOver(true)
+      return
+    }
   }
 
   function handleDragLeave() {
     setIsDragOver(false)
+    setIsBoxDragOver(false)
   }
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     setIsDragOver(false)
+    setIsBoxDragOver(false)
     setDropError(null)
-    const payload = e.dataTransfer.getData(DRAG_MIME)
-    if (!payload) return
-    let animalId: string | null = null
-    let sourceBoxId: string | null = null
-    try {
-      const parsed = JSON.parse(payload)
-      animalId = parsed.animalId
-      sourceBoxId = parsed.sourceBoxId
-    } catch {
+
+    // 1. Drop animal
+    const animalPayload = e.dataTransfer.getData(DRAG_MIME)
+    if (animalPayload) {
+      let animalId: string | null = null
+      let sourceBoxId: string | null = null
+      try {
+        const parsed = JSON.parse(animalPayload)
+        animalId = parsed.animalId
+        sourceBoxId = parsed.sourceBoxId
+      } catch {
+        return
+      }
+      if (!animalId) return
+      if (sourceBoxId === box.id) return
+      startTransition(async () => {
+        const result = await moveAnimalToBox(animalId!, box.id)
+        if (result.error) {
+          setDropError(result.error)
+          setTimeout(() => setDropError(null), 3500)
+        } else {
+          router.refresh()
+        }
+      })
       return
     }
-    if (!animalId) return
-    if (sourceBoxId === box.id) return // meme box
-    startTransition(async () => {
-      const result = await moveAnimalToBox(animalId!, box.id)
-      if (result.error) {
-        setDropError(result.error)
-        setTimeout(() => setDropError(null), 3500)
-      } else {
-        router.refresh()
+
+    // 2. Drop box (réorganisation)
+    const boxPayload = e.dataTransfer.getData(BOX_DRAG_MIME)
+    if (boxPayload && groupKey && onReorderTarget) {
+      try {
+        const parsed = JSON.parse(boxPayload)
+        if (parsed.groupKey !== groupKey) {
+          setDropError('Impossible de déplacer un box entre zones différentes (utiliser Modifier).')
+          setTimeout(() => setDropError(null), 3500)
+          return
+        }
+        if (parsed.boxId && parsed.boxId !== box.id) {
+          onReorderTarget(parsed.boxId)
+        }
+      } catch {
+        // ignore
       }
-    })
+    }
+  }
+
+  function handleBoxDragStart(e: React.DragEvent) {
+    if (!canManage || !groupKey) return
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData(
+      BOX_DRAG_MIME,
+      JSON.stringify({ boxId: box.id, groupKey })
+    )
   }
 
   return (
@@ -172,8 +229,21 @@ export function BoxCard({ box, color, canManage, allBoxes, zones }: BoxCardProps
       onDrop={handleDrop}
       className={`group relative bg-surface rounded-2xl border ${color.borderSoft} overflow-hidden hover:shadow-2xl hover:shadow-black/10 hover:-translate-y-0.5 transition-all duration-200 ${
         isDragOver ? `ring-4 ${color.ring} scale-[1.02] shadow-2xl` : ''
-      } ${pending ? 'opacity-70' : ''}`}
+      } ${isBoxDragOver ? `ring-4 ring-primary/60 scale-[1.02] shadow-2xl` : ''} ${pending ? 'opacity-70' : ''}`}
     >
+      {/* Poignée de drag pour réorganiser (visible au hover) */}
+      {canManage && groupKey && (
+        <div
+          draggable
+          onDragStart={handleBoxDragStart}
+          className="absolute top-1 right-1 z-30 p-1 rounded-md bg-black/50 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+          title="Glisser pour réorganiser"
+          aria-label="Glisser pour réorganiser"
+        >
+          <GripVertical className="w-3.5 h-3.5 text-white" />
+        </div>
+      )}
+
       {/* Bandeau couleur zone */}
       <div className={`h-1 ${color.bg}`} aria-hidden />
 
@@ -184,7 +254,7 @@ export function BoxCard({ box, color, canManage, allBoxes, zones }: BoxCardProps
         </div>
       )}
 
-      {/* Drop indicator */}
+      {/* Drop indicator animal */}
       {isDragOver && (
         <div
           className={`absolute inset-0 z-20 pointer-events-none flex items-center justify-center bg-gradient-to-b from-transparent ${color.bgSoft} backdrop-blur-[1px]`}
@@ -193,6 +263,15 @@ export function BoxCard({ box, color, canManage, allBoxes, zones }: BoxCardProps
             className={`px-4 py-2 rounded-full ${color.bg} ${color.textOn} font-bold text-sm shadow-xl flex items-center gap-2`}
           >
             <Move size={14} /> Déposer ici
+          </div>
+        </div>
+      )}
+
+      {/* Drop indicator reorganisation box */}
+      {isBoxDragOver && (
+        <div className="absolute inset-0 z-20 pointer-events-none flex items-center justify-center bg-primary/10 backdrop-blur-[1px]">
+          <div className="px-4 py-2 rounded-full bg-primary text-white font-bold text-sm shadow-xl flex items-center gap-2">
+            <GripVertical size={14} /> Placer avant
           </div>
         </div>
       )}
