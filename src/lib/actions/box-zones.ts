@@ -124,15 +124,30 @@ export async function deleteBoxZone(id: string) {
     const supabase = await createClient()
     const admin = createAdminClient()
 
-    // Vérifie qu'aucun box n'est rattaché à cette zone
+    // Recupere les ids de la zone + ses sous-zones (profondeur max 2 garantie
+    // par le trigger box_zones_check_depth).
+    const { data: subzones } = await admin
+      .from('box_zones')
+      .select('id')
+      .eq('parent_id', id)
+      .eq('establishment_id', establishmentId)
+    const allZoneIds = [id, ...(subzones ?? []).map((s: { id: string }) => s.id)]
+
+    // Verifie qu'aucun box n'est rattache a cette zone ni a ses sous-zones
     const { data: linkedBoxes } = await admin
       .from('boxes')
-      .select('id')
-      .eq('zone_id', id)
+      .select('id, name, zone_id')
+      .in('zone_id', allZoneIds)
       .eq('establishment_id', establishmentId)
-      .limit(1)
     if (linkedBoxes && linkedBoxes.length > 0) {
-      return { error: 'Impossible de supprimer : des box sont rattachés à cette zone.' }
+      const countDirect = linkedBoxes.filter((b: { zone_id: string }) => b.zone_id === id).length
+      const countSub = linkedBoxes.length - countDirect
+      const parts: string[] = []
+      if (countDirect > 0) parts.push(`${countDirect} box dans cette zone`)
+      if (countSub > 0) parts.push(`${countSub} dans ses sous-zones`)
+      return {
+        error: `Impossible de supprimer : ${parts.join(' + ')}. Déplace ou retire d’abord ces box.`,
+      }
     }
 
     const { data: info } = await admin

@@ -184,10 +184,10 @@ function RootZoneRow({ node, canManage }: { node: ZoneNode; canManage: boolean }
             </div>
 
             {canManage && (
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1">
                 <button
                   onClick={() => setEditing(true)}
-                  className={`${color.text} hover:opacity-70 p-1 rounded hover:bg-white/10`}
+                  className={`${color.text} hover:opacity-100 opacity-60 p-1 rounded hover:bg-white/10`}
                   type="button"
                   title="Modifier"
                 >
@@ -258,10 +258,10 @@ function SubZoneRow({
             {node.name}
           </span>
           {canManage && (
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => setEditing(true)}
-                className={`${color.text} hover:opacity-70 p-1 rounded hover:bg-white/10`}
+                className={`${color.text} opacity-60 hover:opacity-100 p-1 rounded hover:bg-white/10`}
                 type="button"
                 title="Modifier"
               >
@@ -434,15 +434,18 @@ function DeleteZoneButton({ zoneId, zoneName }: { zoneId: string; zoneName: stri
       <button
         onClick={handleDelete}
         disabled={pending}
-        className="text-muted hover:text-error disabled:opacity-50 p-1 rounded hover:bg-white/10"
+        className="text-error opacity-70 hover:opacity-100 hover:bg-error/10 disabled:opacity-30 p-1 rounded"
         type="button"
-        title="Supprimer"
+        title="Supprimer la zone"
       >
         {pending ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
       </button>
       {error && (
-        <span className="text-[10px] text-error ml-1" title={error}>
-          ⚠
+        <span
+          className="text-[10px] text-error ml-1 truncate max-w-[150px]"
+          title={error}
+        >
+          {error}
         </span>
       )}
     </>
