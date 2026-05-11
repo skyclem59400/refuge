@@ -1,4 +1,4 @@
-import { Package, MapPin, CornerDownRight } from 'lucide-react'
+import { Package, MapPin, CornerDownRight, Printer } from 'lucide-react'
 import { getBoxes } from '@/lib/actions/boxes'
 import { listBoxZones, type BoxZone } from '@/lib/actions/box-zones'
 import { getEstablishmentContext } from '@/lib/establishment/context'
@@ -179,6 +179,18 @@ function RootZoneSection({
           <span className={`px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold ${color.textOn} shadow-md`}>
             {totalBoxes} box{totalBoxes !== 1 ? 's' : ''}
           </span>
+          {!isNone && (
+            <a
+              href={`/api/pdf/zone/${zone.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Fiche PDF du chenil"
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold ${color.textOn} shadow-md hover:bg-white/30 transition-colors`}
+            >
+              <Printer className="w-3 h-3" />
+              Fiche PDF
+            </a>
+          )}
         </div>
       </header>
 

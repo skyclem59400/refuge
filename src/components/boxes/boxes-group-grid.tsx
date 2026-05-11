@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { reorderBoxes } from '@/lib/actions/boxes'
-import { BoxCard } from './box-card'
+import { BoxTile } from './box-tile'
 import type { ZoneColor } from '@/lib/zone-colors'
 import type { BoxZone } from '@/lib/actions/box-zones'
 import type { EnrichedBox, BoxSummary } from './types'
@@ -69,21 +69,22 @@ export function BoxesGroupGrid({
           Réorganisation...
         </div>
       )}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 snap-x">
         {orderedIds.map((id) => {
           const box = boxById.get(id)
           if (!box) return null
           return (
-            <BoxCard
-              key={box.id}
-              box={box}
-              color={color}
-              canManage={canManage}
-              allBoxes={allBoxes}
-              zones={zones}
-              groupKey={groupKey}
-              onReorderTarget={(sourceBoxId) => handleReorder(sourceBoxId, box.id)}
-            />
+            <div key={box.id} className="snap-start">
+              <BoxTile
+                box={box}
+                color={color}
+                canManage={canManage}
+                allBoxes={allBoxes}
+                zones={zones}
+                groupKey={groupKey}
+                onReorderTarget={(sourceBoxId) => handleReorder(sourceBoxId, box.id)}
+              />
+            </div>
           )
         })}
       </div>
