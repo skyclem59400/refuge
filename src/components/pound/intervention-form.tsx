@@ -9,6 +9,7 @@ import { createIntervention } from '@/lib/actions/interventions'
 import { CommuneAutocomplete } from '@/components/ui/commune-autocomplete'
 import { RecentCalls } from '@/components/pound/recent-calls'
 import { getBreedsForSpecies } from '@/lib/breeds'
+import { ALL_SPECIES, SPECIES_LABELS } from '@/lib/species'
 import type { AnimalSpecies, AnimalSex, AnimalOrigin } from '@/lib/types/database'
 
 const ORIGIN_OPTIONS: { value: AnimalOrigin; label: string }[] = [
@@ -277,8 +278,9 @@ export function InterventionForm() {
               }}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             >
-              <option value="dog">Chien</option>
-              <option value="cat">Chat</option>
+              {ALL_SPECIES.map((value) => (
+                <option key={value} value={value}>{SPECIES_LABELS[value]}</option>
+              ))}
             </select>
           </div>
 

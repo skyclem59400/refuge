@@ -147,6 +147,9 @@ export async function createAnimal(data: {
   medal_number?: string | null
   loof_number?: string | null
   passport_number?: string | null
+  sire_number?: string | null
+  ede_number?: string | null
+  ring_number?: string | null
   identification_date?: string | null
   identifying_veterinarian_id?: string | null
   icad_updated?: boolean
@@ -279,6 +282,9 @@ export async function updateAnimal(id: string, data: {
   medal_number?: string | null
   loof_number?: string | null
   passport_number?: string | null
+  sire_number?: string | null
+  ede_number?: string | null
+  ring_number?: string | null
   identification_date?: string | null
   identifying_veterinarian_id?: string | null
   icad_updated?: boolean

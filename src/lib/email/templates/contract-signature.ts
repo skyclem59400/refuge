@@ -9,6 +9,8 @@
  * layout, fallbacks pour Outlook, dimensions max 600px).
  */
 
+import { getSpeciesLabel } from '@/lib/species'
+
 export type ContractKind = 'foster' | 'adoption'
 
 export interface ContractEmailParams {
@@ -74,9 +76,7 @@ function buildCtaLabel(p: ContractEmailParams): string {
 }
 
 function speciesLabel(species: string): string {
-  if (species === 'cat') return 'Chat'
-  if (species === 'dog') return 'Chien'
-  return species
+  return getSpeciesLabel(species)
 }
 
 function escapeHtml(s: string): string {

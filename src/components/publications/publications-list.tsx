@@ -22,6 +22,7 @@ import {
   getSocialPostTypeLabel,
 } from '@/lib/sda-utils'
 import { ScheduleDialog } from './schedule-dialog'
+import { getSpeciesEmoji } from '@/lib/species'
 import type { SocialPost } from '@/lib/types/database'
 
 type PostWithAnimal = SocialPost & {
@@ -32,12 +33,6 @@ interface PublicationsListProps {
   posts: PostWithAnimal[]
   canManage: boolean
   hasMetaConnection: boolean
-}
-
-function getSpeciesEmoji(species: string): string {
-  if (species === 'cat') return '🐱'
-  if (species === 'dog') return '🐶'
-  return '🐾'
 }
 
 function getPostDateLabel(post: PostWithAnimal): string {

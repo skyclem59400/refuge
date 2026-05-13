@@ -6,6 +6,7 @@ import { getIcadDeclarationTypeLabel, getIcadStatusLabel, getIcadStatusColor } f
 import { formatDateShort } from '@/lib/utils'
 import type { IcadDeclaration, IcadDeclarationStatus } from '@/lib/types/database'
 import { IcadActionButtons } from '@/components/icad/icad-action-buttons'
+import { getSpeciesEmoji } from '@/lib/species'
 
 interface DeclarationWithAnimal extends IcadDeclaration {
   animals: {
@@ -149,7 +150,7 @@ export default async function IcadPage({
                         href={`/animals/${decl.animals.id}`}
                         className="font-medium hover:text-primary transition-colors"
                       >
-                        {decl.animals.species === 'cat' ? '\uD83D\uDC31' : '\uD83D\uDC36'}{' '}
+                        {getSpeciesEmoji(decl.animals.species)}{' '}
                         {decl.animals.name}
                       </Link>
                     </td>

@@ -195,14 +195,30 @@ export interface CompanyInfo {
 // SDA Estormel - Animal Shelter Types
 // ============================================
 
-export type AnimalSpecies = 'cat' | 'dog'
+export type AnimalSpecies =
+  | 'dog' | 'cat'
+  | 'rabbit' | 'guinea_pig' | 'hamster' | 'rat' | 'ferret' | 'chinchilla'
+  | 'goat' | 'sheep' | 'pig' | 'cow'
+  | 'horse' | 'donkey' | 'pony'
+  | 'chicken' | 'duck' | 'goose'
+  | 'parakeet' | 'parrot' | 'canary'
+  | 'tortoise'
+  | 'other'
 export type AnimalSex = 'male' | 'female' | 'unknown'
 export type AnimalStatus = 'pound' | 'shelter' | 'foster_family' | 'boarding' | 'adopted' | 'returned' | 'transferred' | 'deceased' | 'euthanized'
 export type AnimalOrigin = 'found' | 'abandoned' | 'transferred_in' | 'surrender' | 'requisition' | 'divagation'
 export type MovementType = 'pound_entry' | 'shelter_transfer' | 'foster_placement' | 'adoption' | 'return_to_owner' | 'transfer_out' | 'death' | 'euthanasia' | 'reservation' | 'reservation_cancelled'
 export type HealthRecordType = 'vaccination' | 'sterilization' | 'antiparasitic' | 'consultation' | 'surgery' | 'medication' | 'behavioral_assessment' | 'identification' | 'radio' | 'blood_test' | 'cession'
 export type IcadStatus = 'pending' | 'declared' | 'not_required'
-export type BoxSpecies = 'cat' | 'dog' | 'mixed'
+export type BoxSpecies =
+  | 'dog' | 'cat' | 'mixed'
+  | 'rabbit' | 'guinea_pig' | 'hamster' | 'rat' | 'ferret' | 'chinchilla'
+  | 'goat' | 'sheep' | 'pig' | 'cow'
+  | 'horse' | 'donkey' | 'pony'
+  | 'chicken' | 'duck' | 'goose'
+  | 'parakeet' | 'parrot' | 'canary'
+  | 'tortoise'
+  | 'farm' | 'other'
 export type BoxStatus = 'available' | 'occupied' | 'maintenance'
 export type EstablishmentType = 'farm' | 'shelter' | 'both'
 export type SocialPostType = 'search_owner' | 'adoption' | 'event' | 'info' | 'other'
@@ -239,6 +255,9 @@ export interface Animal {
   medal_number: string | null
   loof_number: string | null
   passport_number: string | null
+  sire_number: string | null
+  ede_number: string | null
+  ring_number: string | null
   identification_date: string | null
   identifying_veterinarian_id: string | null
   icad_updated: boolean
@@ -526,7 +545,7 @@ export interface AdoptionContract {
 // Health Protocols (modeles de soins avec rappels)
 // ============================================
 
-export type ProtocolApplicableSpecies = 'cat' | 'dog' | 'both'
+export type ProtocolApplicableSpecies = AnimalSpecies | 'both' | 'all'
 export type ProtocolInstanceStatus = 'active' | 'completed' | 'cancelled'
 
 export interface HealthProtocol {

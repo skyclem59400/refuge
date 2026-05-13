@@ -12,6 +12,7 @@ import { uploadSocialMedia, deleteSocialMedia } from '@/lib/actions/social-media
 import { getSocialPostTypeLabel } from '@/lib/sda-utils'
 import { VideoPreview } from './video-preview'
 import { VideoControls } from './video-controls'
+import { getSpeciesEmoji, getSpeciesLabel } from '@/lib/species'
 import type { VideoProps } from '@/remotion/types'
 import type { SocialPost, SocialPostType, SocialPlatform } from '@/lib/types/database'
 
@@ -37,18 +38,6 @@ const PLATFORM_OPTIONS: { value: SocialPlatform; label: string; Icon: typeof Fac
   { value: 'instagram', label: 'Instagram', Icon: Instagram },
   { value: 'both', label: 'Les deux', Icon: Send },
 ]
-
-function getSpeciesEmoji(species: string): string {
-  if (species === 'cat') return '🐱'
-  if (species === 'dog') return '🐶'
-  return '🐾'
-}
-
-function getSpeciesLabel(species: string): string {
-  if (species === 'dog') return 'Chien'
-  if (species === 'cat') return 'Chat'
-  return species
-}
 
 export function PublicationForm({ animals, establishmentName, establishmentPhone, establishmentLogoUrl, hasMetaConnection, post }: Readonly<PublicationFormProps>) {
   const router = useRouter()

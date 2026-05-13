@@ -16,6 +16,15 @@ import {
 } from '@/components/ui/select'
 import { VeterinarianSelect } from '@/components/health/veterinarian-select'
 import { getBreedsForSpecies } from '@/lib/breeds'
+import {
+  ALL_SPECIES,
+  SPECIES_LABELS,
+  getIdentificationFieldsForSpecies,
+  getChipLabel,
+  getPassportLabel,
+  getMedalLabel,
+  supportsCompatibility,
+} from '@/lib/species'
 import type { Animal, Box, AnimalSpecies, AnimalSex, AnimalOrigin } from '@/lib/types/database'
 
 interface AnimalFormProps {
@@ -55,6 +64,9 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
   const [medalNumber] = useState(animal?.medal_number || '')
   const [loofNumber, setLoofNumber] = useState(animal?.loof_number || '')
   const [passportNumber, setPassportNumber] = useState(animal?.passport_number || '')
+  const [sireNumber, setSireNumber] = useState(animal?.sire_number || '')
+  const [edeNumber, setEdeNumber] = useState(animal?.ede_number || '')
+  const [ringNumber, setRingNumber] = useState(animal?.ring_number || '')
   const [identificationDate, setIdentificationDate] = useState(animal?.identification_date || '')
   const [identifyingVetId, setIdentifyingVetId] = useState<string | null>(animal?.identifying_veterinarian_id || null)
 
@@ -104,13 +116,16 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
         medal_number: medalNumber || null,
         loof_number: loofNumber || null,
         passport_number: passportNumber || null,
+        sire_number: sireNumber || null,
+        ede_number: edeNumber || null,
+        ring_number: ringNumber || null,
         identification_date: identificationDate || null,
         identifying_veterinarian_id: identifyingVetId || null,
         capture_location: captureLocation || null,
         capture_circumstances: captureCircumstances || null,
-        ok_cats: species === 'dog' ? okCats : null,
-        ok_males: species === 'dog' ? okMales : null,
-        ok_females: species === 'dog' ? okFemales : null,
+        ok_cats: supportsCompatibility(species) ? okCats : null,
+        ok_males: supportsCompatibility(species) ? okMales : null,
+        ok_females: supportsCompatibility(species) ? okFemales : null,
         arrived_sterilized: arrivedSterilized,
         // Si l'animal est arrivé stérilisé, l'état actuel l'est aussi
         sterilized: arrivedSterilized || sterilizedNow,
@@ -166,7 +181,6 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
   const inputClass = 'w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50'
   const labelClass = 'block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5'
 
-  const speciesLabels: Record<AnimalSpecies, string> = { cat: 'Chat', dog: 'Chien' }
   const sexLabels: Record<AnimalSex, string> = { male: 'Male', female: 'Femelle', unknown: 'Inconnu' }
   const originLabels: Record<AnimalOrigin, string> = {
     found: 'Trouve',
@@ -206,8 +220,8 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
             <Select value={species} onValueChange={(v) => setSpecies(v as AnimalSpecies)}>
               <SelectTrigger id="animal-species"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {Object.entries(speciesLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                {ALL_SPECIES.map((value) => (
+                  <SelectItem key={value} value={value}>{SPECIES_LABELS[value]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -363,7 +377,7 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
                 <SelectItem value="__none__">Aucun box</SelectItem>
                 {boxes.map((box) => (
                   <SelectItem key={box.id} value={box.id}>
-                    {box.name} ({(() => { if (box.species_type === 'cat') return 'Chats'; if (box.species_type === 'dog') return 'Chiens'; return 'Mixte'; })()})
+                    {box.name} ({box.species_type === 'mixed' ? 'Mixte' : box.species_type === 'farm' ? 'Ferme' : box.species_type === 'other' ? 'Autres' : SPECIES_LABELS[box.species_type as AnimalSpecies] || box.species_type})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -398,7 +412,7 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
         </div>
 
         {/* Compatibilite - dogs only */}
-        {species === 'dog' && (
+        {supportsCompatibility(species) && (
           <div className="col-span-full mt-4">
             <p className={labelClass}>Compatibilite</p>
             <div className="flex flex-wrap gap-3">
@@ -499,110 +513,163 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
         <h3 className="text-sm font-semibold uppercase tracking-wider text-muted mb-4">Identification</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Numero de puce */}
-          <div>
-            <label htmlFor="animal-chip-number" className={labelClass}>Numero de puce</label>
-            <input
-              id="animal-chip-number"
-              type="text"
-              value={chipNumber}
-              onChange={(e) => setChipNumber(e.target.value)}
-              placeholder="250..."
-              className={inputClass}
-            />
-          </div>
+          {(() => {
+            const fields = getIdentificationFieldsForSpecies(species)
+            return (
+              <>
+                {fields.includes('chip_number') && (
+                  <div>
+                    <label htmlFor="animal-chip-number" className={labelClass}>{getChipLabel(species)}</label>
+                    <input
+                      id="animal-chip-number"
+                      type="text"
+                      value={chipNumber}
+                      onChange={(e) => setChipNumber(e.target.value)}
+                      placeholder="250..."
+                      className={inputClass}
+                    />
+                  </div>
+                )}
 
-          {/* Numero de tatouage */}
-          <div>
-            <label htmlFor="animal-tattoo-number" className={labelClass}>Numero de tatouage</label>
-            <input
-              id="animal-tattoo-number"
-              type="text"
-              value={tattooNumber}
-              onChange={(e) => setTattooNumber(e.target.value)}
-              placeholder="Numero de tatouage"
-              className={inputClass}
-            />
-          </div>
+                {fields.includes('tattoo') && (
+                  <>
+                    <div>
+                      <label htmlFor="animal-tattoo-number" className={labelClass}>Numéro de tatouage</label>
+                      <input
+                        id="animal-tattoo-number"
+                        type="text"
+                        value={tattooNumber}
+                        onChange={(e) => setTattooNumber(e.target.value)}
+                        placeholder="Numéro de tatouage"
+                        className={inputClass}
+                      />
+                    </div>
 
-          {/* Position tatouage */}
-          <div>
-            <label htmlFor="animal-tattoo-position" className={labelClass}>Position du tatouage</label>
-            <input
-              id="animal-tattoo-position"
-              type="text"
-              value={tattooPosition}
-              onChange={(e) => setTattooPosition(e.target.value)}
-              placeholder="Oreille droite, cuisse..."
-              className={inputClass}
-            />
-          </div>
+                    <div>
+                      <label htmlFor="animal-tattoo-position" className={labelClass}>Position du tatouage</label>
+                      <input
+                        id="animal-tattoo-position"
+                        type="text"
+                        value={tattooPosition}
+                        onChange={(e) => setTattooPosition(e.target.value)}
+                        placeholder="Oreille droite, cuisse..."
+                        className={inputClass}
+                      />
+                    </div>
+                  </>
+                )}
 
-          {/* Numero de medaille */}
-          <div>
-            <label htmlFor="animal-medal-number" className={labelClass}>Numero de medaille</label>
-            {isEditing ? (
-              <input
-                id="animal-medal-number"
-                type="text"
-                value={medalNumber}
-                readOnly
-                className={`${inputClass} opacity-60 cursor-not-allowed`}
-              />
-            ) : (
-              <div className={`${inputClass} opacity-60 cursor-not-allowed text-muted`}>
-                Auto-genere
-              </div>
-            )}
-          </div>
+                {fields.includes('medal_number') && (
+                  <div>
+                    <label htmlFor="animal-medal-number" className={labelClass}>{getMedalLabel(species)}</label>
+                    {isEditing ? (
+                      <input
+                        id="animal-medal-number"
+                        type="text"
+                        value={medalNumber}
+                        readOnly
+                        className={`${inputClass} opacity-60 cursor-not-allowed`}
+                      />
+                    ) : (
+                      <div className={`${inputClass} opacity-60 cursor-not-allowed text-muted`}>
+                        Auto-généré
+                      </div>
+                    )}
+                  </div>
+                )}
 
-          {/* Numero LOOF */}
-          <div>
-            <label htmlFor="animal-loof-number" className={labelClass}>Numero LOOF</label>
-            <input
-              id="animal-loof-number"
-              type="text"
-              value={loofNumber}
-              onChange={(e) => setLoofNumber(e.target.value)}
-              placeholder="Numero LOOF"
-              className={inputClass}
-            />
-          </div>
+                {fields.includes('loof_number') && (
+                  <div>
+                    <label htmlFor="animal-loof-number" className={labelClass}>Numéro LOOF</label>
+                    <input
+                      id="animal-loof-number"
+                      type="text"
+                      value={loofNumber}
+                      onChange={(e) => setLoofNumber(e.target.value)}
+                      placeholder="Numéro LOOF"
+                      className={inputClass}
+                    />
+                  </div>
+                )}
 
-          {/* Numero de passeport */}
-          <div>
-            <label htmlFor="animal-passport-number" className={labelClass}>Numero de passeport europeen</label>
-            <input
-              id="animal-passport-number"
-              type="text"
-              value={passportNumber}
-              onChange={(e) => setPassportNumber(e.target.value)}
-              placeholder="Numero de passeport"
-              className={inputClass}
-            />
-          </div>
+                {fields.includes('passport_number') && (
+                  <div>
+                    <label htmlFor="animal-passport-number" className={labelClass}>{getPassportLabel(species)}</label>
+                    <input
+                      id="animal-passport-number"
+                      type="text"
+                      value={passportNumber}
+                      onChange={(e) => setPassportNumber(e.target.value)}
+                      placeholder="Numéro de passeport"
+                      className={inputClass}
+                    />
+                  </div>
+                )}
 
-          {/* Date d'identification */}
-          <div>
-            <label htmlFor="animal-identification-date" className={labelClass}>Date d&apos;identification</label>
-            <DatePicker
-              id="animal-identification-date"
-              value={identificationDate}
-              onChange={(v) => setIdentificationDate(v ?? '')}
-            />
-          </div>
+                {fields.includes('sire_number') && (
+                  <div>
+                    <label htmlFor="animal-sire-number" className={labelClass}>Numéro SIRE</label>
+                    <input
+                      id="animal-sire-number"
+                      type="text"
+                      value={sireNumber}
+                      onChange={(e) => setSireNumber(e.target.value)}
+                      placeholder="Numéro SIRE équidé"
+                      className={inputClass}
+                    />
+                  </div>
+                )}
 
-          {/* Veterinaire identifiant */}
-          <div className="md:col-span-2 lg:col-span-2">
-            <VeterinarianSelect
-              id="animal-identifying-vet"
-              value={identifyingVetId}
-              onChange={(vetId) => setIdentifyingVetId(vetId)}
-              inputClass={inputClass}
-              labelClass={labelClass}
-              label="Veterinaire identifiant"
-            />
-          </div>
+                {fields.includes('ede_number') && (
+                  <div>
+                    <label htmlFor="animal-ede-number" className={labelClass}>Numéro EDE / cheptel</label>
+                    <input
+                      id="animal-ede-number"
+                      type="text"
+                      value={edeNumber}
+                      onChange={(e) => setEdeNumber(e.target.value)}
+                      placeholder="N° EDE de l&apos;élevage"
+                      className={inputClass}
+                    />
+                  </div>
+                )}
+
+                {fields.includes('ring_number') && (
+                  <div>
+                    <label htmlFor="animal-ring-number" className={labelClass}>Numéro de bague</label>
+                    <input
+                      id="animal-ring-number"
+                      type="text"
+                      value={ringNumber}
+                      onChange={(e) => setRingNumber(e.target.value)}
+                      placeholder="N° de bague"
+                      className={inputClass}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label htmlFor="animal-identification-date" className={labelClass}>Date d&apos;identification</label>
+                  <DatePicker
+                    id="animal-identification-date"
+                    value={identificationDate}
+                    onChange={(v) => setIdentificationDate(v ?? '')}
+                  />
+                </div>
+
+                <div className="md:col-span-2 lg:col-span-2">
+                  <VeterinarianSelect
+                    id="animal-identifying-vet"
+                    value={identifyingVetId}
+                    onChange={(vetId) => setIdentifyingVetId(vetId)}
+                    inputClass={inputClass}
+                    labelClass={labelClass}
+                    label="Vétérinaire identifiant"
+                  />
+                </div>
+              </>
+            )
+          })()}
         </div>
       </div>
 

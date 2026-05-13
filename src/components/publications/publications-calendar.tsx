@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, Facebook, Instagram } from 'lucide-react'
 import { getSocialPostStatusColor } from '@/lib/sda-utils'
+import { getSpeciesEmoji } from '@/lib/species'
 import type { SocialPost } from '@/lib/types/database'
 
 type PostWithAnimal = SocialPost & {
@@ -19,12 +20,6 @@ const FRENCH_MONTHS = [
 ]
 
 const FRENCH_DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
-
-function getSpeciesEmoji(species: string): string {
-  if (species === 'cat') return '🐱'
-  if (species === 'dog') return '🐶'
-  return '🐾'
-}
 
 function getDayTextClass(isToday: boolean, isCurrentMonth: boolean): string {
   if (isToday) return 'text-primary font-bold'

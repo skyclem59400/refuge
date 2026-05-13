@@ -6,7 +6,8 @@ import { ZonesManager } from '@/components/boxes/zones-manager'
 import { BoxesGroupGrid } from '@/components/boxes/boxes-group-grid'
 import type { EnrichedBox, BoxSummary } from '@/components/boxes/types'
 import { getZoneColor, NONE_ZONE_COLOR, type ZoneColor } from '@/lib/zone-colors'
-import type { BoxSpecies } from '@/lib/types/database'
+import type { AnimalSpecies, BoxSpecies } from '@/lib/types/database'
+import { ALL_SPECIES, SPECIES_EMOJIS, SPECIES_LABELS_PLURAL } from '@/lib/species'
 
 // ---------------------------------------------------------------------------
 // Types groupes
@@ -420,9 +421,16 @@ function BoxForm({ zones }: { zones: BoxZone[] }) {
           required
           className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
         >
-          <option value="cat">Chats</option>
-          <option value="dog">Chiens</option>
-          <option value="mixed">Mixte</option>
+          <option value="cat">🐱 Chats</option>
+          <option value="dog">🐶 Chiens</option>
+          <option value="mixed">🐾 Mixte (chiens + chats)</option>
+          <option value="farm">🚜 Ferme (mixte)</option>
+          {ALL_SPECIES.filter((s) => s !== 'dog' && s !== 'cat' && s !== 'other').map((s) => (
+            <option key={s} value={s}>
+              {SPECIES_EMOJIS[s as AnimalSpecies]} {SPECIES_LABELS_PLURAL[s as AnimalSpecies]}
+            </option>
+          ))}
+          <option value="other">🐾 Autres</option>
         </select>
       </div>
       <div>

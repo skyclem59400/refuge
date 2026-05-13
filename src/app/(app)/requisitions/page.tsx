@@ -6,6 +6,7 @@ import { getEstablishmentContext } from '@/lib/establishment/context'
 import { getSexIcon, calculateAge } from '@/lib/sda-utils'
 import { AnimalStatusBadge, SpeciesBadge } from '@/components/animals/animal-status-badge'
 import { formatDate } from '@/lib/utils'
+import { getSpeciesEmoji } from '@/lib/species'
 import type { Animal, AnimalPhoto } from '@/lib/types/database'
 
 type AnimalWithPhotos = Animal & { animal_photos: AnimalPhoto[] }
@@ -78,7 +79,7 @@ export default async function RequisitionsPage() {
                               />
                             ) : (
                               <span className="text-muted text-lg">
-                                {a.species === 'cat' ? '\uD83D\uDC31' : '\uD83D\uDC36'}
+                                {getSpeciesEmoji(a.species)}
                               </span>
                             )}
                           </div>

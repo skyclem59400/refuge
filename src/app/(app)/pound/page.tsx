@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { calculateBusinessDays, getSexIcon, calculateAge, getOriginLabel } from '@/lib/sda-utils'
 import { SpeciesBadge } from '@/components/animals/animal-status-badge'
+import { getSpeciesEmoji } from '@/lib/species'
 import type { Animal, AnimalPhoto } from '@/lib/types/database'
 
 // ---------------------------------------------------------------------------
@@ -133,7 +134,7 @@ export default async function PoundPage() {
                               />
                             ) : (
                               <span className="text-muted text-lg">
-                                {a.species === 'cat' ? '🐱' : '🐶'}
+                                {getSpeciesEmoji(a.species)}
                               </span>
                             )}
                           </div>

@@ -5,6 +5,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
 import { logActivity } from '@/lib/actions/activity-log'
 import type {
+  AnimalSpecies,
   HealthProtocol,
   HealthProtocolStep,
   HealthProtocolWithSteps,
@@ -16,7 +17,7 @@ import type {
 // Read
 // ============================================
 
-export async function getHealthProtocols(filters?: { activeOnly?: boolean; species?: 'cat' | 'dog' }) {
+export async function getHealthProtocols(filters?: { activeOnly?: boolean; species?: AnimalSpecies }) {
   try {
     const { establishmentId } = await requireEstablishment()
     const supabase = createAdminClient()
@@ -31,7 +32,8 @@ export async function getHealthProtocols(filters?: { activeOnly?: boolean; speci
     }
 
     if (filters?.species) {
-      query = query.in('applicable_species', [filters.species, 'both'])
+      // 'both' = compat legacy chien/chat, 'all' = nouveau marqueur générique
+      query = query.in('applicable_species', [filters.species, 'both', 'all'])
     }
 
     const { data, error } = await query.order('name', { ascending: true })

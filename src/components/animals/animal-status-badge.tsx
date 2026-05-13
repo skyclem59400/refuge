@@ -1,4 +1,5 @@
-import { getStatusLabel, getStatusColor, getStatusColorOverlay, getSpeciesLabel } from '@/lib/sda-utils'
+import { getStatusLabel, getStatusColor, getStatusColorOverlay } from '@/lib/sda-utils'
+import { getSpeciesLabel } from '@/lib/species'
 
 interface AnimalStatusBadgeProps {
   status: string

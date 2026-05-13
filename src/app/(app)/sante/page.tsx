@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getHealthTypeLabel } from '@/lib/sda-utils'
 import { formatDateShort, formatCurrency } from '@/lib/utils'
 import { HealthTreatmentsSection } from '@/components/treatments/health-treatments-section'
+import { getSpeciesEmoji } from '@/lib/species'
 import type { HealthRecordType, AnimalTreatment } from '@/lib/types/database'
 
 // ---------------------------------------------------------------------------
@@ -144,7 +145,7 @@ export default async function HealthPage({
               <div key={reminder.id} className="rounded-xl border border-error/30 bg-error/10 p-4">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <Link href={`/animals/${reminder.animal_id}`} className="font-semibold text-sm hover:text-primary transition-colors">
-                    {reminder.animals?.species === 'cat' ? '\uD83D\uDC31' : '\uD83D\uDC36'} {reminder.animals?.name}
+                    {getSpeciesEmoji(reminder.animals?.species)} {reminder.animals?.name}
                   </Link>
                   <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-error/20 text-error shrink-0">
                     {getHealthTypeLabel(reminder.type)}
@@ -179,7 +180,7 @@ export default async function HealthPage({
                     href={`/animals/${reminder.animal_id}`}
                     className="font-semibold text-sm hover:text-primary transition-colors"
                   >
-                    {reminder.animals?.species === 'cat' ? '\uD83D\uDC31' : '\uD83D\uDC36'}{' '}
+                    {getSpeciesEmoji(reminder.animals?.species)}{' '}
                     {reminder.animals?.name}
                   </Link>
                   <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-warning/20 text-warning shrink-0">
@@ -261,7 +262,7 @@ export default async function HealthPage({
                         href={`/animals/${record.animal_id}`}
                         className="font-medium hover:text-primary transition-colors"
                       >
-                        {record.animals?.species === 'cat' ? '\uD83D\uDC31' : '\uD83D\uDC36'}{' '}
+                        {getSpeciesEmoji(record.animals?.species)}{' '}
                         {record.animals?.name}
                       </Link>
                     </td>

@@ -5,6 +5,7 @@ import { getEstablishmentContext } from '@/lib/establishment/context'
 import { ClientForm } from '@/components/clients/client-form'
 import { TypeBadge, StatusBadge } from '@/components/documents/status-badge'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
+import { getSpeciesEmoji } from '@/lib/species'
 import type { Client, Document } from '@/lib/types/database'
 
 interface AdoptionRow {
@@ -202,7 +203,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 {typedAdoptions.map((a) => (
                   <li key={a.id} className="px-5 py-3 flex items-center gap-3 hover:bg-surface-hover/30">
                     <span className="text-2xl">
-                      {a.animal?.species === 'cat' ? '🐱' : a.animal?.species === 'dog' ? '🐶' : '🐾'}
+                      {getSpeciesEmoji(a.animal?.species)}
                     </span>
                     <div className="flex-1 min-w-0">
                       <Link
@@ -232,7 +233,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                   return (
                     <li key={f.id} className="px-5 py-3 flex items-center gap-3 hover:bg-surface-hover/30">
                       <span className="text-2xl">
-                        {f.animal?.species === 'cat' ? '🐱' : f.animal?.species === 'dog' ? '🐶' : '🐾'}
+                        {getSpeciesEmoji(f.animal?.species)}
                       </span>
                       <div className="flex-1 min-w-0">
                         <Link

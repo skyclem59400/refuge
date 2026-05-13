@@ -1,4 +1,5 @@
 import type { CompanyInfo } from '@/lib/types/database'
+import { getSpeciesLabel } from '@/lib/species'
 
 interface FosterContractPdfData {
   contract_number: string
@@ -71,9 +72,7 @@ function formatDateShort(dateStr: string | null | undefined): string {
 }
 
 function speciesLabel(species: string): string {
-  if (species === 'cat') return 'Chat'
-  if (species === 'dog') return 'Chien'
-  return species
+  return getSpeciesLabel(species)
 }
 
 function sexLabel(sex: string): string {

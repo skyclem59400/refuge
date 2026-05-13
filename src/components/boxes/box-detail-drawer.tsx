@@ -7,6 +7,8 @@ import { X, Settings, Plus, Printer, Package, Move } from 'lucide-react'
 import type { ZoneColor } from '@/lib/zone-colors'
 import type { BoxAnimal, EnrichedBox, BoxSummary } from './types'
 import { MoveAnimalMenu } from './move-animal-menu'
+import { SPECIES_LABELS_PLURAL } from '@/lib/species'
+import type { AnimalSpecies } from '@/lib/types/database'
 
 interface Props {
   box: EnrichedBox
@@ -138,7 +140,7 @@ export function BoxDetailDrawer({
               {box.animal_count}/{box.capacity}
             </span>
             <span className="px-2.5 py-1 rounded-full bg-white/15 text-xs font-semibold backdrop-blur-sm">
-              {box.species_type === 'cat' ? 'Chats' : box.species_type === 'dog' ? 'Chiens' : 'Mixte'}
+              {box.species_type === 'mixed' ? 'Mixte' : box.species_type === 'farm' ? 'Ferme' : box.species_type === 'other' ? 'Autres' : SPECIES_LABELS_PLURAL[box.species_type as AnimalSpecies] || box.species_type}
             </span>
             <span
               className={`px-2.5 py-1 rounded-full text-xs font-semibold ${

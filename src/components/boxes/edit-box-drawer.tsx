@@ -13,9 +13,15 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { updateBox, deleteBox } from '@/lib/actions/boxes'
-import type { BoxSpecies, BoxStatus } from '@/lib/types/database'
+import type { AnimalSpecies, BoxSpecies, BoxStatus } from '@/lib/types/database'
 import type { BoxZone } from '@/lib/actions/box-zones'
 import type { EnrichedBox } from './types'
+import {
+  ALL_SPECIES,
+  SPECIES_EMOJIS,
+  SPECIES_LABELS_PLURAL,
+  getSpeciesLabelPlural,
+} from '@/lib/species'
 
 interface Props {
   box: EnrichedBox
@@ -65,8 +71,10 @@ export function EditBoxDrawer({ box, zones, onClose }: Props) {
 
   // Validations live
   const capacityTooLow = capacity < animalCount
-  const speciesIncompatible =
-    speciesType === 'cat' ? hasDogs : speciesType === 'dog' ? hasCats : false
+  // species_type 'mixed', 'farm' et 'other' acceptent tout.
+  // Sinon, il faut que toutes les espèces présentes correspondent au type sélectionné.
+  const isWildcard = speciesType === 'mixed' || speciesType === 'farm' || speciesType === 'other'
+  const speciesIncompatible = !isWildcard && Array.from(currentSpecies).some((s) => s !== speciesType)
 
   const zoneOptions = zones
     .map((z) => {
@@ -83,11 +91,10 @@ export function EditBoxDrawer({ box, zones, onClose }: Props) {
       return
     }
     if (speciesIncompatible) {
-      setError(
-        `Espèce incompatible : ${
-          hasDogs && hasCats ? 'des chiens et chats' : hasDogs ? 'des chiens' : 'des chats'
-        } sont déjà dans ce box. Déplace-les d'abord.`
-      )
+      const present = Array.from(currentSpecies)
+        .map((s) => getSpeciesLabelPlural(s))
+        .join(', ')
+      setError(`Espèce incompatible : ${present} déjà dans ce box. Déplace-les d'abord.`)
       return
     }
     setError(null)
@@ -168,16 +175,16 @@ export function EditBoxDrawer({ box, zones, onClose }: Props) {
             />
           </Field>
 
-          {/* Espèce */}
+          {/* Espèce — boutons rapides chien/chat/mixte + select pour les autres */}
           <Field
             label="Espèce"
             warning={
               speciesIncompatible
-                ? `${hasDogs && hasCats ? 'Chiens et chats' : hasDogs ? 'Chiens' : 'Chats'} déjà présents — déplace-les avant de changer`
+                ? `${Array.from(currentSpecies).map((s) => getSpeciesLabelPlural(s)).join(', ')} déjà présents — déplace-les avant de changer`
                 : undefined
             }
           >
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2 mb-2">
               {(['cat', 'dog', 'mixed'] as BoxSpecies[]).map((s) => {
                 const incompat =
                   s === 'cat' ? hasDogs : s === 'dog' ? hasCats : false
@@ -200,6 +207,22 @@ export function EditBoxDrawer({ box, zones, onClose }: Props) {
                 )
               })}
             </div>
+            <select
+              value={!['cat', 'dog', 'mixed'].includes(speciesType) ? speciesType : ''}
+              onChange={(e) => {
+                if (e.target.value) setSpeciesType(e.target.value as BoxSpecies)
+              }}
+              className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            >
+              <option value="">— Autre espèce (ferme, NAC…) —</option>
+              <option value="farm">🚜 Ferme (mixte)</option>
+              {ALL_SPECIES.filter((s) => s !== 'dog' && s !== 'cat' && s !== 'other').map((s) => (
+                <option key={s} value={s}>
+                  {SPECIES_EMOJIS[s as AnimalSpecies]} {SPECIES_LABELS_PLURAL[s as AnimalSpecies]}
+                </option>
+              ))}
+              <option value="other">🐾 Autres</option>
+            </select>
           </Field>
 
           {/* Capacité */}

@@ -21,6 +21,7 @@ import { DailyTreatments } from './daily-treatments'
 import { AnimalStatusBadge } from '@/components/animals/animal-status-badge'
 import { calculateAge, calculateBusinessDays, getOriginLabel } from '@/lib/sda-utils'
 import { formatDate } from '@/lib/utils'
+import { getSpeciesEmoji } from '@/lib/species'
 
 type AnimalWithPhotos = Animal & { animal_photos: AnimalPhoto[] }
 
@@ -169,7 +170,7 @@ export function ShelterDashboard({
             />
           ) : (
             <span className="text-muted text-lg">
-              {animal.species === 'cat' ? '\uD83D\uDC31' : '\uD83D\uDC36'}
+              {getSpeciesEmoji(animal.species)}
             </span>
           )}
         </div>

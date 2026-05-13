@@ -1,4 +1,5 @@
 import type { CompanyInfo } from '@/lib/types/database'
+import { getSpeciesLabel } from '@/lib/species'
 
 interface AdoptionContractPdfData {
   contract_number: string
@@ -83,9 +84,7 @@ function formatEuros(amount: number | null | undefined): string {
 }
 
 function speciesLabel(species: string): string {
-  if (species === 'cat') return 'Chat'
-  if (species === 'dog') return 'Chien'
-  return species
+  return getSpeciesLabel(species)
 }
 
 function sexLabel(sex: string): string {

@@ -11,6 +11,7 @@ import { moveAnimalToBox } from '@/lib/actions/box-assignments'
 import { AssignAnimalsPopover } from './assign-animals-popover'
 import { MoveAnimalMenu } from './move-animal-menu'
 import { EditBoxDrawer } from './edit-box-drawer'
+import { getSpeciesEmoji, getSpeciesLabelPlural } from '@/lib/species'
 
 const DRAG_MIME = 'application/x-sda-animal'
 const BOX_DRAG_MIME = 'application/x-sda-box'
@@ -20,15 +21,13 @@ const BOX_DRAG_MIME = 'application/x-sda-box'
 // ---------------------------------------------------------------------------
 
 function speciesIcon(species: string): string {
-  if (species === 'cat') return '🐱'
-  if (species === 'dog') return '🐶'
-  return '🐾'
+  return getSpeciesEmoji(species)
 }
 
 function speciesTypeLabel(species: string): string {
-  if (species === 'cat') return 'Chats'
-  if (species === 'dog') return 'Chiens'
-  return 'Mixte'
+  if (species === 'mixed') return 'Mixte'
+  if (species === 'farm') return 'Ferme'
+  return getSpeciesLabelPlural(species)
 }
 
 function boxStatusLabel(status: string): string {

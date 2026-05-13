@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { getSpeciesLabel } from '@/lib/species'
 
 // ── Types ──
 
@@ -26,9 +27,9 @@ const POST_TYPE_LABELS: Record<string, string> = {
 // ── Helpers ──
 
 function formatSpeciesLabel(species?: string): string {
-  if (species === 'dog') return 'chien'
-  if (species === 'cat') return 'chat'
-  return species || ''
+  if (!species) return ''
+  const label = getSpeciesLabel(species)
+  return label.toLowerCase()
 }
 
 function buildVideoTextPrompt(body: VideoTextRequest): string {

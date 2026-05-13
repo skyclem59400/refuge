@@ -17,7 +17,8 @@ import {
   PawPrint,
 } from 'lucide-react'
 import { createPost } from '@/lib/actions/social-posts'
-import { getSpeciesLabel, getSexLabel, calculateAge } from '@/lib/sda-utils'
+import { getSexLabel, calculateAge } from '@/lib/sda-utils'
+import { getSpeciesEmoji, getSpeciesLabel } from '@/lib/species'
 import type { Animal, SocialPlatform } from '@/lib/types/database'
 
 interface PostGeneratorProps {
@@ -307,7 +308,7 @@ export function PostGenerator({
                 {/* Animal info pills */}
                 <div className="flex flex-wrap gap-2">
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-medium">
-                    {animal.species === 'cat' ? '🐱' : '🐶'} {getSpeciesLabel(animal.species)}
+                    {getSpeciesEmoji(animal.species)} {getSpeciesLabel(animal.species)}
                   </span>
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-medium">
                     {getSexLabel(animal.sex)}

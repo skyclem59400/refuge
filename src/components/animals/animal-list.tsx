@@ -9,6 +9,7 @@ import { Heart, Bookmark, Home } from 'lucide-react'
 import { AnimalStatusBadge, SpeciesBadge } from './animal-status-badge'
 import { getSexIcon, calculateAge, getStatusLabel } from '@/lib/sda-utils'
 import { toggleAdoptable, toggleReserved, toggleRetirementBasket } from '@/lib/actions/animals'
+import { getSpeciesEmoji } from '@/lib/species'
 import type { Animal, AnimalPhoto, AnimalStatus } from '@/lib/types/database'
 
 type AnimalWithPhotos = Animal & { animal_photos: AnimalPhoto[] }
@@ -100,10 +101,6 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
     }
     if (animal.photo_url) return animal.photo_url
     return null
-  }
-
-  function getFallbackEmoji(species: string): string {
-    return species === 'cat' ? '\ud83d\udc31' : '\ud83d\udc36'
   }
 
   function handleToggleAdoptable(e: React.MouseEvent, animalId: string, currentValue: boolean) {
@@ -294,7 +291,7 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-6xl">
-                      {getFallbackEmoji(animal.species)}
+                      {getSpeciesEmoji(animal.species)}
                     </div>
                   )}
                   {/* Status badge overlay */}

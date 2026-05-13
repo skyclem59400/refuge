@@ -9,6 +9,7 @@ import {
   assignAnimalsToBox,
   type AssignableAnimal,
 } from '@/lib/actions/box-assignments'
+import { getSpeciesEmoji } from '@/lib/species'
 
 interface Props {
   boxId: string
@@ -244,7 +245,7 @@ export function AssignAnimalsPopover({
                           />
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-lg">
-                            {a.species === 'cat' ? '🐱' : '🐶'}
+                            {getSpeciesEmoji(a.species)}
                           </div>
                         )}
                       </div>

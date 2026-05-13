@@ -6,6 +6,7 @@
 // Tous reproduisent fidèlement le layout des PDFs sources fournis par la SDA.
 
 import type { Animal, AnimalHealthRecord, Establishment, Veterinarian, VeterinaryClinic } from '@/lib/types/database'
+import { getSpeciesLabel } from '@/lib/species'
 
 interface CertificateBaseArgs {
   animal: Animal
@@ -29,9 +30,7 @@ function fmtDateTimeFr(date: Date): string {
 }
 
 function speciesLabel(s: string) {
-  if (s === 'cat') return 'Chat'
-  if (s === 'dog') return 'Chien'
-  return s
+  return getSpeciesLabel(s)
 }
 
 function sexLabel(s: string) {

@@ -10,6 +10,8 @@ import { moveAnimalToBox } from '@/lib/actions/box-assignments'
 import { BoxDetailDrawer } from './box-detail-drawer'
 import { AssignAnimalsPopover } from './assign-animals-popover'
 import { EditBoxDrawer } from './edit-box-drawer'
+import { SPECIES_LABELS_PLURAL } from '@/lib/species'
+import type { AnimalSpecies } from '@/lib/types/database'
 
 const DRAG_MIME = 'application/x-sda-animal'
 const BOX_DRAG_MIME = 'application/x-sda-box'
@@ -237,7 +239,7 @@ export function BoxTile({
           <div className="min-w-0 flex-1">
             <div className="text-[11px] font-bold truncate leading-tight">{box.name}</div>
             <div className="text-[9px] text-muted uppercase tracking-wider leading-none">
-              {box.species_type === 'cat' ? 'Chats' : box.species_type === 'dog' ? 'Chiens' : 'Mixte'}
+              {box.species_type === 'mixed' ? 'Mixte' : box.species_type === 'farm' ? 'Ferme' : box.species_type === 'other' ? 'Autres' : SPECIES_LABELS_PLURAL[box.species_type as AnimalSpecies] || box.species_type}
             </div>
           </div>
         </div>

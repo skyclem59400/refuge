@@ -1,4 +1,5 @@
 import type { Animal, AnimalHealthRecord, Establishment } from '@/lib/types/database'
+import { getSpeciesLabel } from '@/lib/species'
 
 interface Args {
   animal: Animal
@@ -107,7 +108,7 @@ export function buildJudicialDossierHtml(args: Args): string {
 <div class="info-box">
   <div class="info-grid">
     <div><strong>Nom :</strong> ${escape(animal.name)}</div>
-    <div><strong>Espèce :</strong> ${animal.species === 'cat' ? 'Chat' : 'Chien'}</div>
+    <div><strong>Espèce :</strong> ${getSpeciesLabel(animal.species)}</div>
     <div><strong>Race :</strong> ${escape(animal.breed)}${animal.breed_cross ? ` × ${escape(animal.breed_cross)}` : ''}</div>
     <div><strong>Sexe :</strong> ${animal.sex === 'male' ? 'Mâle' : (animal.sex === 'female' ? 'Femelle' : 'Inconnu')}</div>
     <div><strong>Date de naissance :</strong> ${fmt(animal.birth_date)}</div>

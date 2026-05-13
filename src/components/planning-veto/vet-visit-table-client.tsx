@@ -12,6 +12,7 @@ import {
   validateVetVisitLine,
   unvalidateVetVisitLine,
 } from '@/lib/actions/vet-visits'
+import { getSpeciesEmoji } from '@/lib/species'
 import type {
   VetVisitWithLines,
   VetVisitLineWithAnimal,
@@ -331,7 +332,7 @@ export function VetVisitTableClient({ visit, availableAnimals }: Readonly<Props>
                       onClick={() => handleAddAnimal(a)}
                       className="w-full text-left px-3 py-2 text-sm hover:bg-surface-hover flex items-center gap-2"
                     >
-                      <span className="text-base">{a.species === 'cat' ? '🐱' : '🐶'}</span>
+                      <span className="text-base">{getSpeciesEmoji(a.species)}</span>
                       <span className="font-medium">{a.name}</span>
                       {a.medal_number && <span className="text-xs text-muted">M. {a.medal_number}</span>}
                       <span className="text-xs text-muted">{a.breed || '—'}</span>
