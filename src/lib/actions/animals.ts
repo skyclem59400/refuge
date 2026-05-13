@@ -204,11 +204,17 @@ export async function createAnimal(data: {
       }
     }
 
-    // Auto-generate medal number
-    const { data: nextMedal } = await admin.rpc('get_next_medal_number', {
-      est_id: establishmentId,
-    })
-    const medalNumber = nextMedal ? String(nextMedal) : data.medal_number
+    // Medal number / boucle d'oreille :
+    //   - si fourni par l'utilisateur (ex. réquisition : boucle d'élevage existante,
+    //     ou transfert d'un autre établissement avec n° médaille déjà attribué), on le respecte
+    //   - sinon, on auto-génère via RPC (chien/chat SDA standard)
+    let medalNumber: string | null | undefined = data.medal_number?.trim() || null
+    if (!medalNumber) {
+      const { data: nextMedal } = await admin.rpc('get_next_medal_number', {
+        est_id: establishmentId,
+      })
+      medalNumber = nextMedal ? String(nextMedal) : null
+    }
 
     const animalData = {
       ...data,

@@ -24,6 +24,7 @@ import {
   getPassportLabel,
   getMedalLabel,
   supportsCompatibility,
+  isFarmRuminantOrPorcine,
 } from '@/lib/species'
 import type { Animal, Box, AnimalSpecies, AnimalSex, AnimalOrigin } from '@/lib/types/database'
 
@@ -61,7 +62,7 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
   const [chipNumber, setChipNumber] = useState(animal?.chip_number || '')
   const [tattooNumber, setTattooNumber] = useState(animal?.tattoo_number || '')
   const [tattooPosition, setTattooPosition] = useState(animal?.tattoo_position || '')
-  const [medalNumber] = useState(animal?.medal_number || '')
+  const [medalNumber, setMedalNumber] = useState(animal?.medal_number || '')
   const [loofNumber, setLoofNumber] = useState(animal?.loof_number || '')
   const [passportNumber, setPassportNumber] = useState(animal?.passport_number || '')
   const [sireNumber, setSireNumber] = useState(animal?.sire_number || '')
@@ -562,7 +563,17 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
                 {fields.includes('medal_number') && (
                   <div>
                     <label htmlFor="animal-medal-number" className={labelClass}>{getMedalLabel(species)}</label>
-                    {isEditing ? (
+                    {isFarmRuminantOrPorcine(species) ? (
+                      // Boucle d'oreille d'élevage : saisie libre (l'animal arrive avec sa boucle)
+                      <input
+                        id="animal-medal-number"
+                        type="text"
+                        value={medalNumber}
+                        onChange={(e) => setMedalNumber(e.target.value)}
+                        placeholder="N° de la boucle existante"
+                        className={inputClass}
+                      />
+                    ) : isEditing ? (
                       <input
                         id="animal-medal-number"
                         type="text"
