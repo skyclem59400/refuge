@@ -217,6 +217,8 @@ export async function syncHelloAssoDonations() {
           cerfa_number: cerfaNumber,
           cerfa_generated: true,
           cerfa_generated_at: new Date().toISOString(),
+          cerfa_sent_at: null,
+          cerfa_sent_to: null,
           notes: null,
           created_by: null,
         }

@@ -4,10 +4,10 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { deleteDonation, generateCerfa } from '@/lib/actions/donations'
+import { deleteDonation, generateCerfa, sendCerfaEmailAction } from '@/lib/actions/donations'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
 import type { Donation } from '@/lib/types/database'
-import { Trash2, FileText, Download, Plus, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { Trash2, FileText, Download, Plus, ArrowUp, ArrowDown, ArrowUpDown, Mail, MailCheck } from 'lucide-react'
 import { HelloAssoBadge } from './helloasso-badge'
 
 type SortKey = 'donor_name' | 'amount' | 'date'
@@ -89,6 +89,33 @@ export function DonationList({ donations, canManage }: Readonly<DonationListProp
         toast.error(result.error)
       } else {
         toast.success(`Recu CERFA ${result.data?.cerfa_number} genere`)
+        router.refresh()
+      }
+      setPendingAction(null)
+    })
+  }
+
+  function handleSendCerfa(donation: Donation) {
+    if (!donation.donor_email) {
+      const promptedEmail = window.prompt(
+        `Aucun email enregistré pour ${donation.donor_name}. Saisis l'email du donateur :`,
+      )
+      if (!promptedEmail) return
+      sendCerfa(donation.id, promptedEmail.trim())
+      return
+    }
+    if (!confirm(`Envoyer le reçu CERFA à ${donation.donor_email} ?`)) return
+    sendCerfa(donation.id)
+  }
+
+  function sendCerfa(id: string, overrideEmail?: string) {
+    setPendingAction(id + '-send')
+    startTransition(async () => {
+      const result = await sendCerfaEmailAction(id, overrideEmail ? { overrideEmail } : undefined)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success(`Reçu fiscal envoyé à ${result.recipient}`)
         router.refresh()
       }
       setPendingAction(null)
@@ -210,6 +237,20 @@ export function DonationList({ donations, canManage }: Readonly<DonationListProp
                 <td className="px-4 py-3 text-right">
                   {canManage && (
                     <div className="flex items-center justify-end gap-2">
+                      {donation.cerfa_generated && donation.cerfa_number && (
+                        <button
+                          onClick={() => handleSendCerfa(donation)}
+                          disabled={isPending && pendingAction === donation.id + '-send'}
+                          className={`transition-colors disabled:opacity-50 ${donation.cerfa_sent_at ? 'text-success hover:text-success/80' : 'text-muted hover:text-primary'}`}
+                          title={
+                            donation.cerfa_sent_at
+                              ? `Renvoyer (déjà envoyé le ${formatDateShort(donation.cerfa_sent_at)} à ${donation.cerfa_sent_to ?? donation.donor_email ?? ''})`
+                              : 'Envoyer le reçu fiscal par email'
+                          }
+                        >
+                          {donation.cerfa_sent_at ? <MailCheck className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                        </button>
+                      )}
                       <Link
                         href={`/donations/nouveau?edit=${donation.id}`}
                         className="text-muted hover:text-primary transition-colors"

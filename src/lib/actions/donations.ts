@@ -7,6 +7,8 @@ import { requireEstablishment, requirePermission } from '@/lib/establishment/per
 import type { Donation, DonationPaymentMethod, DonationNature } from '@/lib/types/database'
 import { logActivity } from '@/lib/actions/activity-log'
 import { trackChanges } from '@/lib/utils/activity'
+import { generateCerfaPdf } from '@/lib/pdf/cerfa-pdf'
+import { sendCerfaByEmail } from '@/lib/email/cerfa-email'
 
 export async function getDonations(filters?: { year?: number }) {
   try {
@@ -257,6 +259,65 @@ export async function getDonationYears(): Promise<number[]> {
     return years.length > 0 ? years : [new Date().getFullYear()]
   } catch {
     return [new Date().getFullYear()]
+  }
+}
+
+export async function sendCerfaEmailAction(
+  donationId: string,
+  options?: { overrideEmail?: string },
+) {
+  try {
+    const { establishmentId } = await requirePermission('manage_donations')
+    const admin = createAdminClient()
+
+    const { data: donation, error: fetchError } = await admin
+      .from('donations')
+      .select('*')
+      .eq('id', donationId)
+      .eq('establishment_id', establishmentId)
+      .single<Donation>()
+
+    if (fetchError || !donation) return { error: 'Don introuvable' }
+
+    if (!donation.cerfa_generated || !donation.cerfa_number) {
+      return { error: 'Générez le reçu CERFA avant de l\'envoyer par email.' }
+    }
+
+    const recipient = options?.overrideEmail?.trim() || donation.donor_email
+    if (!recipient) {
+      return { error: 'Aucun email destinataire : renseignez l\'email du donateur d\'abord.' }
+    }
+
+    const { buffer, filename } = await generateCerfaPdf(donationId)
+    const { messageId, recipient: sentTo } = await sendCerfaByEmail({
+      donation,
+      pdfBuffer: buffer,
+      pdfFilename: filename,
+      to: recipient,
+    })
+
+    await admin
+      .from('donations')
+      .update({
+        cerfa_sent_at: new Date().toISOString(),
+        cerfa_sent_to: sentTo,
+      })
+      .eq('id', donationId)
+
+    logActivity({
+      action: 'update',
+      entityType: 'donation',
+      entityId: donationId,
+      entityName: `CERFA ${donation.cerfa_number} envoyé à ${sentTo}`,
+      details: { messageId, recipient: sentTo },
+    })
+
+    revalidatePath('/donations')
+    revalidatePath(`/donations/${donationId}`)
+    return { success: true, recipient: sentTo }
+  } catch (e) {
+    console.error('[donations] sendCerfaEmailAction failed:', e)
+    return { error: (e as Error).message || 'Échec de l\'envoi du reçu fiscal.' }
   }
 }
 

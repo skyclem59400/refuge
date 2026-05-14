@@ -709,6 +709,8 @@ export interface Donation {
   cerfa_number: string | null
   cerfa_generated: boolean
   cerfa_generated_at: string | null
+  cerfa_sent_at: string | null
+  cerfa_sent_to: string | null
   notes: string | null
   created_by: string | null
   created_at: string
