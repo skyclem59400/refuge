@@ -11,6 +11,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/server'
+import { getClientDisplayName } from '@/lib/types/database'
 
 export const ADHESION_AMOUNT_EUR = 30
 
@@ -105,7 +106,7 @@ export async function finalizeAdoption(
   const [{ data: contact }, { data: animal }] = await Promise.all([
     admin
       .from('clients')
-      .select('id, name, email, phone, address, postal_code, city')
+      .select('id, kind, name, first_name, email, phone, address, postal_code, city')
       .eq('id', contract.adopter_client_id)
       .single(),
     admin
@@ -177,7 +178,7 @@ export async function finalizeAdoption(
           numero: numero as string,
           date: contract.adoption_date,
           client_id: contact.id,
-          client_name: contact.name,
+          client_name: getClientDisplayName(contact),
           client_email: contact.email,
           client_address: contact.address,
           client_postal_code: contact.postal_code,
@@ -252,7 +253,7 @@ export async function finalizeAdoption(
           establishment_id: contract.establishment_id,
           client_id: contact.id,
           adoption_contract_id: contract.id,
-          donor_name: contact.name,
+          donor_name: getClientDisplayName(contact),
           donor_email: contact.email,
           donor_phone: contact.phone,
           donor_address: contact.address,

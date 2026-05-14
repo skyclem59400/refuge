@@ -32,10 +32,10 @@ import { getMovementLabel } from '@/lib/sda-utils'
 import { sendContractForSignature, syncContractSignatureStatus } from '@/lib/actions/foster-contract-signature'
 import { sendAdoptionContractForSignature, syncAdoptionContractSignatureStatus } from '@/lib/actions/adoption-contract-signature'
 import { cancelPendingMovement, markMovementSignedManually, deleteMovementAsAdmin } from '@/lib/actions/movement-with-contract'
-import type { AnimalMovement, MovementType } from '@/lib/types/database'
+import { getClientDisplayName, type AnimalMovement, type ClientKind, type MovementType } from '@/lib/types/database'
 
 interface MovementWithRelations extends AnimalMovement {
-  related_client?: { id: string; name: string } | null
+  related_client?: { id: string; kind: ClientKind; name: string; first_name: string | null } | null
 }
 
 interface MovementsTimelineProps {
@@ -231,7 +231,7 @@ export function MovementsTimeline({ movements, userNames, isAdmin = false }: Rea
       {movements.map((mv, idx) => {
         const visual = movementVisuals[mv.type] ?? movementVisuals.pound_entry
         const Icon = visual.icon
-        const linkedName = mv.related_client?.name || mv.person_name
+        const linkedName = mv.related_client ? getClientDisplayName(mv.related_client) : mv.person_name
         const submittedBy = (mv.created_by && userNames[mv.created_by]) || null
         const isLast = idx === movements.length - 1
         const sigStatus = mv.signature_status

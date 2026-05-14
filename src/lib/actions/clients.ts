@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
-import type { ContactCategory } from '@/lib/types/database'
+import type { ClientKind, ContactCategory } from '@/lib/types/database'
 import { logActivity } from '@/lib/actions/activity-log'
 
 export async function searchClientsByCategory(category: ContactCategory, search?: string) {
@@ -13,13 +13,13 @@ export async function searchClientsByCategory(category: ContactCategory, search?
 
     let query = supabase
       .from('clients')
-      .select('id, name, email, phone, city')
+      .select('id, kind, name, first_name, email, phone, city')
       .eq('establishment_id', establishmentId)
       .eq('type', category)
 
     if (search && search.trim()) {
       const term = `%${search.trim()}%`
-      query = query.or(`name.ilike.${term},email.ilike.${term},city.ilike.${term}`)
+      query = query.or(`name.ilike.${term},first_name.ilike.${term},email.ilike.${term},city.ilike.${term}`)
     }
 
     const { data, error } = await query.order('name', { ascending: true }).limit(20)
@@ -48,12 +48,12 @@ export async function searchAllClients(search?: string) {
 
     let query = supabase
       .from('clients')
-      .select('id, name, email, phone, city, type, is_adopter, is_foster, is_member, member_since')
+      .select('id, kind, name, first_name, contact_person, email, phone, city, type, is_adopter, is_foster, is_member, member_since')
       .eq('establishment_id', establishmentId)
 
     if (search && search.trim()) {
       const term = `%${search.trim()}%`
-      query = query.or(`name.ilike.${term},email.ilike.${term},city.ilike.${term}`)
+      query = query.or(`name.ilike.${term},first_name.ilike.${term},email.ilike.${term},city.ilike.${term}`)
     }
 
     const { data, error } = await query.order('name', { ascending: true }).limit(30)
@@ -69,7 +69,10 @@ export async function searchAllClients(search?: string) {
 }
 
 export async function createClientAction(data: {
+  kind: ClientKind
   name: string
+  first_name?: string | null
+  contact_person?: string | null
   email?: string | null
   phone?: string | null
   address?: string | null
@@ -101,7 +104,10 @@ export async function createClientAction(data: {
 }
 
 export async function updateClientAction(id: string, data: {
+  kind?: ClientKind
   name?: string
+  first_name?: string | null
+  contact_person?: string | null
   email?: string | null
   phone?: string | null
   address?: string | null

@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { createDocument, updateDocument } from '@/lib/actions/documents'
 import { ClientSearch } from '@/components/clients/client-search'
 import { formatCurrency } from '@/lib/utils'
-import type { Client, Document, DocumentType, LineItem } from '@/lib/types/database'
+import { getClientDisplayName, type Client, type Document, type DocumentType, type LineItem } from '@/lib/types/database'
 
 const SERVICE_PRESETS = [
   { label: 'Mediation animale', description: 'Mediation animale' },
@@ -205,7 +205,7 @@ export function DocumentForm({ document: doc, initialClient, establishmentId }: 
     startTransition(async () => {
       const payload = {
         client_id: selectedClient.id,
-        client_name: selectedClient.name,
+        client_name: getClientDisplayName(selectedClient),
         client_email: selectedClient.email,
         client_address: selectedClient.address,
         client_postal_code: selectedClient.postal_code,

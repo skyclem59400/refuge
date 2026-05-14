@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Trash2, Pencil, FileText, PawPrint } from 'lucide-react'
 import { deletePaymentEntry } from '@/lib/actions/payment-entries'
 import { formatCurrency } from '@/lib/utils'
-import type { PaymentEntryWithRelations, PaymentEntryMethod, PaymentEntryType } from '@/lib/types/database'
+import { getClientDisplayName, type PaymentEntryWithRelations, type PaymentEntryMethod, type PaymentEntryType } from '@/lib/types/database'
 
 const METHOD_LABELS: Record<PaymentEntryMethod, string> = {
   cheque: 'Chèque',
@@ -182,7 +182,7 @@ export function PaymentEntriesClient({ entries, stats, year }: Readonly<Props>) 
                     <td className="px-4 py-3">
                       <div>{e.payer_name || '—'}</div>
                       {e.related_client && (
-                        <div className="text-xs text-muted">→ {e.related_client.name}</div>
+                        <div className="text-xs text-muted">→ {getClientDisplayName(e.related_client)}</div>
                       )}
                     </td>
                     <td className="px-4 py-3">{METHOD_LABELS[e.method]}</td>

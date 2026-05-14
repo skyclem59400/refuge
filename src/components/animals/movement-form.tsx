@@ -228,7 +228,9 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
       return
     }
     startCreatingClient(async () => {
-      const result = await createClientAction({ name: trimmed, type: clientCategory })
+      // Création rapide depuis un mouvement : pas de saisie séparée nom/prénom,
+      // on créé en organization (toujours autorisé). L'utilisateur peut requalifier.
+      const result = await createClientAction({ kind: 'organization', name: trimmed, type: clientCategory })
       if (result.error || !result.data) {
         toast.error(result.error || 'Création impossible')
         return

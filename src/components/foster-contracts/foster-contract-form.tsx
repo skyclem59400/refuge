@@ -6,11 +6,13 @@ import { toast } from 'sonner'
 import { Loader2, Plus } from 'lucide-react'
 import { updateFosterContract } from '@/lib/actions/foster-contracts'
 import { searchClientsByCategory, createClientAction } from '@/lib/actions/clients'
-import type { FosterContract, FosterContractStatus } from '@/lib/types/database'
+import { getClientDisplayName, type ClientKind, type FosterContract, type FosterContractStatus } from '@/lib/types/database'
 
 interface FosterFamilyOption {
   id: string
+  kind: ClientKind
   name: string
+  first_name: string | null
   city: string | null
   phone: string | null
 }
@@ -55,7 +57,7 @@ export function FosterContractForm({ animalId, contract, onClose }: Readonly<Fos
       searchClientsByCategory('foster_family').then((res) => {
         if (res.data) {
           const found = res.data.find((c) => c.id === contract.foster_client_id)
-          if (found) setFosterDisplayName(found.name)
+          if (found) setFosterDisplayName(getClientDisplayName(found as FosterFamilyOption))
         }
       })
     }
@@ -85,16 +87,18 @@ export function FosterContractForm({ animalId, contract, onClose }: Readonly<Fos
   }, [])
 
   function selectFoster(opt: FosterFamilyOption) {
+    const label = getClientDisplayName(opt)
     setFosterClientId(opt.id)
-    setFosterDisplayName(opt.name)
-    setSearchTerm(opt.name)
+    setFosterDisplayName(label)
+    setSearchTerm(label)
     setShowFosterDropdown(false)
   }
 
-  async function handleFosterCreated(client: { id: string; name: string }) {
+  async function handleFosterCreated(client: { id: string; kind: ClientKind; name: string; first_name: string | null }) {
+    const label = getClientDisplayName(client)
     setFosterClientId(client.id)
-    setFosterDisplayName(client.name)
-    setSearchTerm(client.name)
+    setFosterDisplayName(label)
+    setSearchTerm(label)
     setShowCreateFoster(false)
     setShowFosterDropdown(false)
   }
@@ -308,9 +312,10 @@ function CreateFosterModal({
 }: Readonly<{
   initialName: string
   onClose: () => void
-  onCreated: (client: { id: string; name: string }) => void
+  onCreated: (client: { id: string; kind: ClientKind; name: string; first_name: string | null }) => void
 }>) {
   const [name, setName] = useState(initialName)
+  const [firstName, setFirstName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [address, setAddress] = useState('')
@@ -324,9 +329,15 @@ function CreateFosterModal({
       toast.error('Le nom est obligatoire')
       return
     }
+    if (!firstName.trim()) {
+      toast.error('Le prénom est obligatoire')
+      return
+    }
     startTransition(async () => {
       const result = await createClientAction({
+        kind: 'person',
         name: name.trim(),
+        first_name: firstName.trim(),
         phone: phone.trim() || null,
         email: email.trim() || null,
         address: address.trim() || null,
@@ -338,7 +349,12 @@ function CreateFosterModal({
         toast.error(result.error)
       } else if (result.data) {
         toast.success('Famille d’accueil creee')
-        onCreated({ id: result.data.id, name: result.data.name })
+        onCreated({
+          id: result.data.id,
+          kind: result.data.kind ?? 'person',
+          name: result.data.name,
+          first_name: result.data.first_name ?? null,
+        })
       }
     })
   }
@@ -351,9 +367,15 @@ function CreateFosterModal({
       <div className="bg-surface rounded-xl border border-border p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-base font-semibold mb-4">Nouvelle famille d’accueil</h3>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label htmlFor="ff-name" className={labelClass}>Nom et prenom *</label>
-            <input id="ff-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required className={inputClass} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="ff-name" className={labelClass}>Nom *</label>
+              <input id="ff-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="ff-firstname" className={labelClass}>Prénom *</label>
+              <input id="ff-firstname" type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required className={inputClass} />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

@@ -178,6 +178,7 @@ export async function createInvoiceFromTicket(
       .from('clients')
       .insert({
         establishment_id: establishmentId,
+        kind: 'organization',
         name: target.name,
         email: target.email,
         address: target.address,
@@ -229,6 +230,7 @@ export async function createInvoiceFromTicket(
       numero: numero as string,
       date: today,
       client_id: clientId,
+      // Astreinte ticket : target.name est le nom de la mairie (organization)
       client_name: target.name,
       client_email: target.email,
       client_address: target.address,

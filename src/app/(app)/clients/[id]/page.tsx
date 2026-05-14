@@ -6,7 +6,7 @@ import { ClientForm } from '@/components/clients/client-form'
 import { TypeBadge, StatusBadge } from '@/components/documents/status-badge'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
 import { getSpeciesEmoji } from '@/lib/species'
-import type { Client, Document } from '@/lib/types/database'
+import { getClientDisplayName, type Client, type Document } from '@/lib/types/database'
 
 interface AdoptionRow {
   id: string
@@ -103,6 +103,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const totalDonated = typedDonations.reduce((s, d) => s + Number(d.amount), 0)
 
   const canEditClients = ctx!.permissions.canManageClients
+  const displayName = getClientDisplayName(typedClient)
 
   return (
     <div className="animate-fade-up">
@@ -111,8 +112,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           &larr; Retour
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">{typedClient.name}</h1>
-          <p className="text-sm text-muted mt-1">Fiche contact</p>
+          <h1 className="text-2xl font-bold">{displayName}</h1>
+          <p className="text-sm text-muted mt-1">
+            {typedClient.kind === 'organization' ? 'Fiche organisation' : 'Fiche contact'}
+          </p>
         </div>
       </div>
 
@@ -122,10 +125,13 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           <div className="bg-surface rounded-xl border border-border p-5">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center text-xl font-bold text-white">
-                {typedClient.name[0].toUpperCase()}
+                {(displayName[0] || '?').toUpperCase()}
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold">{typedClient.name}</h3>
+                <h3 className="font-semibold">{displayName}</h3>
+                {typedClient.kind === 'organization' && typedClient.contact_person && (
+                  <p className="text-xs text-muted mt-0.5">Réf. {typedClient.contact_person}</p>
+                )}
                 <div className="flex flex-wrap gap-1 mt-1">
                   {typedClient.is_adopter && (
                     <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-primary/15 text-primary">

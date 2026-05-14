@@ -29,7 +29,7 @@ export async function getPaymentEntries(filters?: ListFilters) {
       .select(`
         *,
         related_animal:animals!related_animal_id(id, name),
-        related_client:clients!related_client_id(id, name),
+        related_client:clients!related_client_id(id, kind, name, first_name),
         related_document:documents!related_document_id(id, numero, type),
         related_donation:donations!related_donation_id(id, donor_name)
       `)
@@ -62,7 +62,7 @@ export async function getPaymentEntry(id: string) {
       .select(`
         *,
         related_animal:animals!related_animal_id(id, name),
-        related_client:clients!related_client_id(id, name),
+        related_client:clients!related_client_id(id, kind, name, first_name),
         related_document:documents!related_document_id(id, numero, type),
         related_donation:donations!related_donation_id(id, donor_name)
       `)

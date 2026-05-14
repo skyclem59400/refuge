@@ -5,7 +5,7 @@ import { Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { createClientAction, updateClientAction } from '@/lib/actions/clients'
-import type { Client, ContactCategory } from '@/lib/types/database'
+import { getClientDisplayName, type Client, type ContactCategory } from '@/lib/types/database'
 
 const categoryLabels: Record<ContactCategory, string> = {
   client: 'Client',
@@ -42,7 +42,11 @@ export function ClientSearch({ onSelect, selected, establishmentId, category, pl
       return
     }
     startCreating(async () => {
+      // Création rapide : on crée toujours une organisation (1 seul champ saisi).
+      // L'utilisateur pourra compléter la fiche en passant à "Particulier" si
+      // c'est en réalité une personne — évite de planter sur le prénom manquant.
       const result = await createClientAction({
+        kind: 'organization',
         name: trimmed,
         type: category ?? null,
       })
@@ -100,7 +104,9 @@ export function ClientSearch({ onSelect, selected, establishmentId, category, pl
     } else {
       const q = query.toLowerCase()
       setResults(allClients.filter(c =>
-        c.name.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q)
+        c.name.toLowerCase().includes(q)
+        || c.first_name?.toLowerCase().includes(q)
+        || c.email?.toLowerCase().includes(q)
       ))
     }
   }, [query, allClients, loaded])
@@ -127,7 +133,7 @@ export function ClientSearch({ onSelect, selected, establishmentId, category, pl
         }
         const promoted: Client = { ...client, type: category }
         setAllClients((prev) => prev.map((c) => (c.id === client.id ? promoted : c)))
-        toast.success(`${client.name} transformé en ${categoryLabels[category].toLowerCase()}`)
+        toast.success(`${getClientDisplayName(client)} transformé en ${categoryLabels[category].toLowerCase()}`)
         onSelect(promoted)
         setQuery('')
         setIsOpen(false)
@@ -147,13 +153,14 @@ export function ClientSearch({ onSelect, selected, establishmentId, category, pl
   }
 
   if (selected) {
+    const selectedDisplay = getClientDisplayName(selected)
     return (
       <div className="flex items-center gap-3 p-3 bg-surface-dark border border-primary/30 rounded-lg">
         <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
-          {selected.name[0].toUpperCase()}
+          {(selectedDisplay[0] || '?').toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{selected.name}</p>
+          <p className="text-sm font-medium truncate">{selectedDisplay}</p>
           <p className="text-xs text-muted truncate">
             {[selected.email, selected.city].filter(Boolean).join(' - ')}
           </p>
@@ -188,6 +195,7 @@ export function ClientSearch({ onSelect, selected, establishmentId, category, pl
             results.map((client) => {
               const needsConversion = !!category && client.type !== category
               const currentCategoryLabel = client.type ? categoryLabels[client.type as ContactCategory] : 'Sans catégorie'
+              const clientDisplay = getClientDisplayName(client)
               return (
                 <button
                   key={client.id}
@@ -196,11 +204,11 @@ export function ClientSearch({ onSelect, selected, establishmentId, category, pl
                   className="w-full text-left px-4 py-2.5 hover:bg-surface-hover transition-colors flex items-center gap-3"
                 >
                   <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-                    {client.name[0].toUpperCase()}
+                    {(clientDisplay[0] || '?').toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-medium truncate">{client.name}</p>
+                      <p className="text-sm font-medium truncate">{clientDisplay}</p>
                       <span className={`shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${needsConversion ? 'bg-amber-500/15 text-amber-600' : 'bg-primary/15 text-primary'}`}>
                         {currentCategoryLabel}
                       </span>

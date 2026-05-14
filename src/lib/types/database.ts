@@ -1,5 +1,6 @@
 export type RoleType = 'admin' | 'salarie' | 'benevole'
 export type ContactCategory = 'client' | 'member' | 'volunteer' | 'board_member' | 'foster_family' | 'veterinarian'
+export type ClientKind = 'person' | 'organization'
 export type DocumentType = 'devis' | 'facture' | 'avoir'
 export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'converted' | 'validated'
 export type DocumentPaymentMethod = 'cheque' | 'virement' | 'especes' | 'cb' | 'prelevement' | 'autre'
@@ -14,7 +15,10 @@ export interface LineItem {
 
 export interface Client {
   id: string
+  kind: ClientKind
   name: string
+  first_name: string | null
+  contact_person: string | null
   email: string | null
   phone: string | null
   address: string | null
@@ -29,6 +33,11 @@ export interface Client {
   establishment_id: string
   created_at: string
   updated_at: string
+}
+
+export function getClientDisplayName(client: Pick<Client, 'kind' | 'name' | 'first_name'>): string {
+  if (client.kind === 'organization') return client.name
+  return client.first_name ? `${client.name} ${client.first_name}` : client.name
 }
 
 export interface Document {
@@ -316,7 +325,7 @@ export interface AnimalMovement {
   destination: string | null
   icad_status: IcadStatus
   related_client_id: string | null
-  related_client?: { id: string; name: string } | null
+  related_client?: { id: string; kind: ClientKind; name: string; first_name: string | null } | null
   signature_status: MovementSignatureStatus | null
   related_contract_id: string | null
   related_contract_type: MovementRelatedContractType | null
@@ -1129,7 +1138,7 @@ export interface PaymentEntry {
 
 export interface PaymentEntryWithRelations extends PaymentEntry {
   related_animal?: { id: string; name: string } | null
-  related_client?: { id: string; name: string } | null
+  related_client?: { id: string; kind: ClientKind; name: string; first_name: string | null } | null
   related_document?: { id: string; numero: string; type: DocumentType } | null
   related_donation?: { id: string; donor_name: string } | null
 }

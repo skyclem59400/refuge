@@ -5,14 +5,17 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClientAction, updateClientAction } from '@/lib/actions/clients'
 import { getCategoryLabel, ALL_CONTACT_CATEGORIES } from '@/lib/sda-utils'
-import type { Client, ContactCategory } from '@/lib/types/database'
+import type { Client, ClientKind, ContactCategory } from '@/lib/types/database'
 
 interface ClientFormProps {
   client?: Client
 }
 
 export function ClientForm({ client }: ClientFormProps) {
+  const [kind, setKind] = useState<ClientKind>(client?.kind || 'person')
   const [name, setName] = useState(client?.name || '')
+  const [firstName, setFirstName] = useState(client?.first_name || '')
+  const [contactPerson, setContactPerson] = useState(client?.contact_person || '')
   const [email, setEmail] = useState(client?.email || '')
   const [phone, setPhone] = useState(client?.phone || '')
   const [address, setAddress] = useState(client?.address || '')
@@ -24,17 +27,25 @@ export function ClientForm({ client }: ClientFormProps) {
   const router = useRouter()
 
   const isEditing = !!client
+  const isPerson = kind === 'person'
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) {
-      toast.error('Le nom est obligatoire')
+      toast.error(isPerson ? 'Le nom est obligatoire' : 'Le nom de l’organisation est obligatoire')
+      return
+    }
+    if (isPerson && !firstName.trim()) {
+      toast.error('Le prénom est obligatoire')
       return
     }
 
     startTransition(async () => {
       const data = {
+        kind,
         name: name.trim(),
+        first_name: isPerson ? firstName.trim() : null,
+        contact_person: !isPerson && contactPerson.trim() ? contactPerson.trim() : null,
         email: email || null,
         phone: phone || null,
         address: address || null,
@@ -61,20 +72,92 @@ export function ClientForm({ client }: ClientFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="bg-surface rounded-xl border border-border p-6 max-w-2xl space-y-5">
-      {/* Name */}
+      {/* Kind toggle */}
       <div>
         <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
-          Nom *
+          Type de contact
         </label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Nom du contact"
-          required
-          className={inputClass}
-        />
+        <div className="inline-flex rounded-lg border border-border p-1 bg-surface-dark">
+          <button
+            type="button"
+            onClick={() => setKind('person')}
+            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+              isPerson ? 'gradient-primary text-white font-semibold' : 'text-muted hover:text-foreground'
+            }`}
+          >
+            Particulier
+          </button>
+          <button
+            type="button"
+            onClick={() => setKind('organization')}
+            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+              !isPerson ? 'gradient-primary text-white font-semibold' : 'text-muted hover:text-foreground'
+            }`}
+          >
+            Organisation
+          </button>
+        </div>
       </div>
+
+      {/* Name fields — adaptive */}
+      {isPerson ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+              Nom *
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="DUPONT"
+              required
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+              Prénom *
+            </label>
+            <input
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="Jean"
+              required
+              className={inputClass}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+              Nom de l&rsquo;organisation *
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Mairie de Cambrai"
+              required
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+              Personne référente
+            </label>
+            <input
+              type="text"
+              value={contactPerson}
+              onChange={(e) => setContactPerson(e.target.value)}
+              placeholder="Marjorie Gosselet"
+              className={inputClass}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Email / Phone */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

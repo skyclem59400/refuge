@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { deleteClientAction } from '@/lib/actions/clients'
 import { getCategoryLabel, getCategoryColor, ALL_CONTACT_CATEGORIES } from '@/lib/sda-utils'
-import type { Client, ContactCategory } from '@/lib/types/database'
+import { getClientDisplayName, type Client, type ContactCategory } from '@/lib/types/database'
 
 interface ClientListProps {
   readonly initialData: Client[]
@@ -34,7 +34,7 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
       .from('clients')
       .select('*')
       .eq('establishment_id', establishmentId)
-      .or(`name.ilike.%${query}%,email.ilike.%${query}%,city.ilike.%${query}%`)
+      .or(`name.ilike.%${query}%,first_name.ilike.%${query}%,email.ilike.%${query}%,city.ilike.%${query}%`)
       .order('name')
 
     if (data) setClients(data as Client[])
@@ -110,14 +110,21 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
                 </td>
               </tr>
             ) : (
-              displayed.map((client) => (
+              displayed.map((client) => {
+                const displayName = getClientDisplayName(client)
+                return (
                 <tr key={client.id} className="hover:bg-surface-hover/30 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
-                        {client.name[0].toUpperCase()}
+                        {(displayName[0] || '?').toUpperCase()}
                       </div>
-                      <span className="font-medium">{client.name}</span>
+                      <span className="font-medium">{displayName}</span>
+                      {client.kind === 'organization' && (
+                        <span className="text-[10px] uppercase tracking-wider text-muted/70 bg-surface-hover/50 px-1.5 py-0.5 rounded">
+                          Org
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-muted">{client.email || '-'}</td>
@@ -155,7 +162,7 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
                       </Link>
                       {canEdit && (
                         <button
-                          onClick={() => handleDelete(client.id, client.name)}
+                          onClick={() => handleDelete(client.id, displayName)}
                           disabled={isPending}
                           className="px-2 py-1 rounded text-xs font-medium bg-danger/15 text-danger hover:bg-danger/25 transition-colors disabled:opacity-50"
                         >
@@ -165,7 +172,7 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
                     </div>
                   </td>
                 </tr>
-              ))
+              )})
             )}
           </tbody>
         </table>

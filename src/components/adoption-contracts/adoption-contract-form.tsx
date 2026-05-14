@@ -6,11 +6,13 @@ import { toast } from 'sonner'
 import { Loader2, Plus } from 'lucide-react'
 import { updateAdoptionContract } from '@/lib/actions/adoption-contracts'
 import { searchClientsByCategory, createClientAction } from '@/lib/actions/clients'
-import type { AdoptionContract, AdoptionContractStatus } from '@/lib/types/database'
+import { getClientDisplayName, type AdoptionContract, type AdoptionContractStatus, type ClientKind } from '@/lib/types/database'
 
 interface AdopterOption {
   id: string
+  kind: ClientKind
   name: string
+  first_name: string | null
   city: string | null
   phone: string | null
 }
@@ -59,7 +61,7 @@ export function AdoptionContractForm({ animalId, contract, onClose }: Readonly<A
       searchClientsByCategory('client').then((res) => {
         if (res.data) {
           const found = res.data.find((c) => c.id === contract.adopter_client_id)
-          if (found) setAdopterDisplayName(found.name)
+          if (found) setAdopterDisplayName(getClientDisplayName(found as AdopterOption))
         }
       })
     }
@@ -85,16 +87,18 @@ export function AdoptionContractForm({ animalId, contract, onClose }: Readonly<A
   }, [])
 
   function selectAdopter(opt: AdopterOption) {
+    const label = getClientDisplayName(opt)
     setAdopterClientId(opt.id)
-    setAdopterDisplayName(opt.name)
-    setSearchTerm(opt.name)
+    setAdopterDisplayName(label)
+    setSearchTerm(label)
     setShowAdopterDropdown(false)
   }
 
-  async function handleAdopterCreated(client: { id: string; name: string }) {
+  async function handleAdopterCreated(client: { id: string; kind: ClientKind; name: string; first_name: string | null }) {
+    const label = getClientDisplayName(client)
     setAdopterClientId(client.id)
-    setAdopterDisplayName(client.name)
-    setSearchTerm(client.name)
+    setAdopterDisplayName(label)
+    setSearchTerm(label)
     setShowCreateAdopter(false)
     setShowAdopterDropdown(false)
   }
@@ -310,9 +314,10 @@ function CreateAdopterModal({
 }: Readonly<{
   initialName: string
   onClose: () => void
-  onCreated: (client: { id: string; name: string }) => void
+  onCreated: (client: { id: string; kind: ClientKind; name: string; first_name: string | null }) => void
 }>) {
   const [name, setName] = useState(initialName)
+  const [firstName, setFirstName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [address, setAddress] = useState('')
@@ -326,9 +331,15 @@ function CreateAdopterModal({
       toast.error('Le nom est obligatoire')
       return
     }
+    if (!firstName.trim()) {
+      toast.error('Le prénom est obligatoire')
+      return
+    }
     startTransition(async () => {
       const result = await createClientAction({
+        kind: 'person',
         name: name.trim(),
+        first_name: firstName.trim(),
         phone: phone.trim() || null,
         email: email.trim() || null,
         address: address.trim() || null,
@@ -340,7 +351,12 @@ function CreateAdopterModal({
         toast.error(result.error)
       } else if (result.data) {
         toast.success('Adoptant créé')
-        onCreated({ id: result.data.id, name: result.data.name })
+        onCreated({
+          id: result.data.id,
+          kind: result.data.kind ?? 'person',
+          name: result.data.name,
+          first_name: result.data.first_name ?? null,
+        })
       }
     })
   }
@@ -353,9 +369,15 @@ function CreateAdopterModal({
       <div className="bg-surface rounded-xl border border-border p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-base font-semibold mb-4">Nouvel adoptant</h3>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label htmlFor="ad-name" className={labelClass}>Nom et prénom *</label>
-            <input id="ad-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required className={inputClass} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="ad-name" className={labelClass}>Nom *</label>
+              <input id="ad-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="ad-firstname" className={labelClass}>Prénom *</label>
+              <input id="ad-firstname" type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required className={inputClass} />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
