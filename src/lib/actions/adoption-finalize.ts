@@ -13,7 +13,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getClientDisplayName } from '@/lib/types/database'
 
-export const ADHESION_AMOUNT_EUR = 30
+export const ADHESION_AMOUNT_EUR = 35
 
 interface FinalizeResult {
   invoiceId: string | null
