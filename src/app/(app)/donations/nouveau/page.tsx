@@ -11,7 +11,7 @@ export default async function NewDonationPage({
   searchParams: Promise<{ edit?: string }>
 }>) {
   const params = await searchParams
-  await getEstablishmentContext()
+  const ctx = await getEstablishmentContext()
 
   let donation: Donation | undefined
   if (params.edit) {
@@ -51,7 +51,7 @@ export default async function NewDonationPage({
       </div>
 
       {/* Form */}
-      <DonationForm donation={donation} />
+      <DonationForm donation={donation} establishmentId={ctx!.establishment.id} />
     </div>
   )
 }

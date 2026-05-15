@@ -55,12 +55,7 @@ export async function getDonation(id: string) {
 }
 
 export async function createDonation(data: {
-  donor_name: string
-  donor_email: string | null
-  donor_phone: string | null
-  donor_address: string | null
-  donor_postal_code: string | null
-  donor_city: string | null
+  client_id: string
   amount: number
   date: string
   payment_method: DonationPaymentMethod
@@ -73,6 +68,20 @@ export async function createDonation(data: {
     const admin = createAdminClient()
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Snapshot donor info from the client (figé au moment du don, pas live)
+    const { data: client, error: clientError } = await admin
+      .from('clients')
+      .select('id, kind, name, first_name, email, phone, address, postal_code, city')
+      .eq('id', data.client_id)
+      .eq('establishment_id', establishmentId)
+      .single()
+
+    if (clientError || !client) return { error: 'Contact donateur introuvable.' }
+
+    const donorName = client.kind === 'organization' || !client.first_name
+      ? client.name
+      : `${client.name} ${client.first_name}`
+
     // Get CERFA number before insert
     const { data: cerfaNumber, error: rpcError } = await admin.rpc('get_next_cerfa_number', {
       est_id: establishmentId,
@@ -83,8 +92,19 @@ export async function createDonation(data: {
     const { data: donation, error } = await admin
       .from('donations')
       .insert({
-        ...data,
         establishment_id: establishmentId,
+        client_id: client.id,
+        donor_name: donorName,
+        donor_email: client.email,
+        donor_phone: client.phone,
+        donor_address: client.address,
+        donor_postal_code: client.postal_code,
+        donor_city: client.city,
+        amount: data.amount,
+        date: data.date,
+        payment_method: data.payment_method,
+        nature: data.nature,
+        notes: data.notes,
         created_by: user?.id,
         cerfa_number: cerfaNumber,
         cerfa_generated: true,
@@ -101,8 +121,8 @@ export async function createDonation(data: {
       action: 'create',
       entityType: 'donation',
       entityId: donation.id,
-      entityName: `Don ${cerfaNumber || ''} - ${data.donor_name}`,
-      details: { montant: data.amount, donateur: data.donor_name, methode: data.payment_method, nature: data.nature },
+      entityName: `Don ${cerfaNumber || ''} - ${donorName}`,
+      details: { montant: data.amount, donateur: donorName, methode: data.payment_method, nature: data.nature },
     })
     return { data: donation as Donation }
   } catch (e) {
