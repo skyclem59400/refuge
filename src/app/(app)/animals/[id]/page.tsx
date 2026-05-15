@@ -60,12 +60,20 @@ async function fetchAnimalData(admin: SupabaseAdmin, id: string, estabId: string
       .order('start_date', { ascending: false }),
   ])
 
-  const { data: adoptionContracts } = await admin
-    .from('adoption_contracts')
-    .select('*, adopter:clients!adopter_client_id(id, name, email, phone, city)')
-    .eq('animal_id', id)
-    .eq('establishment_id', estabId)
-    .order('adoption_date', { ascending: false })
+  const [{ data: adoptionContracts }, { data: abandonmentContracts }] = await Promise.all([
+    admin
+      .from('adoption_contracts')
+      .select('*, adopter:clients!adopter_client_id(id, name, email, phone, city)')
+      .eq('animal_id', id)
+      .eq('establishment_id', estabId)
+      .order('adoption_date', { ascending: false }),
+    admin
+      .from('abandonment_contracts')
+      .select('*, cedant:clients!cedant_client_id(id, kind, name, first_name, email, phone, address, postal_code, city)')
+      .eq('animal_id', id)
+      .eq('establishment_id', estabId)
+      .order('signature_date', { ascending: false }),
+  ])
 
   return {
     animal: animal as Animal | null,
@@ -77,6 +85,7 @@ async function fetchAnimalData(admin: SupabaseAdmin, id: string, estabId: string
     icadDeclarations: (icadDeclarations as IcadDeclaration[]) || [],
     fosterContracts: fosterContracts || [],
     adoptionContracts: adoptionContracts || [],
+    abandonmentContracts: abandonmentContracts || [],
   }
 }
 
@@ -183,6 +192,8 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
         icadDeclarations={data.icadDeclarations}
         fosterContracts={data.fosterContracts}
         adoptionContracts={data.adoptionContracts}
+        abandonmentContracts={data.abandonmentContracts}
+        establishmentId={estabId}
         healthProtocols={healthProtocols}
         boxes={data.boxes}
         userNames={userNames}

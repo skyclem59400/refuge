@@ -551,6 +551,75 @@ export interface AdoptionContract {
 }
 
 // ============================================
+// Abandonment Contracts (Contrat d'abandon à distance par anticipation)
+// ============================================
+
+export type AbandonmentMotif =
+  | 'legal'
+  | 'deces_proprietaire'
+  | 'demenagement'
+  | 'divorce'
+  | 'allergies'
+  | 'maladie_animal'
+  | 'probleme_comportemental'
+  | 'difficultes_financieres'
+  | 'autre'
+
+export type AbandonmentContractStatus =
+  | 'draft'                  // Brouillon, pas envoyé
+  | 'pending_signature'      // Envoyé au cédant pour signature
+  | 'active'                 // Signé, en attente de remise physique
+  | 'handover_completed'     // Animal remis effectivement, mouvement d'entrée déclenché
+  | 'cancelled'              // Annulé avant aboutissement
+
+export const ABANDONMENT_MOTIF_LABELS: Record<AbandonmentMotif, string> = {
+  legal: 'Abandon légal',
+  deces_proprietaire: 'Décès du propriétaire',
+  demenagement: 'Déménagement',
+  divorce: 'Divorce / séparation',
+  allergies: 'Allergies',
+  maladie_animal: 'Maladie de l’animal',
+  probleme_comportemental: 'Problème comportemental',
+  difficultes_financieres: 'Difficultés financières',
+  autre: 'Autre',
+}
+
+export interface AbandonmentContract {
+  id: string
+  establishment_id: string
+  contract_number: string
+  animal_id: string
+  cedant_client_id: string
+  signature_date: string
+  expected_handover_date: string | null
+  actual_handover_date: string | null
+  motif: AbandonmentMotif
+  motif_details: string | null
+  amount: number
+  note: string | null
+  cedant_id_card_number: string | null
+  cedant_passport_number: string | null
+  status: AbandonmentContractStatus
+  signature_status: SignatureStatus | 'manual_paper'
+  documenso_document_id: number | null
+  documenso_recipient_id: number | null
+  documenso_signing_url: string | null
+  signature_sent_at: string | null
+  signature_viewed_at: string | null
+  signed_at_via_documenso: string | null
+  signed_pdf_url: string | null
+  pdf_url: string | null
+  signed_at_location: string | null
+  signed_at: string | null
+  triggered_movement_id: string | null
+  invoice_document_id: string | null
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ============================================
 // Health Protocols (modeles de soins avec rappels)
 // ============================================
 
