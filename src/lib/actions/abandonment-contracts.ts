@@ -183,6 +183,60 @@ export async function updateAbandonmentContract(
   }
 }
 
+/**
+ * Marque le contrat comme « animal arrivé » : l'animal a été physiquement
+ * remis au refuge. Met à jour actual_handover_date et status='handover_completed'.
+ * Le mouvement d'entrée doit être enregistré séparément depuis l'onglet
+ * Mouvements (workflow opérationnel existant).
+ */
+export async function markAbandonmentHandoverCompleted(id: string, handoverDate?: string) {
+  try {
+    const { establishmentId } = await requirePermission('manage_movements')
+    const admin = createAdminClient()
+
+    const { data: current } = await admin
+      .from('abandonment_contracts')
+      .select('id, animal_id, status, signature_status, contract_number')
+      .eq('id', id)
+      .eq('establishment_id', establishmentId)
+      .single()
+
+    if (!current) return { error: 'Contrat introuvable' }
+    if (current.signature_status !== 'signed' && current.signature_status !== 'manual_paper') {
+      return { error: 'Le contrat doit être signé avant de marquer l\'arrivée de l\'animal.' }
+    }
+    if (current.status === 'handover_completed') {
+      return { error: 'Animal déjà marqué comme arrivé pour ce contrat.' }
+    }
+
+    const { error } = await admin
+      .from('abandonment_contracts')
+      .update({
+        status: 'handover_completed',
+        actual_handover_date: handoverDate ?? new Date().toISOString().split('T')[0],
+      })
+      .eq('id', id)
+      .eq('establishment_id', establishmentId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath(`/animals/${current.animal_id}`)
+    revalidatePath('/abandonments')
+    logActivity({
+      action: 'update',
+      entityType: 'abandonment_contract',
+      entityId: id,
+      entityName: current.contract_number,
+      parentType: 'animal',
+      parentId: current.animal_id,
+      details: { status: 'handover_completed', actual_handover_date: handoverDate ?? 'today' },
+    })
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
 export async function deleteAbandonmentContract(id: string) {
   try {
     const { establishmentId } = await requirePermission('manage_movements')

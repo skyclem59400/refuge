@@ -26,11 +26,11 @@ import {
   supportsCompatibility,
   isFarmRuminantOrPorcine,
 } from '@/lib/species'
-import type { Animal, Box, AnimalSpecies, AnimalSex, AnimalOrigin } from '@/lib/types/database'
+import type { Animal, Box, BoxWithZone, AnimalSpecies, AnimalSex, AnimalOrigin } from '@/lib/types/database'
 
 interface AnimalFormProps {
   animal?: Animal
-  boxes?: Box[]
+  boxes?: BoxWithZone[]
 }
 
 export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
@@ -376,11 +376,15 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
               <SelectTrigger id="animal-box"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Aucun box</SelectItem>
-                {boxes.map((box) => (
-                  <SelectItem key={box.id} value={box.id}>
-                    {box.name} ({box.species_type === 'mixed' ? 'Mixte' : box.species_type === 'farm' ? 'Ferme' : box.species_type === 'other' ? 'Autres' : SPECIES_LABELS[box.species_type as AnimalSpecies] || box.species_type})
-                  </SelectItem>
-                ))}
+                {boxes.map((box) => {
+                  const zoneName = box.zone?.name
+                  const speciesLabel = box.species_type === 'mixed' ? 'Mixte' : box.species_type === 'farm' ? 'Ferme' : box.species_type === 'other' ? 'Autres' : SPECIES_LABELS[box.species_type as AnimalSpecies] || box.species_type
+                  return (
+                    <SelectItem key={box.id} value={box.id}>
+                      {zoneName ? `${zoneName} — ${box.name}` : box.name} ({speciesLabel})
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           </div>

@@ -49,7 +49,7 @@ async function fetchAnimalData(admin: SupabaseAdmin, id: string, estabId: string
     admin.from('animal_photos').select('*').eq('animal_id', id).order('is_primary', { ascending: false }),
     admin.from('animal_movements').select('*, related_client:clients!related_client_id(id, kind, name, first_name)').eq('animal_id', id).order('date', { ascending: false }),
     admin.from('animal_health_records').select('*').eq('animal_id', id).order('date', { ascending: false }),
-    admin.from('boxes').select('*').eq('establishment_id', estabId).order('name'),
+    admin.from('boxes').select('*, zone:box_zones!zone_id(id, name, parent_id)').eq('establishment_id', estabId).order('name'),
     admin.from('social_posts').select('*').eq('animal_id', id).order('created_at', { ascending: false }),
     admin.from('icad_declarations').select('*').eq('animal_id', id).order('created_at', { ascending: false }),
     admin

@@ -703,8 +703,25 @@ export interface Box {
   species_type: BoxSpecies
   capacity: number
   status: BoxStatus
+  zone_id: string | null
+  sort_order: number | null
   created_at: string
   updated_at: string
+}
+
+export interface BoxZone {
+  id: string
+  establishment_id: string
+  name: string
+  parent_id: string | null
+  description: string | null
+  sort_order: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BoxWithZone extends Box {
+  zone?: { id: string; name: string; parent_id: string | null } | null
 }
 
 export interface SocialPost {

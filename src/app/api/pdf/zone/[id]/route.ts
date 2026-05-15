@@ -5,7 +5,7 @@ import { buildZoneSheetHtml } from '@/lib/pdf/zone-template'
 import type { Box, Establishment } from '@/lib/types/database'
 
 interface ZoneRow { id: string; name: string; parent_id: string | null; description: string | null; establishment_id?: string }
-interface BoxRow extends Box { sort_order?: number; zone_id: string | null }
+interface BoxRow extends Box {}
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

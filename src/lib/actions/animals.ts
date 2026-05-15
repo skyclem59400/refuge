@@ -546,6 +546,13 @@ export async function recordMovement(animalId: string, data: {
       const exitTypes: MovementType[] = ['adoption', 'return_to_owner', 'transfer_out', 'death', 'euthanasia']
       if (exitTypes.includes(data.type)) {
         updateData.exit_date = data.date
+        // L'animal quitte l'établissement : on libère son box (sinon il faut
+        // supprimer/recréer le box pour le réutiliser).
+        updateData.box_id = null
+      }
+      // Foster placement : l'animal part en FA, on libère aussi le box.
+      if (data.type === 'foster_placement') {
+        updateData.box_id = null
       }
 
       const { error: updateError } = await supabase

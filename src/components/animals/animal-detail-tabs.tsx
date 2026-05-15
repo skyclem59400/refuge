@@ -16,6 +16,7 @@ import { AbandonmentContractsTab } from '@/components/abandonment-contracts/aban
 import { MovementsTimeline } from '@/components/animals/movements-timeline'
 import { ApplyProtocolModal } from '@/components/health/apply-protocol-modal'
 import { updatePost, deletePost } from '@/lib/actions/social-posts'
+import { deleteHealthRecord } from '@/lib/actions/health'
 import { formatDateShort, formatCurrency } from '@/lib/utils'
 import {
   getSexLabel,
@@ -24,7 +25,7 @@ import {
 } from '@/lib/sda-utils'
 import { PostGenerator } from '@/components/social/post-generator'
 import { IcadDeclarations } from '@/components/icad/icad-declarations'
-import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, AnimalTreatment, AnimalStatus, Box, SocialPost, IcadDeclaration, ActivityLog, FosterContract, AdoptionContract, AbandonmentContract, Client, HealthProtocolWithSteps } from '@/lib/types/database'
+import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, AnimalTreatment, AnimalStatus, Box, BoxWithZone, SocialPost, IcadDeclaration, ActivityLog, FosterContract, AdoptionContract, AbandonmentContract, Client, HealthProtocolWithSteps } from '@/lib/types/database'
 
 interface FosterContractWithRelations extends FosterContract {
   foster?: {
@@ -116,7 +117,7 @@ interface AnimalDetailTabsProps {
   abandonmentContracts?: AbandonmentContractWithRelations[]
   establishmentId: string
   healthProtocols?: HealthProtocolWithSteps[]
-  boxes: Box[]
+  boxes: BoxWithZone[]
   userNames: Record<string, string>
   establishmentName: string
   establishmentPhone: string
@@ -227,11 +228,16 @@ export function AnimalDetailTabs({
           {animal.behavior_score != null && (
             <span className="text-xs">Comportement : {animal.behavior_score}/5</span>
           )}
-          {animal.box_id && boxes.length > 0 && (
-            <span className="text-xs">
-              Box : {boxes.find((b) => b.id === animal.box_id)?.name || '-'}
-            </span>
-          )}
+          {animal.box_id && boxes.length > 0 && (() => {
+            const currentBox = boxes.find((b) => b.id === animal.box_id)
+            if (!currentBox) return null
+            const zoneName = currentBox.zone?.name
+            return (
+              <span className="text-xs">
+                Box : {zoneName ? `${zoneName} — ${currentBox.name}` : currentBox.name}
+              </span>
+            )
+          })()}
         </div>
       </div>
 
@@ -393,7 +399,7 @@ function InfoTab({
   canManageAnimals,
 }: Readonly<{
   animal: Animal
-  boxes: Box[]
+  boxes: BoxWithZone[]
   canManageAnimals: boolean
 }>) {
   return (
@@ -697,56 +703,106 @@ function HealthTab({
           <p className="p-5 text-sm text-muted text-center">Aucun acte sanitaire enregistre</p>
         ) : (
           <div className="divide-y divide-border">
-            {healthRecords.map((hr) => {
-              const isOverdue = hr.next_due_date && hr.next_due_date < today
-              const isSoon = hr.next_due_date && !isOverdue && hr.next_due_date <= in30Days
-
-              return (
-                <div key={hr.id} className="p-4 hover:bg-surface-hover/30 transition-colors">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-info/15 text-info">
-                          {getHealthTypeLabel(hr.type)}
-                        </span>
-                        <span className="text-xs text-muted">{formatDateShort(hr.date)}</span>
-                      </div>
-                      <p className="text-sm mt-1">{hr.description}</p>
-                      {hr.veterinarian && (
-                        <div className="flex items-center gap-1 mt-1 text-xs text-muted">
-                          <Stethoscope className="w-3 h-3" />
-                          <span>{hr.veterinarian}</span>
-                        </div>
-                      )}
-                      {hr.next_due_date && (
-                        <div className={`flex items-center gap-1 mt-1 text-xs ${
-                          (() => {
-                            if (isOverdue) return 'text-error font-semibold'
-                            if (isSoon) return 'text-warning'
-                            return 'text-muted'
-                          })()
-                        }`}>
-                          {isOverdue ? (
-                            <AlertTriangle className="w-3 h-3" />
-                          ) : (
-                            <Calendar className="w-3 h-3" />
-                          )}
-                          <span>
-                            Prochain : {formatDateShort(hr.next_due_date)}
-                            {isOverdue && ' (en retard)'}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {hr.cost != null && hr.cost > 0 && (
-                      <span className="text-sm font-semibold text-nowrap">{formatCurrency(hr.cost)}</span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+            {healthRecords.map((hr) => (
+              <HealthRecordRow
+                key={hr.id}
+                record={hr}
+                today={today}
+                in30Days={in30Days}
+                canManageHealth={canManageHealth}
+              />
+            ))}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function HealthRecordRow({
+  record,
+  today,
+  in30Days,
+  canManageHealth,
+}: Readonly<{
+  record: AnimalHealthRecord
+  today: string
+  in30Days: string
+  canManageHealth: boolean
+}>) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+
+  const isOverdue = record.next_due_date && record.next_due_date < today
+  const isSoon = record.next_due_date && !isOverdue && record.next_due_date <= in30Days
+
+  function handleDelete() {
+    if (!window.confirm(`Supprimer cet acte sanitaire (${getHealthTypeLabel(record.type)} du ${formatDateShort(record.date)}) ? Cette action est irréversible.`)) return
+    startTransition(async () => {
+      const result = await deleteHealthRecord(record.id)
+      if (result.error) toast.error(result.error)
+      else { toast.success('Acte sanitaire supprimé'); router.refresh() }
+    })
+  }
+
+  return (
+    <div className="p-4 hover:bg-surface-hover/30 transition-colors">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-info/15 text-info">
+              {getHealthTypeLabel(record.type)}
+            </span>
+            <span className="text-xs text-muted">{formatDateShort(record.date)}</span>
+            {record.protocol_instance_id && (
+              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary" title="Issu d'un protocole">
+                Protocole
+              </span>
+            )}
+          </div>
+          <p className="text-sm mt-1">{record.description}</p>
+          {record.veterinarian && (
+            <div className="flex items-center gap-1 mt-1 text-xs text-muted">
+              <Stethoscope className="w-3 h-3" />
+              <span>{record.veterinarian}</span>
+            </div>
+          )}
+          {record.next_due_date && (
+            <div className={`flex items-center gap-1 mt-1 text-xs ${
+              (() => {
+                if (isOverdue) return 'text-error font-semibold'
+                if (isSoon) return 'text-warning'
+                return 'text-muted'
+              })()
+            }`}>
+              {isOverdue ? (
+                <AlertTriangle className="w-3 h-3" />
+              ) : (
+                <Calendar className="w-3 h-3" />
+              )}
+              <span>
+                Prochain : {formatDateShort(record.next_due_date)}
+                {isOverdue && ' (en retard)'}
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {record.cost != null && record.cost > 0 && (
+            <span className="text-sm font-semibold text-nowrap">{formatCurrency(record.cost)}</span>
+          )}
+          {canManageHealth && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={isPending}
+              className="p-1.5 rounded-lg text-muted hover:text-error hover:bg-error/10 transition-colors disabled:opacity-50"
+              title="Supprimer cet acte sanitaire"
+            >
+              {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

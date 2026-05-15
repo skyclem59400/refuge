@@ -318,6 +318,13 @@ export async function finalizeMovementOnSignature(params: {
     const exitTypes = ['adoption', 'return_to_owner', 'transfer_out', 'death', 'euthanasia']
     if (exitTypes.includes(mv.type)) {
       updateData.exit_date = mv.date
+      // L'animal quitte l'établissement : on libère automatiquement son box
+      // (sinon Franck est obligé de supprimer/recréer le box pour le réutiliser).
+      updateData.box_id = null
+    }
+    // Foster placement : l'animal part en FA, on libère aussi le box
+    if (mv.type === 'foster_placement') {
+      updateData.box_id = null
     }
 
     const { error: animUpdErr } = await admin

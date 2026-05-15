@@ -6,9 +6,10 @@ import { toast } from 'sonner'
 import {
   Pencil, Trash2, FileDown, FileSignature, Calendar, User, Euro,
   Loader2, Plus, AlertCircle, Clock, CheckCircle2, X, Send, RefreshCw,
+  PackageCheck,
 } from 'lucide-react'
 import { AbandonmentContractForm } from '@/components/abandonment-contracts/abandonment-contract-form'
-import { deleteAbandonmentContract } from '@/lib/actions/abandonment-contracts'
+import { deleteAbandonmentContract, markAbandonmentHandoverCompleted } from '@/lib/actions/abandonment-contracts'
 import {
   sendAbandonmentContractForSignature,
   syncAbandonmentContractSignatureStatus,
@@ -106,6 +107,25 @@ export function AbandonmentContractsTab({ animalId, establishmentId, contracts, 
       setActingId(null)
       if (result.error) toast.error(result.error)
       else { toast.success(`Statut à jour : ${result.data?.status}`); router.refresh() }
+    })
+  }
+
+  function handleHandoverCompleted(c: AbandonmentContractWithRelations) {
+    const today = new Date().toISOString().split('T')[0]
+    const dateStr = window.prompt(
+      `Date à laquelle l'animal a été remis au refuge ? (format AAAA-MM-JJ, défaut aujourd'hui)`,
+      today,
+    )
+    if (!dateStr) return
+    setActingId(c.id)
+    startTransition(async () => {
+      const result = await markAbandonmentHandoverCompleted(c.id, dateStr.trim() || undefined)
+      setActingId(null)
+      if (result.error) toast.error(result.error)
+      else {
+        toast.success(`Animal marqué comme arrivé le ${dateStr}. Pense à enregistrer le mouvement d'entrée depuis l'onglet Mouvements.`)
+        router.refresh()
+      }
     })
   }
 
@@ -214,6 +234,14 @@ export function AbandonmentContractsTab({ animalId, establishmentId, contracts, 
                       className="p-2 rounded-lg text-muted hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
                       title="Mettre à jour le statut depuis Documenso">
                       {isPending && actingId === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    </button>
+                  )}
+                  {canManage && c.status === 'active' && (c.signature_status === 'signed' || c.signature_status === 'manual_paper') && (
+                    <button type="button" onClick={() => handleHandoverCompleted(c)}
+                      disabled={isPending && actingId === c.id}
+                      className="p-2 rounded-lg text-success hover:bg-success/10 transition-colors disabled:opacity-50"
+                      title="Marquer l'animal comme arrivé au refuge">
+                      {isPending && actingId === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackageCheck className="w-4 h-4" />}
                     </button>
                   )}
                   {canManage && (
