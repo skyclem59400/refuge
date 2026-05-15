@@ -95,6 +95,7 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
           <thead>
             <tr className="bg-surface-hover/50">
               <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Nom</th>
+              <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Prénom</th>
               <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Email</th>
               <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Telephone</th>
               <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wider">Ville</th>
@@ -105,13 +106,14 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
           <tbody className="divide-y divide-border">
             {displayed.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted">
+                <td colSpan={7} className="px-4 py-8 text-center text-muted">
                   Aucun contact trouve
                 </td>
               </tr>
             ) : (
               displayed.map((client) => {
                 const displayName = getClientDisplayName(client)
+                const secondary = client.kind === 'person' ? client.first_name : client.contact_person
                 return (
                 <tr key={client.id} className="hover:bg-surface-hover/30 transition-colors">
                   <td className="px-4 py-3">
@@ -119,13 +121,18 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
                       <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
                         {(displayName[0] || '?').toUpperCase()}
                       </div>
-                      <span className="font-medium">{displayName}</span>
+                      <span className="font-medium">{client.name}</span>
                       {client.kind === 'organization' && (
                         <span className="text-[10px] uppercase tracking-wider text-muted/70 bg-surface-hover/50 px-1.5 py-0.5 rounded">
                           Org
                         </span>
                       )}
                     </div>
+                  </td>
+                  <td className="px-4 py-3 text-muted">
+                    {secondary ?? (
+                      <span className="text-muted/40">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-muted">{client.email || '-'}</td>
                   <td className="px-4 py-3 text-muted">{client.phone || '-'}</td>
