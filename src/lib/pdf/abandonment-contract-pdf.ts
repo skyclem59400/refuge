@@ -6,6 +6,7 @@ interface BuildResult {
   buffer: Buffer
   filename: string
   contractNumber: string
+  pageCount: number
 }
 
 export async function buildAbandonmentContractPdf(contractId: string): Promise<BuildResult> {
@@ -95,10 +96,20 @@ export async function buildAbandonmentContractPdf(contractId: string): Promise<B
       printBackground: true,
       margin: { top: '0', right: '0', bottom: '0', left: '0' },
     })
+    const buffer = Buffer.from(pdfBuffer)
+    let pageCount = 1
+    try {
+      const { PDFDocument } = await import('pdf-lib')
+      const pdfDoc = await PDFDocument.load(buffer)
+      pageCount = pdfDoc.getPageCount()
+    } catch (e) {
+      console.warn('[abandonment-contract-pdf] page count failed:', (e as Error).message)
+    }
     return {
-      buffer: Buffer.from(pdfBuffer),
+      buffer,
       filename: `contrat_abandon_${contract.contract_number}.pdf`,
       contractNumber: contract.contract_number,
+      pageCount,
     }
   } finally {
     await browser.close()

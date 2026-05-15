@@ -11,7 +11,7 @@
 
 import { getSpeciesLabel } from '@/lib/species'
 
-export type ContractKind = 'foster' | 'adoption'
+export type ContractKind = 'foster' | 'adoption' | 'abandonment'
 
 export interface ContractEmailParams {
   /** "foster" → famille d'accueil, "adoption" → adoption */
@@ -57,22 +57,32 @@ function buildSubject(p: ContractEmailParams): string {
   if (p.kind === 'foster') {
     return `Convention famille d'accueil — ${p.animalName} | ${p.establishmentName}`
   }
+  if (p.kind === 'abandonment') {
+    return `Contrat d'abandon par anticipation — ${p.animalName} | ${p.establishmentName}`
+  }
   return `Contrat d'adoption — ${p.animalName} | ${p.establishmentName}`
 }
 
 function buildHeading(p: ContractEmailParams): string {
-  return p.kind === 'foster' ? 'Convention famille d’accueil' : 'Contrat d’adoption'
+  if (p.kind === 'foster') return 'Convention famille d’accueil'
+  if (p.kind === 'abandonment') return 'Contrat d’abandon par anticipation'
+  return 'Contrat d’adoption'
 }
 
 function buildIntro(p: ContractEmailParams): string {
   if (p.kind === 'foster') {
     return `Merci pour votre engagement à accueillir <strong>${escapeHtml(p.animalName)}</strong> en famille d'accueil. Vous trouverez ci-dessous la convention de placement à signer électroniquement avant le début de l'accueil.`
   }
+  if (p.kind === 'abandonment') {
+    return `Vous avez fait part à ${escapeHtml(p.establishmentName)} de votre souhait de céder <strong>${escapeHtml(p.animalName)}</strong>. Vous trouverez ci-dessous le contrat de cession volontaire à signer électroniquement pour finaliser la démarche, avant la remise effective de l'animal au refuge.`
+  }
   return `Félicitations pour l'adoption de <strong>${escapeHtml(p.animalName)}</strong>. Le contrat d'adoption ci-dessous est à signer électroniquement pour finaliser la cession définitive.`
 }
 
 function buildCtaLabel(p: ContractEmailParams): string {
-  return p.kind === 'foster' ? 'Signer la convention' : 'Signer le contrat'
+  if (p.kind === 'foster') return 'Signer la convention'
+  if (p.kind === 'abandonment') return 'Signer le contrat'
+  return 'Signer le contrat'
 }
 
 function speciesLabel(species: string): string {

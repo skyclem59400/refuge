@@ -5,10 +5,14 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Pencil, Trash2, FileDown, FileSignature, Calendar, User, Euro,
-  Loader2, Plus, AlertCircle, Clock, CheckCircle2, X,
+  Loader2, Plus, AlertCircle, Clock, CheckCircle2, X, Send, RefreshCw,
 } from 'lucide-react'
 import { AbandonmentContractForm } from '@/components/abandonment-contracts/abandonment-contract-form'
 import { deleteAbandonmentContract } from '@/lib/actions/abandonment-contracts'
+import {
+  sendAbandonmentContractForSignature,
+  syncAbandonmentContractSignatureStatus,
+} from '@/lib/actions/abandonment-contract-signature'
 import { formatDateShort } from '@/lib/utils'
 import {
   ABANDONMENT_MOTIF_LABELS,
@@ -62,6 +66,7 @@ export function AbandonmentContractsTab({ animalId, establishmentId, contracts, 
   const [showForm, setShowForm] = useState(false)
   const [editingContract, setEditingContract] = useState<AbandonmentContractWithRelations | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [actingId, setActingId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   function openCreate() { setEditingContract(null); setShowForm(true) }
@@ -76,6 +81,31 @@ export function AbandonmentContractsTab({ animalId, establishmentId, contracts, 
       setDeletingId(null)
       if (result.error) toast.error(result.error)
       else { toast.success('Contrat supprimé'); router.refresh() }
+    })
+  }
+
+  function handleSendForSignature(c: AbandonmentContractWithRelations) {
+    if (!c.cedant?.email) {
+      toast.error("Le cédant n'a pas d'email enregistré. Mets-le à jour avant l'envoi.")
+      return
+    }
+    if (!window.confirm(`Envoyer le contrat ${c.contract_number} pour signature électronique à ${fullCedantName(c.cedant)} (${c.cedant.email}) ?`)) return
+    setActingId(c.id)
+    startTransition(async () => {
+      const result = await sendAbandonmentContractForSignature(c.id)
+      setActingId(null)
+      if (result.error) toast.error(result.error)
+      else { toast.success('Contrat envoyé pour signature électronique'); router.refresh() }
+    })
+  }
+
+  function handleSyncSignature(c: AbandonmentContractWithRelations) {
+    setActingId(c.id)
+    startTransition(async () => {
+      const result = await syncAbandonmentContractSignatureStatus(c.id)
+      setActingId(null)
+      if (result.error) toast.error(result.error)
+      else { toast.success(`Statut à jour : ${result.data?.status}`); router.refresh() }
     })
   }
 
@@ -163,6 +193,29 @@ export function AbandonmentContractsTab({ animalId, establishmentId, contracts, 
                     title="Aperçu PDF">
                     <FileDown className="w-4 h-4" />
                   </a>
+                  {c.signed_pdf_url && (
+                    <a href={c.signed_pdf_url} target="_blank" rel="noopener noreferrer"
+                      className="p-2 rounded-lg text-success hover:bg-success/10 transition-colors"
+                      title="PDF signé (horodaté Documenso)">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </a>
+                  )}
+                  {canManage && c.signature_status === 'not_sent' && (
+                    <button type="button" onClick={() => handleSendForSignature(c)}
+                      disabled={isPending && actingId === c.id}
+                      className="p-2 rounded-lg text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                      title="Envoyer pour signature électronique">
+                      {isPending && actingId === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    </button>
+                  )}
+                  {canManage && (c.signature_status === 'pending' || c.signature_status === 'viewed') && (
+                    <button type="button" onClick={() => handleSyncSignature(c)}
+                      disabled={isPending && actingId === c.id}
+                      className="p-2 rounded-lg text-muted hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                      title="Mettre à jour le statut depuis Documenso">
+                      {isPending && actingId === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    </button>
+                  )}
                   {canManage && (
                     <>
                       <button type="button" onClick={() => openEdit(c)}

@@ -100,13 +100,22 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Documents from Optimus carry an externalId. Adoption contracts are
-  // namespaced with the "adoption_" prefix to differentiate from foster
-  // contracts (which use the bare contract uuid).
+  // Documents from Optimus carry an externalId. The prefix distinguishes the type:
+  //   "adoption_<uuid>"     → adoption_contracts
+  //   "abandonment_<uuid>"  → abandonment_contracts
+  //   "<uuid>" (no prefix)  → foster_contracts (legacy)
   const externalId = payload.data?.externalId
   const isAdoption = typeof externalId === 'string' && externalId.startsWith('adoption_')
-  const tableName: 'adoption_contracts' | 'foster_contracts' = isAdoption ? 'adoption_contracts' : 'foster_contracts'
-  const bucketName: 'adoption-contracts' | 'foster-contracts' = isAdoption ? 'adoption-contracts' : 'foster-contracts'
+  const isAbandonment = typeof externalId === 'string' && externalId.startsWith('abandonment_')
+
+  const tableName: 'adoption_contracts' | 'foster_contracts' | 'abandonment_contracts' =
+    isAdoption ? 'adoption_contracts'
+    : isAbandonment ? 'abandonment_contracts'
+    : 'foster_contracts'
+  const bucketName: 'adoption-contracts' | 'foster-contracts' | 'abandonment-contracts' =
+    isAdoption ? 'adoption-contracts'
+    : isAbandonment ? 'abandonment-contracts'
+    : 'foster-contracts'
 
   type ContractRow = { id: string; animal_id: string; signature_status: string; documenso_document_id: number | null }
 
@@ -124,7 +133,9 @@ export async function POST(request: NextRequest) {
   }
 
   if (!contract && externalId) {
-    const idLookup = isAdoption ? externalId.replace(/^adoption_/, '') : externalId
+    let idLookup = externalId
+    if (isAdoption) idLookup = externalId.replace(/^adoption_/, '')
+    else if (isAbandonment) idLookup = externalId.replace(/^abandonment_/, '')
     const { data } = await admin
       .from(tableName)
       .select('id, animal_id, signature_status, documenso_document_id')
@@ -180,14 +191,14 @@ export async function POST(request: NextRequest) {
 
   // Propagate to the linked animal_movement (if any) so its signature_status
   // matches the contract and the deferred animal status change is applied.
-  // Only on terminal events: document.completed (full signature) or
-  // document.rejected. Don't fire on partial document.signed when there are
-  // multiple recipients, even though FA/adoption only have one in practice.
+  // Only on terminal events. Abandonment contracts do NOT trigger a movement
+  // automatically — the animal arrives physically later, the movement is
+  // recorded then by an operator.
   const propagate =
     payload.event === 'document.completed' ||
     payload.event === 'document.rejected' ||
     (payload.event === 'document.signed' && finalEvent)
-  if (propagate) {
+  if (propagate && !isAbandonment) {
     await finalizeMovementOnSignature({
       contractId: contract.id,
       contractType: isAdoption ? 'adoption' : 'foster',
@@ -197,5 +208,15 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  return NextResponse.json({ ok: true, contractId: contract.id, type: isAdoption ? 'adoption' : 'foster', newStatus })
+  // Pour les contrats d'abandon, on bascule le statut métier en "active" à la
+  // signature complète (côté webhook au cas où le sync manuel n'est pas appelé).
+  if (isAbandonment && propagate && newStatus === 'signed') {
+    await admin
+      .from('abandonment_contracts')
+      .update({ status: 'active' })
+      .eq('id', contract.id)
+  }
+
+  const type = isAdoption ? 'adoption' : isAbandonment ? 'abandonment' : 'foster'
+  return NextResponse.json({ ok: true, contractId: contract.id, type, newStatus })
 }
