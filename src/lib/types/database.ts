@@ -87,6 +87,7 @@ export interface Establishment {
   type: EstablishmentType
   google_calendar_id: string
   documenso_folder_id: string | null
+  adoption_appointment_settings: AdoptionAppointmentSettings
   created_at: string
   updated_at: string
 }
@@ -373,7 +374,8 @@ export interface StaffSchedule {
 
 // Common appointment types - but any string is allowed for custom types
 export type AppointmentType = string
-export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled'
+export type AppointmentStatus = 'pending_validation' | 'scheduled' | 'confirmed' | 'completed' | 'cancelled'
+export type AppointmentSource = 'manual' | 'public_portal'
 
 export interface Appointment {
   id: string
@@ -389,9 +391,45 @@ export interface Appointment {
   end_time: string
   notes: string | null
   status: AppointmentStatus
+  source: AppointmentSource
   created_by: string
   created_at: string
   updated_at: string
+}
+
+export type WeekDayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
+
+export interface OpeningRange {
+  start: string // 'HH:MM'
+  end: string // 'HH:MM'
+}
+
+export interface AdoptionAppointmentSettings {
+  enabled: boolean
+  allowed_user_ids: string[]
+  slot_duration_minutes: number
+  min_advance_days: number
+  max_advance_days: number
+  opening_hours: Record<WeekDayKey, OpeningRange[]>
+  closed_dates: string[] // ISO date 'YYYY-MM-DD'
+}
+
+export const DEFAULT_ADOPTION_APPOINTMENT_SETTINGS: AdoptionAppointmentSettings = {
+  enabled: false,
+  allowed_user_ids: [],
+  slot_duration_minutes: 45,
+  min_advance_days: 2,
+  max_advance_days: 30,
+  opening_hours: {
+    mon: [{ start: '14:00', end: '17:00' }],
+    tue: [{ start: '14:00', end: '17:00' }],
+    wed: [{ start: '14:00', end: '17:00' }],
+    thu: [{ start: '14:00', end: '17:00' }],
+    fri: [{ start: '14:00', end: '17:00' }],
+    sat: [{ start: '14:00', end: '17:00' }],
+    sun: [],
+  },
+  closed_dates: [],
 }
 
 export interface ActivityLog {

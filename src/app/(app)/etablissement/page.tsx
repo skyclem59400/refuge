@@ -10,6 +10,8 @@ import { PendingUsersList } from '@/components/establishment/pending-users-list'
 import { InviteMemberSearch } from '@/components/establishment/invite-member-search'
 import { AddCollaborator } from '@/components/establishment/add-collaborator'
 import { ActivityLogList } from '@/components/establishment/activity-log-list'
+import { AdoptionAppointmentSettingsForm } from '@/components/establishment/adoption-appointment-settings-form'
+import { getAdoptionAppointmentSettings } from '@/lib/actions/adoption-appointments'
 
 export default async function EtablissementPage() {
   const ctx = await getEstablishmentContext()
@@ -29,12 +31,14 @@ export default async function EtablissementPage() {
     { data: invitableUsers },
     { data: permissionGroups },
     activityResult,
+    adoptionSettings,
   ] = await Promise.all([
     getEstablishmentMembers(),
     getUnassignedUsers(),
     getInvitableUsers(),
     getPermissionGroups(),
     isAdmin ? getActivityLogs({ limit: 500 }) : Promise.resolve({ data: [] }),
+    getAdoptionAppointmentSettings(),
   ])
 
   // Build user names map from all members (for activity log filter)
@@ -54,6 +58,11 @@ export default async function EtablissementPage() {
       </div>
 
       <EstablishmentForm establishment={ctx.establishment} />
+
+      <AdoptionAppointmentSettingsForm
+        initial={adoptionSettings}
+        members={members || []}
+      />
 
       <PermissionGroups groups={permissionGroups || []} />
 
