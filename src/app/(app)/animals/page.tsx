@@ -3,7 +3,6 @@ import { PawPrint, Plus } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { AnimalList } from '@/components/animals/animal-list'
-import { HunimalisSyncButton } from '@/components/animals/hunimalis-sync-button'
 import type { Animal, AnimalPhoto } from '@/lib/types/database'
 
 type AnimalWithPhotos = Animal & { animal_photos: AnimalPhoto[] }
@@ -21,12 +20,6 @@ export default async function AnimalsPage() {
 
   const animalList = (animals as AnimalWithPhotos[]) || []
 
-  // Get last sync date from any synced animal
-  const lastSynced = animalList
-    .filter((a) => a.last_synced_at)
-    .sort((a, b) => new Date(b.last_synced_at!).getTime() - new Date(a.last_synced_at!).getTime())[0]
-    ?.last_synced_at || null
-
   return (
     <div className="animate-fade-up">
       <div className="flex items-center justify-between mb-6">
@@ -39,9 +32,6 @@ export default async function AnimalsPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {ctx!.permissions.canManageAnimals && ctx!.establishment.name === 'SDA' && (
-            <HunimalisSyncButton lastSyncedAt={lastSynced} />
-          )}
           {ctx!.permissions.canManageAnimals && (
             <Link
               href="/animals/nouveau"
