@@ -35,6 +35,17 @@ export function BoxesGroupGrid({
   const orderedIds = optimisticOrder ?? boxes.map((b) => b.id)
   const boxById = new Map(boxes.map((b) => [b.id, b]))
 
+  // Sépare les ids en 2 sous-groupes : noms se terminant par chiffre vs lettre.
+  // Permet l'affichage en 2 lignes distinctes (ex: Box 1-11 au-dessus, Box A-M en dessous).
+  const numericIds: string[] = []
+  const alphaIds: string[] = []
+  for (const id of orderedIds) {
+    const box = boxById.get(id)
+    if (!box) continue
+    if (/\d\s*$/.test(box.name)) numericIds.push(id)
+    else alphaIds.push(id)
+  }
+
   function handleReorder(sourceBoxId: string, targetBoxId: string) {
     if (sourceBoxId === targetBoxId) return
     const ids = [...orderedIds]
@@ -61,6 +72,29 @@ export function BoxesGroupGrid({
     })
   }
 
+  function renderRow(ids: string[]) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {ids.map((id) => {
+          const box = boxById.get(id)
+          if (!box) return null
+          return (
+            <BoxTile
+              key={box.id}
+              box={box}
+              color={color}
+              canManage={canManage}
+              allBoxes={allBoxes}
+              zones={zones}
+              groupKey={groupKey}
+              onReorderTarget={(sourceBoxId) => handleReorder(sourceBoxId, box.id)}
+            />
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div className="relative">
       {pending && (
@@ -69,24 +103,9 @@ export function BoxesGroupGrid({
           Réorganisation...
         </div>
       )}
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 snap-x">
-        {orderedIds.map((id) => {
-          const box = boxById.get(id)
-          if (!box) return null
-          return (
-            <div key={box.id} className="snap-start">
-              <BoxTile
-                box={box}
-                color={color}
-                canManage={canManage}
-                allBoxes={allBoxes}
-                zones={zones}
-                groupKey={groupKey}
-                onReorderTarget={(sourceBoxId) => handleReorder(sourceBoxId, box.id)}
-              />
-            </div>
-          )
-        })}
+      <div className="space-y-3 pb-2">
+        {numericIds.length > 0 && renderRow(numericIds)}
+        {alphaIds.length > 0 && renderRow(alphaIds)}
       </div>
     </div>
   )

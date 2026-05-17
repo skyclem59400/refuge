@@ -122,6 +122,26 @@ export async function createBox(data: {
     const { establishmentId } = await requirePermission('manage_boxes')
     const supabase = await createClient()
 
+    // Auto-calc sort_order : place le nouveau box à la fin de sa zone (+10).
+    // Ça évite que tous les nouveaux box arrivent à 0 et se retrouvent en haut.
+    let nextSortOrder = 10
+    {
+      const zoneFilter = data.zone_id
+        ? { column: 'zone_id', value: data.zone_id }
+        : null
+      const q = supabase
+        .from('boxes')
+        .select('sort_order')
+        .eq('establishment_id', establishmentId)
+        .order('sort_order', { ascending: false })
+        .limit(1)
+      const maxQ = zoneFilter ? q.eq(zoneFilter.column, zoneFilter.value) : q.is('zone_id', null)
+      const { data: maxRow } = await maxQ
+      if (maxRow && maxRow[0] && typeof (maxRow[0] as { sort_order: number }).sort_order === 'number') {
+        nextSortOrder = (maxRow[0] as { sort_order: number }).sort_order + 10
+      }
+    }
+
     const { data: box, error } = await supabase
       .from('boxes')
       .insert({
@@ -131,6 +151,7 @@ export async function createBox(data: {
         status: data.status || 'available',
         establishment_id: establishmentId,
         zone_id: data.zone_id ?? null,
+        sort_order: nextSortOrder,
       })
       .select()
       .single()
