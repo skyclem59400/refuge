@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { jsonWithCors, preflightWithCors } from '@/lib/public/cors'
 import { verifyTurnstile } from '@/lib/public/turnstile'
+import { sendAdoptionInquiryConfirmation } from '@/lib/email/adoption-inquiry-email'
 import {
   DEFAULT_ADOPTION_APPOINTMENT_SETTINGS,
   type AdoptionAppointmentSettings,
@@ -265,6 +266,25 @@ export async function POST(req: NextRequest) {
       await admin.from('appointments').delete().eq('id', (appointment as { id: string }).id)
       return jsonWithCors({ error: 'Enregistrement de la demande impossible : ' + inqErr?.message }, origin, { status: 500 })
     }
+
+    // 9. Email accusé de réception (fire-and-forget : ne pas bloquer la réponse
+    //    si Brevo a un hoquet — l'utilisateur a déjà sa confirmation à l'écran)
+    const { data: estabRow } = await admin
+      .from('establishments')
+      .select('name')
+      .eq('id', animal.establishment_id)
+      .single()
+
+    sendAdoptionInquiryConfirmation({
+      to: emailLower,
+      firstName: body.first_name,
+      animalName: animal.name,
+      appointmentDate: body.date,
+      appointmentTime: body.start_time,
+      establishmentName: (estabRow as { name: string } | null)?.name ?? 'SDA Nord',
+    }).catch((e) => {
+      console.error('[adoption-inquiry] email confirmation échoué', e)
+    })
 
     return jsonWithCors(
       {
