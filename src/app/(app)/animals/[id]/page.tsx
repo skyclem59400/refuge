@@ -172,37 +172,15 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
                 establishmentId={estabId}
               />
             )}
-            <div className="inline-flex rounded-lg border border-border overflow-hidden">
-              <a
-                href={`/api/pdf/animal-poster/${data.animal.id}?format=png`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-dark hover:bg-surface text-sm font-medium text-text transition-colors"
-                title="Visuel 1080×1350 PNG — Facebook / Instagram"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-                Visuel réseaux
-              </a>
-              <a
-                href={`/api/pdf/animal-poster/${data.animal.id}?format=pdf`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-dark hover:bg-surface text-sm font-medium text-text transition-colors border-l border-border"
-                title="Version PDF — impression / affichage"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                PDF
-              </a>
-            </div>
-            {/* Astuce : preview HTML pour itérer le design rapidement */}
             <a
-              href={`/api/pdf/animal-poster/${data.animal.id}?format=html`}
+              href={`/api/pdf/animal-poster/${data.animal.id}?format=png`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[11px] text-muted/60 hover:text-muted underline ml-1"
-              title="Aperçu HTML brut (debug design)"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-dark hover:bg-surface border border-border text-sm font-medium text-text transition-colors"
+              title="Visuel 1080×1350 prêt pour Facebook / Instagram"
             >
-              aperçu
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+              Visuel
             </a>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted mt-1 flex-wrap">

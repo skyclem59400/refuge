@@ -179,9 +179,12 @@ export function buildAnimalPosterHtml(data: AnimalPosterData): string {
     background: linear-gradient(to bottom, rgba(15, 27, 42, 0.7), transparent);
   }
   .logo-img {
-    width: 90px; height: 90px;
+    width: 96px; height: 96px;
     object-fit: contain;
-    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4));
+    background: var(--white);
+    border-radius: 50%;
+    padding: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.35), 0 0 0 3px rgba(255,255,255,0.15);
   }
   .badge-eyebrow {
     background: var(--terracotta);
