@@ -1,6 +1,6 @@
-// Template HTML pour l'affiche d'un animal (entrée fourrière / à l'adoption).
-// Format A4 portrait, design éditorial sobre type "magazine".
-// Destiné à l'impression + publication réseaux sociaux (PDF puis screenshot).
+// Template HTML pour l'affiche d'un animal — Direction B (photo immersive).
+// Format social 1080x1350 (ratio 4:5), optimisé Facebook + Instagram fil.
+// Typo : Fraunces (serif moderne, charte portail refuge) + Inter (UI).
 
 import type { Animal, AnimalOrigin } from '@/lib/types/database'
 
@@ -15,7 +15,8 @@ export interface AnimalPosterData {
   photoDataUrl: string | null
   logoDataUrl?: string
   establishmentPhone?: string
-  establishmentName?: string
+  // Si true, la valeur passée dans establishmentPhone est en fait un email
+  establishmentContactIsEmail?: boolean
 }
 
 const SPECIES_LABEL: Record<string, string> = {
@@ -39,10 +40,7 @@ function calculateAgeFr(birthDate: string | null): string {
   const now = new Date()
   let years = now.getFullYear() - birth.getFullYear()
   let months = now.getMonth() - birth.getMonth()
-  if (months < 0) {
-    years--
-    months += 12
-  }
+  if (months < 0) { years--; months += 12 }
   if (years === 0 && months === 0) return 'Quelques semaines'
   if (years === 0) return `${months} mois`
   if (years === 1 && months === 0) return '1 an'
@@ -51,68 +49,60 @@ function calculateAgeFr(birthDate: string | null): string {
   return `~${years} ans`
 }
 
-function formatDateFr(iso: string | null | undefined): string {
-  if (!iso) return ''
-  try {
-    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-  } catch {
-    return ''
-  }
-}
-
 function isLookingForOwner(origin: AnimalOrigin, status: string): boolean {
-  // Cas "cherche propriétaire" : trouvé / divagation ET encore dans le délai
-  // (status pound = fourrière en cours)
   return (origin === 'found' || origin === 'divagation') && (status === 'pound' || status === 'shelter')
 }
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
 function buildIdentificationLine(a: AnimalPosterData['animal']): string {
-  const parts: string[] = []
-  if (a.chip_number) parts.push(`Puce ${a.chip_number.slice(-6)}`)
-  else if (a.tattoo_number) parts.push(`Tatouage ${a.tattoo_number}`)
-  else if (a.medal_number) parts.push(`Médaille ${a.medal_number}`)
-  else parts.push('Aucune identification')
-  return parts.join(' · ')
+  if (a.chip_number) return `Puce •••${a.chip_number.slice(-4)}`
+  if (a.tattoo_number) return `Tatouage ${a.tattoo_number}`
+  if (a.medal_number) return `Médaille ${a.medal_number}`
+  return 'Sans identification'
 }
 
 export function buildAnimalPosterHtml(data: AnimalPosterData): string {
   const a = data.animal
   const isFound = isLookingForOwner(a.origin_type, a.status)
+
   const eyebrow = isFound ? 'AVIS · CHERCHONS PROPRIÉTAIRE' : (a.adoptable ? 'À L\'ADOPTION' : 'NOUVEAU PENSIONNAIRE')
-  const headline = isFound ? 'Trouvé(e)' : 'À adopter'
+  const headline = isFound ? 'Trouvé(e)' : 'Rencontrez'
 
   const species = SPECIES_LABEL[a.species] ?? a.species
   const sex = SEX_LABEL[a.sex ?? 'unknown']
   const age = calculateAgeFr(a.birth_date)
 
-  const breedLine = [a.breed, a.breed_cross && 'croisé(e)'].filter(Boolean).join(' ')
-  const colorLine = a.color ? `Robe : ${a.color}` : null
+  const breedLine = [a.breed, a.breed_cross && 'croisé'].filter(Boolean).join(' ')
+  const colorLine = a.color ? a.color.trim() : null
   const identificationLine = buildIdentificationLine(a)
-  const sterilizedLine = a.sterilized === true ? 'Stérilisé(e)' : (a.sterilized === false ? 'Non stérilisé(e)' : null)
+  const sterilizedLine = a.sterilized === true ? 'Stérilisé(e)' : null
 
   const captureLocation = a.capture_location
-  const captureCirc = a.capture_circumstances
-  const entryDate = a.pound_entry_date ? formatDateFr(a.pound_entry_date) : null
+  const captureCirc = a.capture_circumstances && isFound ? a.capture_circumstances : null
 
-  const phone = data.establishmentPhone ?? '03 27 83 32 70'
-  const orgName = data.establishmentName ?? 'Société de Défense des Animaux du Nord'
+  const contactValue = data.establishmentPhone ?? ''
+  const contactIsEmail = data.establishmentContactIsEmail ?? false
+  const hasContact = contactValue.length > 0
 
   const photoBlock = data.photoDataUrl
-    ? `<img src="${escapeHtml(data.photoDataUrl)}" alt="" class="photo" />`
-    : `<div class="photo placeholder"><div class="placeholder-emoji">${a.species === 'cat' ? '🐈' : '🐕'}</div></div>`
+    ? `<img src="${escapeHtml(data.photoDataUrl)}" alt="" class="hero-photo" />`
+    : `<div class="hero-photo placeholder"><div class="placeholder-emoji">${a.species === 'cat' ? '🐈' : '🐕'}</div></div>`
 
   const logoBlock = data.logoDataUrl
-    ? `<img src="${escapeHtml(data.logoDataUrl)}" alt="" class="logo" />`
-    : `<div class="logo-text">SDA</div>`
+    ? `<img src="${escapeHtml(data.logoDataUrl)}" alt="" class="logo-img" />`
+    : ''
+
+  const displayName = a.name && a.name.toUpperCase() !== 'INCONNU' ? a.name : ''
+
+  // Lignes meta secondaires (race / couleur / identification)
+  const metaSecondary: string[] = []
+  if (breedLine) metaSecondary.push(breedLine)
+  if (colorLine) metaSecondary.push(colorLine)
+  metaSecondary.push(identificationLine)
+  if (sterilizedLine) metaSecondary.push(sterilizedLine)
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -120,212 +110,267 @@ export function buildAnimalPosterHtml(data: AnimalPosterData): string {
 <meta charset="utf-8" />
 <title>Affiche - ${escapeHtml(a.name ?? 'Animal')}</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700;800&display=swap');
 
-  @page {
-    size: A4 portrait;
-    margin: 0;
-  }
+  @page { size: 1080px 1350px; margin: 0; }
 
   :root {
     --navy: #1e3a5f;
     --navy-deep: #15293f;
     --teal: #5ba8a0;
+    --terracotta: #c96b3c;
     --paper: #faf8f2;
-    --stone-200: #e7e5e4;
-    --stone-500: #78716c;
-    --stone-700: #44403c;
-    --stone-900: #1c1917;
-    --accent: #c96b3c;
+    --white: #ffffff;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
-    width: 210mm;
-    height: 297mm;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    background: var(--paper);
-    color: var(--stone-900);
+    width: 1080px; height: 1350px;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #000;
+    color: var(--white);
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  .page {
-    width: 210mm;
-    height: 297mm;
-    display: flex;
-    flex-direction: column;
-    background: var(--paper);
+  .poster {
+    position: relative;
+    width: 1080px; height: 1350px;
+    overflow: hidden;
   }
 
-  /* === HEADER BANDEAU NAVY === */
+  /* === PHOTO PLEIN CADRE === */
+  .hero-photo {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    z-index: 1;
+  }
+  .hero-photo.placeholder {
+    background: linear-gradient(135deg, #2a3b4d, #1e3a5f);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .placeholder-emoji { font-size: 400px; opacity: 0.3; }
+
+  /* === OVERLAY GRADIENT BAS === */
+  .gradient-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      transparent 40%,
+      rgba(15, 27, 42, 0.4) 60%,
+      rgba(15, 27, 42, 0.95) 90%,
+      rgba(15, 27, 42, 1) 100%
+    );
+    z-index: 2;
+  }
+
+  /* === HEADER (logo + bandeau) === */
   .header {
-    background: var(--navy);
-    color: var(--paper);
-    padding: 8mm 12mm;
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 3;
+    padding: 36px 48px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 3px solid var(--teal);
+    background: linear-gradient(to bottom, rgba(15, 27, 42, 0.7), transparent);
+  }
+  .logo-img {
+    width: 90px; height: 90px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4));
+  }
+  .badge-eyebrow {
+    background: var(--terracotta);
+    color: var(--white);
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-size: 16px;
+    letter-spacing: 0.18em;
+    font-weight: 800;
+    text-transform: uppercase;
+    box-shadow: 0 4px 16px rgba(201, 107, 60, 0.5);
   }
 
-  .header-left { display: flex; align-items: center; gap: 4mm; }
-  .logo { width: 14mm; height: 14mm; object-fit: contain; }
-  .logo-text {
-    width: 14mm; height: 14mm;
-    background: var(--paper); color: var(--navy);
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'Cormorant Garamond', serif;
-    font-weight: 600; font-size: 7mm; border-radius: 50%;
-  }
-  .header-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 4.2mm; line-height: 1.1; letter-spacing: 0.01em;
-  }
-  .header-subtitle {
-    font-size: 2.6mm; letter-spacing: 0.18em;
-    color: var(--teal); text-transform: uppercase;
-    margin-top: 0.8mm; font-weight: 600;
+  /* === CONTENU BAS === */
+  .content {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 3;
+    padding: 60px 64px 72px 64px;
   }
 
-  .header-right {
-    text-align: right;
-    font-size: 3mm; letter-spacing: 0.22em; font-weight: 700;
-    text-transform: uppercase; color: var(--paper);
-  }
-  .header-eyebrow { color: var(--teal); margin-bottom: 1mm; }
-  .header-date { font-size: 2.4mm; color: var(--paper); opacity: 0.7; font-weight: 500; letter-spacing: 0.1em; }
-
-  /* === PHOTO === */
-  .photo-wrap {
-    flex: 0 0 130mm;
-    width: 210mm;
-    background: var(--stone-200);
-    overflow: hidden;
-    position: relative;
-  }
-  .photo {
-    width: 100%; height: 100%; object-fit: cover; display: block;
-  }
-  .photo.placeholder {
-    display: flex; align-items: center; justify-content: center;
-    background: linear-gradient(135deg, var(--stone-200), #d6d3d1);
-  }
-  .placeholder-emoji {
-    font-size: 60mm; opacity: 0.4;
+  .headline-prefix {
+    font-family: 'Inter', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.22em;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 12px;
   }
 
-  /* === BLOC INFO === */
-  .info {
-    flex: 1;
-    padding: 10mm 14mm 8mm 14mm;
-    display: flex; flex-direction: column;
-    background: var(--paper);
+  .headline {
+    font-family: 'Fraunces', 'Georgia', serif;
+    font-size: 112px;
+    line-height: 0.95;
+    font-weight: 500;
+    letter-spacing: -0.025em;
+    margin-bottom: 8px;
+    color: var(--white);
+    text-shadow: 0 2px 24px rgba(0,0,0,0.5);
+  }
+  .headline .name {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--teal);
   }
 
-  .info-headline {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 16mm;
-    line-height: 1;
-    color: var(--navy);
-    margin-bottom: 1mm;
+  .location {
+    font-family: 'Inter', sans-serif;
+    font-size: 28px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.9);
+    margin-top: 18px;
+    margin-bottom: 28px;
+    letter-spacing: 0.02em;
   }
-  .info-headline .accent {
-    font-style: italic; color: var(--teal); font-weight: 400;
+  .location-pin { color: var(--terracotta); font-weight: 700; margin-right: 6px; }
+  .location strong {
+    font-weight: 700;
+    color: var(--white);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
   }
-  .info-divider {
-    width: 18mm; height: 1px;
-    background: var(--accent);
-    margin: 4mm 0 5mm 0;
-  }
-  .info-location {
-    font-size: 4mm; letter-spacing: 0.05em;
-    color: var(--stone-700); font-weight: 500;
-    margin-bottom: 5mm;
-  }
-  .info-location strong {
-    color: var(--navy); font-weight: 700; text-transform: uppercase;
+
+  /* Meta principale : espèce · sexe · âge */
+  .meta-main {
+    font-family: 'Inter', sans-serif;
+    font-size: 24px;
+    font-weight: 600;
     letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--white);
+    margin-bottom: 8px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+  }
+  .meta-main-sep { color: var(--teal); margin: 0 12px; }
+
+  .meta-secondary {
+    font-family: 'Inter', sans-serif;
+    font-size: 19px;
+    color: rgba(255,255,255,0.85);
+    line-height: 1.5;
+    margin-top: 14px;
+    margin-bottom: 18px;
+    font-weight: 400;
+  }
+  .meta-secondary span { display: inline-block; }
+  .meta-secondary .sep { color: var(--teal); margin: 0 10px; opacity: 0.6; }
+
+  .circumstances {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 20px;
+    color: rgba(255,255,255,0.75);
+    line-height: 1.4;
+    margin-bottom: 24px;
+    padding-left: 14px;
+    border-left: 2px solid var(--teal);
   }
 
-  .info-meta {
-    font-size: 3.4mm; letter-spacing: 0.06em;
-    color: var(--stone-700);
-    text-transform: uppercase; font-weight: 600;
-    margin-bottom: 3.5mm;
-  }
-  .info-meta-detail {
-    font-size: 3.3mm; color: var(--stone-700);
-    margin-bottom: 1.8mm; font-weight: 400; line-height: 1.4;
-  }
-  .info-meta-detail strong { color: var(--navy); font-weight: 600; }
-
-  /* === CTA TÉLÉPHONE === */
+  /* === CTA Phone === */
   .cta {
-    margin-top: auto;
-    padding-top: 6mm;
-    border-top: 1px solid var(--stone-200);
+    margin-top: 28px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .cta-icon {
+    flex: 0 0 64px;
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: var(--teal);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--white);
+    box-shadow: 0 4px 20px rgba(91, 168, 160, 0.4);
+  }
+  .cta-icon svg { width: 28px; height: 28px; }
+  .cta-content {
+    flex: 1;
   }
   .cta-label {
-    font-size: 2.8mm; letter-spacing: 0.15em;
-    color: var(--stone-500); text-transform: uppercase;
-    margin-bottom: 2mm; font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.18em;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 4px;
   }
   .cta-phone {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 11mm; color: var(--navy);
-    line-height: 1; font-weight: 500;
-  }
-  .cta-org {
-    font-size: 3mm; color: var(--stone-500);
-    margin-top: 2mm; letter-spacing: 0.02em;
+    font-family: 'Fraunces', serif;
+    font-size: 48px;
+    font-weight: 500;
+    color: var(--white);
+    line-height: 1;
+    letter-spacing: -0.01em;
   }
 </style>
 </head>
 <body>
-  <div class="page">
+  <div class="poster">
+    ${photoBlock}
+    <div class="gradient-overlay"></div>
+
     <header class="header">
-      <div class="header-left">
-        ${logoBlock}
-        <div>
-          <div class="header-title">Société de Défense<br/>des Animaux du Nord</div>
-          <div class="header-subtitle">Estourmel · depuis 1864</div>
-        </div>
-      </div>
-      <div class="header-right">
-        <div class="header-eyebrow">${escapeHtml(eyebrow)}</div>
-        ${entryDate ? `<div class="header-date">Entrée le ${escapeHtml(entryDate)}</div>` : ''}
-      </div>
+      ${logoBlock}
+      <div class="badge-eyebrow">${escapeHtml(eyebrow)}</div>
     </header>
 
-    <div class="photo-wrap">
-      ${photoBlock}
-    </div>
-
-    <main class="info">
-      <h1 class="info-headline">
-        ${escapeHtml(headline)}<span class="accent"> ${escapeHtml(a.name && a.name !== 'INCONNU' ? `· ${a.name}` : '')}</span>
+    <div class="content">
+      <div class="headline-prefix">${escapeHtml(headline)}</div>
+      <h1 class="headline">
+        ${displayName ? `<span class="name">${escapeHtml(displayName)}</span>` : (isFound ? '<span class="name">cet animal</span>' : '<span class="name">notre pensionnaire</span>')}
       </h1>
-      <div class="info-divider"></div>
 
-      ${captureLocation ? `<div class="info-location">À <strong>${escapeHtml(captureLocation)}</strong></div>` : ''}
+      ${captureLocation ? `
+        <div class="location">
+          <span class="location-pin">●</span>À <strong>${escapeHtml(captureLocation)}</strong>
+        </div>
+      ` : ''}
 
-      <div class="info-meta">
-        ${escapeHtml(species)} · ${escapeHtml(sex)} · ${escapeHtml(age)}
+      <div class="meta-main">
+        ${escapeHtml(species)}<span class="meta-main-sep">·</span>${escapeHtml(sex)}<span class="meta-main-sep">·</span>${escapeHtml(age)}
       </div>
 
-      ${breedLine ? `<div class="info-meta-detail"><strong>Race :</strong> ${escapeHtml(breedLine)}</div>` : ''}
-      ${colorLine ? `<div class="info-meta-detail">${escapeHtml(colorLine)}</div>` : ''}
-      <div class="info-meta-detail">${escapeHtml(identificationLine)}${sterilizedLine ? ` · ${escapeHtml(sterilizedLine)}` : ''}</div>
-      ${captureCirc && isFound ? `<div class="info-meta-detail" style="margin-top: 3mm; font-style: italic; color: var(--stone-500);">${escapeHtml(captureCirc)}</div>` : ''}
+      ${metaSecondary.length > 0 ? `
+        <div class="meta-secondary">
+          ${metaSecondary.map((s, i) => `<span>${escapeHtml(s)}</span>${i < metaSecondary.length - 1 ? '<span class="sep">/</span>' : ''}`).join('')}
+        </div>
+      ` : ''}
 
+      ${captureCirc ? `<div class="circumstances">« ${escapeHtml(captureCirc)} »</div>` : ''}
+
+      ${hasContact ? `
       <div class="cta">
-        <div class="cta-label">${isFound ? 'Vous reconnaissez cet animal ?' : 'Pour en savoir plus'}</div>
-        <div class="cta-phone">☎ ${escapeHtml(phone)}</div>
-        <div class="cta-org">${escapeHtml(orgName)} · 28 rue du Marais, 59400 Estourmel</div>
+        <div class="cta-icon">
+          ${contactIsEmail
+            ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>`
+            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`
+          }
+        </div>
+        <div class="cta-content">
+          <div class="cta-label">${isFound ? 'Vous le reconnaissez ?' : 'Pour le rencontrer'}</div>
+          <div class="cta-phone">${escapeHtml(contactValue)}</div>
+        </div>
       </div>
-    </main>
+      ` : ''}
+    </div>
   </div>
 </body>
 </html>`

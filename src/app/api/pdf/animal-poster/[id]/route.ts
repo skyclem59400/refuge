@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { renderHtmlToPdf, fetchLogoBase64 } from '@/lib/pdf/render'
+import { renderHtmlToImage, fetchLogoBase64 } from '@/lib/pdf/render'
 import { buildAnimalPosterHtml } from '@/lib/pdf/animal-poster-template'
 import type { Animal, Establishment } from '@/lib/types/database'
 
@@ -14,7 +14,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const admin = createAdminClient()
 
-    // Récupère l'animal et vérifie l'appartenance à un établissement du user
     const { data: animal, error: aErr } = await admin
       .from('animals')
       .select('*')
@@ -37,7 +36,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .eq('id', (animal as Animal).establishment_id)
       .single()
 
-    // Photo primaire (table animal_photos puis fallback animal.photo_url)
     const { data: photos } = await admin
       .from('animal_photos')
       .select('url, is_primary')
@@ -50,27 +48,48 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const photoDataUrl = await fetchLogoBase64(photoUrl ?? null)
     const logoDataUrl = await fetchLogoBase64((establishment as Establishment | null)?.logo_url ?? null)
 
+    // Téléphone : on lit depuis l'établissement. Fallback sur l'email si vide.
+    const estab = establishment as Establishment | null
+    const phoneFromDb = estab?.phone?.trim() ?? ''
+    const emailFromDb = estab?.email?.trim() ?? ''
+    const contactValue = phoneFromDb || emailFromDb || ''
+
     const html = buildAnimalPosterHtml({
       animal: a,
       photoDataUrl: photoDataUrl ?? null,
       logoDataUrl,
-      establishmentPhone: '03 27 83 32 70',
-      establishmentName: 'Société de Défense des Animaux du Nord',
+      establishmentPhone: contactValue,
+      establishmentContactIsEmail: !phoneFromDb && !!emailFromDb,
     })
 
-    // Mode preview HTML (utile pour itérer le design sans regénérer le PDF)
-    if (req.nextUrl.searchParams.get('format') === 'html') {
-      return new NextResponse(html, {
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    // Format ratio 4:5 — optimal Facebook fil + Instagram fil
+    const WIDTH = 1080
+    const HEIGHT = 1350
+
+    const format = req.nextUrl.searchParams.get('format') ?? 'png'
+
+    if (format === 'html') {
+      return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+    }
+
+    const slug = (a.name ?? 'animal').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+
+    if (format === 'pdf') {
+      const pdf = await renderHtmlToImage(html, { width: WIDTH, height: HEIGHT, format: 'pdf' })
+      return new NextResponse(new Uint8Array(pdf), {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `inline; filename="visuel-${slug}.pdf"`,
+        },
       })
     }
 
-    const pdf = await renderHtmlToPdf(html)
-    const filename = `affiche-${(a.name ?? 'animal').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
-    return new NextResponse(new Uint8Array(pdf), {
+    // Défaut : PNG (le plus pratique pour upload réseaux sociaux)
+    const png = await renderHtmlToImage(html, { width: WIDTH, height: HEIGHT, format: 'png' })
+    return new NextResponse(new Uint8Array(png), {
       headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="${filename}"`,
+        'Content-Type': 'image/png',
+        'Content-Disposition': `inline; filename="visuel-${slug}.png"`,
       },
     })
   } catch (e) {
