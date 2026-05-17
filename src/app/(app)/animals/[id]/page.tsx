@@ -11,6 +11,7 @@ import { getTreatments } from '@/lib/actions/treatments'
 import { getHealthProtocols } from '@/lib/actions/health-protocols'
 import { getActivityLogs } from '@/lib/actions/activity-log'
 import { getOutings } from '@/lib/actions/outings'
+import { getSponsorshipsForAnimal } from '@/lib/actions/sponsorships'
 import { ArrowLeft } from 'lucide-react'
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>
@@ -110,14 +111,16 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
   const data = await fetchAnimalData(admin, id, estabId)
   if (!data.animal) notFound()
 
-  const [outingsResult, treatmentsResult, protocolsResult] = await Promise.all([
+  const [outingsResult, treatmentsResult, protocolsResult, sponsorshipsResult] = await Promise.all([
     getOutings({ animalId: id, limit: 100 }),
     getTreatments({ animalId: id }),
     getHealthProtocols({ activeOnly: true, species: data.animal.species }),
+    getSponsorshipsForAnimal(id),
   ])
   const outings = outingsResult.data || []
   const treatments = (treatmentsResult.data || []) as AnimalTreatment[]
   const healthProtocols = protocolsResult.data || []
+  const sponsorships = sponsorshipsResult.data || []
 
   // Collect user IDs from movements, health records, and outings
   const allCreatedByIds = [
@@ -128,7 +131,7 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
 
   let userNames = await resolveUserNames(admin, allCreatedByIds)
 
-  const { canManageAnimals, canManageHealth, canManageMovements, canManagePosts, isAdmin } = ctx!.permissions
+  const { canManageAnimals, canManageClients, canManageHealth, canManageMovements, canManagePosts, isAdmin } = ctx!.permissions
 
   // Fetch activity logs for admin only
   let activityLogs: ActivityLog[] = []
@@ -193,6 +196,7 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
         fosterContracts={data.fosterContracts}
         adoptionContracts={data.adoptionContracts}
         abandonmentContracts={data.abandonmentContracts}
+        sponsorships={sponsorships}
         establishmentId={estabId}
         healthProtocols={healthProtocols}
         boxes={data.boxes}
@@ -200,6 +204,7 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
         establishmentName={ctx!.establishment.name}
         establishmentPhone={ctx!.establishment.phone}
         canManageAnimals={canManageAnimals}
+        canManageClients={canManageClients}
         canManageHealth={canManageHealth}
         canManageMovements={canManageMovements}
         canManagePosts={canManagePosts}

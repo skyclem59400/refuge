@@ -1309,3 +1309,68 @@ export interface NotificationPreferences {
   created_at: string
   updated_at: string
 }
+
+// ============================================================
+// Parrainage (sponsorships)
+// ============================================================
+export type SponsorshipStatus = 'active' | 'pending' | 'ended'
+export type SponsorshipKind = 'financial_monthly' | 'financial_punctual' | 'symbolic'
+export type SponsorshipEndedReason =
+  | 'animal_adopted'
+  | 'animal_deceased'
+  | 'animal_transferred'
+  | 'animal_returned'
+  | 'sponsor_cancelled'
+  | 'sponsor_deceased'
+  | 'other'
+
+export interface Sponsorship {
+  id: string
+  establishment_id: string
+  animal_id: string
+  client_id: string
+  status: SponsorshipStatus
+  kind: SponsorshipKind
+  monthly_amount: number | null
+  started_at: string
+  ended_at: string | null
+  ended_reason: SponsorshipEndedReason | null
+  public_alias: string | null
+  show_publicly: boolean
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+// Inclut les relations souvent fetchées en même temps
+export interface SponsorshipWithAnimal extends Sponsorship {
+  animal: Pick<Animal, 'id' | 'name' | 'species' | 'status' | 'photo_url'> | null
+}
+
+export interface SponsorshipWithClient extends Sponsorship {
+  client: Pick<Client, 'id' | 'kind' | 'name' | 'first_name' | 'email' | 'phone' | 'city'> | null
+  total_donated?: number  // Cumul des dons fléchés (calculé en server action)
+}
+
+export const SPONSORSHIP_KIND_LABELS: Record<SponsorshipKind, string> = {
+  financial_monthly: 'Mensuel',
+  financial_punctual: 'Ponctuel',
+  symbolic: 'Symbolique',
+}
+
+export const SPONSORSHIP_STATUS_LABELS: Record<SponsorshipStatus, string> = {
+  active: 'Actif',
+  pending: 'En attente',
+  ended: 'Terminé',
+}
+
+export const SPONSORSHIP_ENDED_REASON_LABELS: Record<SponsorshipEndedReason, string> = {
+  animal_adopted: 'Animal adopté',
+  animal_deceased: 'Animal décédé',
+  animal_transferred: 'Animal transféré',
+  animal_returned: 'Animal retourné',
+  sponsor_cancelled: 'Parrain a annulé',
+  sponsor_deceased: 'Parrain décédé',
+  other: 'Autre',
+}

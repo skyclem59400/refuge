@@ -13,6 +13,7 @@ import { MovementForm } from '@/components/animals/movement-form'
 import { FosterContractsTab } from '@/components/foster-contracts/foster-contracts-tab'
 import { AdoptionContractsTab } from '@/components/adoption-contracts/adoption-contracts-tab'
 import { AbandonmentContractsTab } from '@/components/abandonment-contracts/abandonment-contracts-tab'
+import { AnimalSponsorshipsSection } from '@/components/animals/animal-sponsorships-section'
 import { MovementsTimeline } from '@/components/animals/movements-timeline'
 import { ApplyProtocolModal } from '@/components/health/apply-protocol-modal'
 import { updatePost, deletePost } from '@/lib/actions/social-posts'
@@ -25,7 +26,7 @@ import {
 } from '@/lib/sda-utils'
 import { PostGenerator } from '@/components/social/post-generator'
 import { IcadDeclarations } from '@/components/icad/icad-declarations'
-import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, AnimalTreatment, AnimalStatus, Box, BoxWithZone, SocialPost, IcadDeclaration, ActivityLog, FosterContract, AdoptionContract, AbandonmentContract, Client, HealthProtocolWithSteps } from '@/lib/types/database'
+import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, AnimalTreatment, AnimalStatus, Box, BoxWithZone, SocialPost, IcadDeclaration, ActivityLog, FosterContract, AdoptionContract, AbandonmentContract, Client, HealthProtocolWithSteps, SponsorshipWithClient } from '@/lib/types/database'
 
 interface FosterContractWithRelations extends FosterContract {
   foster?: {
@@ -83,10 +84,11 @@ import {
   Clock,
   Home,
   Heart,
+  HandHeart,
   ListChecks,
 } from 'lucide-react'
 
-type TabId = 'info' | 'photos' | 'health' | 'movements' | 'foster' | 'adoption' | 'abandonment' | 'documents' | 'outings' | 'posts' | 'icad' | 'activity'
+type TabId = 'info' | 'photos' | 'health' | 'movements' | 'foster' | 'adoption' | 'sponsorships' | 'abandonment' | 'documents' | 'outings' | 'posts' | 'icad' | 'activity'
 
 interface AnimalOuting {
   id: string
@@ -115,6 +117,7 @@ interface AnimalDetailTabsProps {
   fosterContracts?: FosterContractWithRelations[]
   adoptionContracts?: AdoptionContractWithRelations[]
   abandonmentContracts?: AbandonmentContractWithRelations[]
+  sponsorships?: SponsorshipWithClient[]
   establishmentId: string
   healthProtocols?: HealthProtocolWithSteps[]
   boxes: BoxWithZone[]
@@ -122,6 +125,7 @@ interface AnimalDetailTabsProps {
   establishmentName: string
   establishmentPhone: string
   canManageAnimals: boolean
+  canManageClients: boolean
   canManageHealth: boolean
   canManageMovements: boolean
   canManagePosts: boolean
@@ -129,13 +133,14 @@ interface AnimalDetailTabsProps {
   activityLogs?: ActivityLog[]
 }
 
-const baseTabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'outings' | 'socialPosts' | 'icadDeclarations' | 'activityLogs' | 'fosterContracts' | 'adoptionContracts' | 'abandonmentContracts'; adminOnly?: boolean }[] = [
+const baseTabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'outings' | 'socialPosts' | 'icadDeclarations' | 'activityLogs' | 'fosterContracts' | 'adoptionContracts' | 'abandonmentContracts' | 'sponsorshipsActive'; adminOnly?: boolean }[] = [
   { id: 'info', label: 'Infos', icon: Info },
   { id: 'photos', label: 'Photos', icon: Camera, countKey: 'photos' },
   { id: 'health', label: 'Sante', icon: HeartPulse, countKey: 'healthRecords' },
   { id: 'movements', label: 'Mouvements', icon: ArrowRightLeft, countKey: 'movements' },
   { id: 'foster', label: 'Famille d’accueil', icon: Home, countKey: 'fosterContracts' },
   { id: 'adoption', label: 'Adoption', icon: Heart, countKey: 'adoptionContracts' },
+  { id: 'sponsorships', label: 'Parrains', icon: HandHeart, countKey: 'sponsorshipsActive' },
   { id: 'abandonment', label: 'Abandon', icon: AlertTriangle, countKey: 'abandonmentContracts' },
   { id: 'documents', label: 'Documents', icon: FileText },
   { id: 'outings', label: 'Sorties', icon: Footprints, countKey: 'outings' },
@@ -154,6 +159,7 @@ export function AnimalDetailTabs({
   fosterContracts = [],
   adoptionContracts = [],
   abandonmentContracts = [],
+  sponsorships = [],
   establishmentId,
   healthProtocols = [],
   boxes,
@@ -161,6 +167,7 @@ export function AnimalDetailTabs({
   establishmentName,
   establishmentPhone,
   canManageAnimals,
+  canManageClients,
   canManageHealth,
   canManageMovements,
   treatments = [],
@@ -179,6 +186,8 @@ export function AnimalDetailTabs({
   const primaryPhoto = photos.find((p) => p.is_primary) || photos[0] || null
   const displayPhotoUrl = primaryPhoto?.url || animal.photo_url || null
 
+  const sponsorshipsActiveCount = sponsorships.filter((s) => s.status === 'active').length
+
   const counts: Record<string, number> = {
     photos: photos.length || (animal.photo_url ? 1 : 0),
     healthRecords: healthRecords.length,
@@ -188,8 +197,13 @@ export function AnimalDetailTabs({
     icadDeclarations: icadDeclarations.length,
     fosterContracts: fosterContracts.length,
     adoptionContracts: adoptionContracts.length,
+    abandonmentContracts: abandonmentContracts.length,
+    sponsorshipsActive: sponsorshipsActiveCount,
     activityLogs: activityLogs.length,
   }
+
+  const presentStatuses: AnimalStatus[] = ['shelter', 'pound', 'boarding', 'foster_family']
+  const animalIsPresent = presentStatuses.includes(animal.status)
 
   const todayDate = new Date()
   const today = todayDate.toISOString().split('T')[0]
@@ -340,6 +354,15 @@ export function AnimalDetailTabs({
             animalId={animal.id}
             contracts={adoptionContracts}
             canManage={canManageAnimals}
+          />
+        )}
+
+        {activeTab === 'sponsorships' && (
+          <AnimalSponsorshipsSection
+            animalId={animal.id}
+            canEdit={canManageClients}
+            animalIsPresent={animalIsPresent}
+            initialData={sponsorships}
           />
         )}
 

@@ -3,7 +3,9 @@ import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { ClientForm } from '@/components/clients/client-form'
+import { ClientSponsorshipsSection } from '@/components/clients/client-sponsorships-section'
 import { TypeBadge, StatusBadge } from '@/components/documents/status-badge'
+import { getSponsorshipsForClient } from '@/lib/actions/sponsorships'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
 import { getSpeciesEmoji } from '@/lib/species'
 import { getClientDisplayName, type Client, type Document } from '@/lib/types/database'
@@ -53,6 +55,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     { data: documents },
     { data: adoptions },
     { data: fosters },
+    sponsorshipsResult,
   ] = await Promise.all([
     admin.from('clients').select('*').eq('id', id).eq('establishment_id', estabId).single(),
     admin
@@ -77,6 +80,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       .eq('foster_client_id', id)
       .eq('establishment_id', estabId)
       .order('start_date', { ascending: false }),
+    getSponsorshipsForClient(id),
   ])
 
   if (!client) notFound()
@@ -85,6 +89,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const typedDocs = (documents as Document[]) || []
   const typedAdoptions = (adoptions as unknown as AdoptionRow[]) || []
   const typedFosters = (fosters as unknown as FosterRow[]) || []
+  const sponsorshipsData = sponsorshipsResult.data ?? []
 
   // Donations : lien direct via client_id (les anciennes lignes ont été
   // backfillées par migration 20260506e). On évite ainsi le matching par
@@ -273,6 +278,13 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               </ul>
             </Section>
           )}
+
+          {/* Parrainages */}
+          <ClientSponsorshipsSection
+            clientId={id}
+            canEdit={canEditClients}
+            initialData={sponsorshipsData}
+          />
 
           {/* Documents (factures) */}
           <Section title="Documents" count={typedDocs.length}>
