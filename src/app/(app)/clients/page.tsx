@@ -10,13 +10,27 @@ export default async function ClientsPage() {
   const estabId = ctx!.establishment.id
   const admin = createAdminClient()
 
-  const [{ data: clients }, { data: members }] = await Promise.all([
+  const [
+    { data: clients },
+    { data: members },
+    { count: legacyCount },
+    { count: legacyConvertedCount },
+  ] = await Promise.all([
     admin
       .from('clients')
       .select('*')
       .eq('establishment_id', estabId)
       .order('name'),
     getEstablishmentMembers(),
+    admin
+      .from('legacy_contacts')
+      .select('id', { count: 'exact', head: true })
+      .eq('establishment_id', estabId),
+    admin
+      .from('legacy_contacts')
+      .select('id', { count: 'exact', head: true })
+      .eq('establishment_id', estabId)
+      .not('converted_to_client_id', 'is', null),
   ])
 
   return (
@@ -41,6 +55,8 @@ export default async function ClientsPage() {
         members={members || []}
         canEdit={ctx!.permissions.canManageClients}
         establishmentId={estabId}
+        legacyCount={legacyCount ?? 0}
+        legacyConvertedCount={legacyConvertedCount ?? 0}
       />
     </div>
   )
