@@ -79,7 +79,7 @@ export default async function PoundPage() {
                 {alertAnimals.map((a) => (
                   <li key={a.id} className="text-sm">
                     <Link
-                      href={`/animaux/${a.id}`}
+                      href={`/animals/${a.id}`}
                       className="font-medium underline hover:text-warning transition-colors"
                     >
                       {a.name}
