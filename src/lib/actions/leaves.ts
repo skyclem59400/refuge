@@ -6,7 +6,7 @@ import { requireEstablishment, requirePermission } from '@/lib/establishment/per
 import { logActivity } from '@/lib/actions/activity-log'
 import { createNotification, notifyAdminsWithPermission } from '@/lib/actions/notifications'
 import { getCoverageImpactForRequest } from '@/lib/actions/leave-coverage'
-import type { LeaveRequestStatus } from '@/lib/types/database'
+import type { LeaveGranularity, LeaveRequestStatus } from '@/lib/types/database'
 
 // ===========================================================================
 // HELPERS
@@ -193,18 +193,33 @@ export async function createLeaveRequest(data: {
   half_day_start?: boolean
   half_day_end?: boolean
   days_count: number
+  granularity?: LeaveGranularity
+  start_time?: string | null
+  end_time?: string | null
+  duration_hours?: number | null
   reason?: string
 }) {
   try {
     const { establishmentId, membership } = await requirePermission('view_own_leaves')
     const supabase = await createClient()
 
-    if (!data.leave_type_id || !data.start_date || !data.end_date || !data.days_count) {
+    if (!data.leave_type_id || !data.start_date || !data.end_date) {
       return { error: 'Tous les champs obligatoires doivent etre remplis' }
     }
 
     if (data.start_date > data.end_date) {
       return { error: 'La date de debut doit etre avant la date de fin' }
+    }
+
+    const granularity: LeaveGranularity = data.granularity || 'full_day'
+
+    if (granularity === 'hourly') {
+      if (!data.start_time || !data.end_time) {
+        return { error: 'Heure de debut et de fin obligatoires pour un arret horaire' }
+      }
+      if (data.start_date !== data.end_date) {
+        return { error: 'Un arret horaire ne peut couvrir qu une seule journee' }
+      }
     }
 
     const { data: request, error } = await supabase
@@ -218,6 +233,10 @@ export async function createLeaveRequest(data: {
         half_day_start: data.half_day_start ?? false,
         half_day_end: data.half_day_end ?? false,
         days_count: data.days_count,
+        granularity,
+        start_time: granularity === 'hourly' ? data.start_time : null,
+        end_time: granularity === 'hourly' ? data.end_time : null,
+        duration_hours: granularity === 'hourly' ? data.duration_hours ?? null : null,
         status: 'pending' as LeaveRequestStatus,
         reason: data.reason || null,
       })
@@ -244,6 +263,114 @@ export async function createLeaveRequest(data: {
     })
 
     return { data: request }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+/**
+ * Admin/manager creates a leave entry on behalf of a member.
+ * Auto-approved (admin already validating by entering).
+ */
+export async function adminCreateLeaveRequest(data: {
+  member_id: string
+  leave_type_id: string
+  start_date: string
+  end_date: string
+  half_day_start?: boolean
+  half_day_end?: boolean
+  days_count: number
+  granularity?: LeaveGranularity
+  start_time?: string | null
+  end_time?: string | null
+  duration_hours?: number | null
+  reason?: string
+  auto_approve?: boolean
+}) {
+  try {
+    const { establishmentId, membership } = await requirePermission('manage_leaves')
+    const adminClient = createAdminClient()
+
+    if (!data.member_id || !data.leave_type_id || !data.start_date || !data.end_date) {
+      return { error: 'Membre, type et periode obligatoires' }
+    }
+    if (data.start_date > data.end_date) {
+      return { error: 'La date de debut doit etre avant la date de fin' }
+    }
+
+    const granularity: LeaveGranularity = data.granularity || 'full_day'
+    if (granularity === 'hourly') {
+      if (!data.start_time || !data.end_time) {
+        return { error: 'Heures obligatoires pour un arret horaire' }
+      }
+      if (data.start_date !== data.end_date) {
+        return { error: 'Un arret horaire ne couvre qu une seule journee' }
+      }
+    }
+
+    const autoApprove = data.auto_approve ?? true
+    const status: LeaveRequestStatus = autoApprove ? 'approved' : 'pending'
+
+    const { data: row, error } = await adminClient
+      .from('leave_requests')
+      .insert({
+        establishment_id: establishmentId,
+        member_id: data.member_id,
+        leave_type_id: data.leave_type_id,
+        start_date: data.start_date,
+        end_date: data.end_date,
+        half_day_start: data.half_day_start ?? false,
+        half_day_end: data.half_day_end ?? false,
+        days_count: data.days_count,
+        granularity,
+        start_time: granularity === 'hourly' ? data.start_time : null,
+        end_time: granularity === 'hourly' ? data.end_time : null,
+        duration_hours: granularity === 'hourly' ? data.duration_hours ?? null : null,
+        status,
+        reason: data.reason || null,
+        reviewed_by: autoApprove ? membership.id : null,
+        reviewed_at: autoApprove ? new Date().toISOString() : null,
+        admin_comment: autoApprove ? '[Saisie admin]' : null,
+      })
+      .select()
+      .single()
+
+    if (error) return { error: error.message }
+
+    if (autoApprove) {
+      const { data: lt } = await adminClient
+        .from('leave_types')
+        .select('deducts_balance')
+        .eq('id', data.leave_type_id)
+        .single()
+
+      if (lt?.deducts_balance && granularity !== 'hourly') {
+        const year = new Date(data.start_date).getFullYear()
+        const { data: balance } = await adminClient
+          .from('leave_balances')
+          .select('id, used')
+          .eq('member_id', data.member_id)
+          .eq('leave_type_id', data.leave_type_id)
+          .eq('year', year)
+          .single()
+        if (balance) {
+          await adminClient
+            .from('leave_balances')
+            .update({ used: balance.used + data.days_count })
+            .eq('id', balance.id)
+        }
+      }
+    }
+
+    revalidateLeavePaths()
+    logActivity({
+      action: 'create',
+      entityType: 'leave_request',
+      entityId: row.id,
+      details: { admin_created: true, granularity, status },
+    })
+
+    return { data: row }
   } catch (e) {
     return { error: (e as Error).message }
   }

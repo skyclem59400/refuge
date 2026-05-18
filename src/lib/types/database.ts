@@ -1127,6 +1127,8 @@ export interface LeaveBalance {
   updated_at: string
 }
 
+export type LeaveGranularity = 'full_day' | 'half_day' | 'hourly'
+
 export interface LeaveRequest {
   id: string
   establishment_id: string
@@ -1137,6 +1139,10 @@ export interface LeaveRequest {
   half_day_start: boolean
   half_day_end: boolean
   days_count: number
+  granularity: LeaveGranularity
+  start_time: string | null
+  end_time: string | null
+  duration_hours: number | null
   status: LeaveRequestStatus
   reason: string | null
   admin_comment: string | null
@@ -1144,6 +1150,24 @@ export interface LeaveRequest {
   reviewed_at: string | null
   created_at: string
   updated_at: string
+}
+
+export type LeaveAttachmentKind = 'sick_note' | 'extended_leave_proof' | 'other'
+
+export interface LeaveAttachment {
+  id: string
+  establishment_id: string
+  member_id: string
+  leave_request_id: string | null
+  kind: LeaveAttachmentKind
+  storage_path: string
+  file_name: string | null
+  mime_type: string | null
+  size_bytes: number | null
+  notes: string | null
+  uploaded_by: string | null
+  created_at: string
+  signed_url?: string
 }
 
 export interface LeaveRequestWithDetails extends LeaveRequest {

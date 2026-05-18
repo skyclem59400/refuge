@@ -7,6 +7,7 @@ import { approveLeaveRequest, refuseLeaveRequest } from '@/lib/actions/leaves'
 import { getCoverageImpactForRequest } from '@/lib/actions/leave-coverage'
 import type { CoverageImpactResult } from '@/lib/actions/leave-coverage'
 import { LeaveStatusBadge } from './leave-status-badge'
+import { LeaveAttachmentsPanel } from './leave-attachments-panel'
 import type { LeaveRequest, LeaveType } from '@/lib/types/database'
 
 interface LeaveRequestReviewProps {
@@ -160,6 +161,14 @@ export function LeaveRequestReview({
               </div>
             )}
           </div>
+
+          {/* Pieces jointes (arret maladie, justifs) */}
+          <LeaveAttachmentsPanel
+            memberId={request.member_id}
+            leaveRequestId={request.id}
+            defaultKind="sick_note"
+            title="Pieces jointes de la demande"
+          />
 
           {/* Impact couverture */}
           {request.status === 'pending' && (
