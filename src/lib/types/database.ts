@@ -88,9 +88,13 @@ export interface Establishment {
   google_calendar_id: string
   documenso_folder_id: string | null
   adoption_appointment_settings: AdoptionAppointmentSettings
+  min_daily_staff: number
   created_at: string
   updated_at: string
 }
+
+export type ContractType = 'salarie' | 'auto_entrepreneur' | 'benevole' | 'autre'
+export type AvailabilityStatus = 'active' | 'on_extended_leave'
 
 export interface PermissionGroup {
   id: string
@@ -139,6 +143,12 @@ export interface EstablishmentMember {
   role_type: RoleType
   is_pseudo_user: boolean
   password_set: boolean
+  // Coverage / staffing
+  contract_type: ContractType
+  availability_status: AvailabilityStatus
+  extended_leave_from: string | null
+  extended_leave_until: string | null
+  extended_leave_reason: string | null
   created_at: string
   updated_at: string
   // Enriched from auth.users via RPC

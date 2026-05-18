@@ -73,6 +73,7 @@ export default async function AdminCongesPage() {
         leaveTypes={leaveTypes}
         members={members}
         pendingCount={pendingCount}
+        minDailyStaff={ctx.establishment.min_daily_staff ?? 3}
       />
     </div>
   )

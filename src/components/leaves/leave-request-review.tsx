@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { toast } from 'sonner'
+import { AlertTriangle, ShieldAlert } from 'lucide-react'
 import { approveLeaveRequest, refuseLeaveRequest } from '@/lib/actions/leaves'
+import { getCoverageImpactForRequest } from '@/lib/actions/leave-coverage'
+import type { CoverageImpactResult } from '@/lib/actions/leave-coverage'
 import { LeaveStatusBadge } from './leave-status-badge'
 import type { LeaveRequest, LeaveType } from '@/lib/types/database'
 
@@ -32,14 +35,43 @@ export function LeaveRequestReview({
   const [isPending, startTransition] = useTransition()
   const [action, setAction] = useState<'approve' | 'refuse' | null>(null)
   const [comment, setComment] = useState('')
+  const [impact, setImpact] = useState<CoverageImpactResult | null>(null)
+  const [impactLoading, setImpactLoading] = useState(true)
+  const [needsForce, setNeedsForce] = useState(false)
+  const [forceComment, setForceComment] = useState('')
 
-  function handleApprove() {
+  useEffect(() => {
+    let cancelled = false
+    setImpactLoading(true)
+    getCoverageImpactForRequest(request.id).then((res) => {
+      if (cancelled) return
+      if (res.data) setImpact(res.data)
+      setImpactLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [request.id])
+
+  function handleApprove(force = false) {
+    if (force && !forceComment.trim()) {
+      toast.error('Un motif est obligatoire pour forcer la validation')
+      return
+    }
     startTransition(async () => {
-      const result = await approveLeaveRequest(request.id, comment.trim() || undefined)
-      if (result.error) {
-        toast.error(result.error)
+      const finalComment = force
+        ? forceComment.trim()
+        : comment.trim() || undefined
+      const result = await approveLeaveRequest(request.id, finalComment, { force })
+      if ('error' in result) {
+        if (result.below_threshold) {
+          setNeedsForce(true)
+          toast.error(result.error)
+        } else {
+          toast.error(result.error)
+        }
       } else {
-        toast.success('Demande validee')
+        toast.success(result.forced ? 'Demande validee (forcee)' : 'Demande validee')
         onReviewed()
       }
     })
@@ -50,7 +82,6 @@ export function LeaveRequestReview({
       toast.error('Un commentaire est obligatoire pour refuser une demande')
       return
     }
-
     startTransition(async () => {
       const result = await refuseLeaveRequest(request.id, comment.trim())
       if (result.error) {
@@ -62,10 +93,11 @@ export function LeaveRequestReview({
     })
   }
 
+  const showThresholdBanner = impact?.will_go_below && !needsForce
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-surface rounded-xl border border-border w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        {/* En-tete */}
         <div className="flex items-center justify-between p-5 border-b border-border">
           <h2 className="text-lg font-bold text-text">Examiner la demande</h2>
           <button
@@ -78,7 +110,6 @@ export function LeaveRequestReview({
           </button>
         </div>
 
-        {/* Details de la demande */}
         <div className="p-5 space-y-4">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -130,18 +161,53 @@ export function LeaveRequestReview({
             )}
           </div>
 
+          {/* Impact couverture */}
+          {request.status === 'pending' && (
+            <div className="border-t border-border pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-2">
+                Impact sur l&apos;effectif
+              </p>
+              {impactLoading ? (
+                <p className="text-xs text-muted italic">Calcul en cours...</p>
+              ) : !impact ? (
+                <p className="text-xs text-muted italic">Impossible de calculer l&apos;impact</p>
+              ) : !impact.member_is_salaried ? (
+                <p className="text-xs text-muted">
+                  Demandeur non salarie : aucun impact sur le seuil minimum de salaries.
+                </p>
+              ) : impact.will_go_below ? (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs space-y-1">
+                    <p className="font-semibold text-red-500">
+                      Sous le seuil : {impact.worst_available_salaried}/{impact.threshold} salaries le jour le plus critique.
+                    </p>
+                    <p className="text-muted">
+                      Validation bloquee. Un administrateur peut forcer la validation avec un motif.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-emerald-400">
+                  OK : minimum {impact.worst_available_salaried}/{impact.threshold} salaries dispo
+                  sur la periode.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Actions */}
           {request.status === 'pending' && (
             <div className="space-y-4 pt-2">
-              {/* Choix d'action si pas encore selectionne */}
-              {action === null && (
+              {action === null && !needsForce && (
                 <div className="flex gap-3">
                   <button
                     onClick={() => setAction('approve')}
-                    disabled={isPending}
+                    disabled={isPending || !!showThresholdBanner}
                     className="flex-1 px-3 py-2 rounded-lg font-semibold text-white text-sm
                       bg-green-600 hover:bg-green-700 transition-colors
                       disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={showThresholdBanner ? 'Validation bloquee par le seuil minimum' : undefined}
                   >
                     Valider
                   </button>
@@ -157,7 +223,70 @@ export function LeaveRequestReview({
                 </div>
               )}
 
-              {/* Formulaire de commentaire pour approbation */}
+              {/* Bouton force quand le seuil bloque */}
+              {showThresholdBanner && action === null && !needsForce && (
+                <button
+                  onClick={() => setNeedsForce(true)}
+                  disabled={isPending}
+                  className="w-full px-3 py-2 rounded-lg font-semibold text-sm
+                    bg-amber-500/10 text-amber-500 border border-amber-500/30
+                    hover:bg-amber-500/20 transition-colors flex items-center justify-center gap-2"
+                >
+                  <ShieldAlert className="w-4 h-4" />
+                  Forcer la validation sous le seuil
+                </button>
+              )}
+
+              {/* Form override (forcer la validation) */}
+              {needsForce && (
+                <div className="space-y-3 bg-amber-500/5 border border-amber-500/30 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <ShieldAlert className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <p className="font-semibold text-amber-500">Validation forcee</p>
+                      <p className="text-muted mt-0.5">
+                        Vous allez approuver malgre un effectif sous le seuil minimum.
+                        Le motif sera enregistre dans l&apos;historique.
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted mb-1.5">
+                      Motif (obligatoire)
+                    </label>
+                    <textarea
+                      value={forceComment}
+                      onChange={(e) => setForceComment(e.target.value)}
+                      rows={2}
+                      placeholder="Ex : remplacement organise via X..."
+                      className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm resize-y
+                        focus:border-primary focus:ring-1 focus:ring-primary transition-colors
+                        placeholder:text-muted/50"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleApprove(true)}
+                      disabled={isPending || !forceComment.trim()}
+                      className="flex-1 px-3 py-2 rounded-lg font-semibold text-white text-sm
+                        bg-amber-600 hover:bg-amber-700 transition-colors
+                        disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isPending ? 'Validation...' : 'Confirmer la validation forcee'}
+                    </button>
+                    <button
+                      onClick={() => { setNeedsForce(false); setForceComment('') }}
+                      disabled={isPending}
+                      className="px-3 py-2 rounded-lg font-semibold text-sm text-muted
+                        bg-surface-dark hover:bg-surface-hover transition-colors
+                        disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {action === 'approve' && (
                 <div className="space-y-3">
                   <div>
@@ -176,7 +305,7 @@ export function LeaveRequestReview({
                   </div>
                   <div className="flex gap-3">
                     <button
-                      onClick={handleApprove}
+                      onClick={() => handleApprove(false)}
                       disabled={isPending}
                       className="flex-1 px-3 py-2 rounded-lg font-semibold text-white text-sm
                         bg-green-600 hover:bg-green-700 transition-colors
@@ -197,7 +326,6 @@ export function LeaveRequestReview({
                 </div>
               )}
 
-              {/* Formulaire de commentaire pour refus */}
               {action === 'refuse' && (
                 <div className="space-y-3">
                   <div>

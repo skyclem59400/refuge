@@ -5,6 +5,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
 import { logActivity } from '@/lib/actions/activity-log'
 import { createNotification, notifyAdminsWithPermission } from '@/lib/actions/notifications'
+import { getCoverageImpactForRequest } from '@/lib/actions/leave-coverage'
 import type { LeaveRequestStatus } from '@/lib/types/database'
 
 // ===========================================================================
@@ -298,15 +299,28 @@ export async function cancelLeaveRequest(id: string) {
 }
 
 /**
- * Approve a leave request (admin)
+ * Approve a leave request (admin).
+ * If the approval would drop salaried staffing below the establishment threshold,
+ * returns `{ below_threshold: true, ... }` unless `options.force` is set.
  */
-export async function approveLeaveRequest(id: string, comment?: string) {
+export async function approveLeaveRequest(
+  id: string,
+  comment?: string,
+  options?: { force?: boolean }
+): Promise<
+  | { success: true; forced?: boolean }
+  | {
+      error: string
+      below_threshold?: boolean
+      worst_available_salaried?: number
+      threshold?: number
+    }
+> {
   try {
     const { establishmentId, membership } = await requirePermission('manage_leaves')
     const supabase = await createClient()
     const adminClient = createAdminClient()
 
-    // Fetch the request
     const { data: request, error: fetchError } = await adminClient
       .from('leave_requests')
       .select('*')
@@ -322,14 +336,30 @@ export async function approveLeaveRequest(id: string, comment?: string) {
       return { error: 'Cette demande a deja ete traitee' }
     }
 
-    // Update request status
+    if (!options?.force) {
+      const impact = await getCoverageImpactForRequest(id)
+      if (impact.data?.will_go_below) {
+        return {
+          error: `Effectif salarie insuffisant : ${impact.data.worst_available_salaried}/${impact.data.threshold} le jour le plus critique.`,
+          below_threshold: true,
+          worst_available_salaried: impact.data.worst_available_salaried,
+          threshold: impact.data.threshold,
+        }
+      }
+    }
+
     const { error } = await supabase
       .from('leave_requests')
       .update({
         status: 'approved' as LeaveRequestStatus,
         reviewed_by: membership.id,
         reviewed_at: new Date().toISOString(),
-        admin_comment: comment || null,
+        admin_comment:
+          options?.force && comment
+            ? `[Validation forcee] ${comment}`
+            : options?.force
+              ? '[Validation forcee sous le seuil minimum]'
+              : comment || null,
       })
       .eq('id', id)
 
@@ -367,10 +397,9 @@ export async function approveLeaveRequest(id: string, comment?: string) {
       action: 'update',
       entityType: 'leave_request',
       entityId: id,
-      details: { status: 'approved', admin_comment: comment },
+      details: { status: 'approved', admin_comment: comment, forced: options?.force ?? false },
     })
 
-    // Notify the requesting member (resolve user_id from member_id)
     const { data: member } = await adminClient
       .from('establishment_members')
       .select('user_id')
@@ -389,7 +418,7 @@ export async function approveLeaveRequest(id: string, comment?: string) {
       })
     }
 
-    return { success: true }
+    return { success: true, forced: options?.force ?? false }
   } catch (e) {
     return { error: (e as Error).message }
   }
@@ -484,7 +513,6 @@ export async function deleteLeaveRequest(id: string) {
       return { error: 'Demande non trouvee' }
     }
 
-    // If it was approved and deducts balance, reverse the used days
     if (request.status === 'approved') {
       const { data: leaveType } = await adminClient
         .from('leave_types')
@@ -512,13 +540,14 @@ export async function deleteLeaveRequest(id: string) {
       }
     }
 
-    const { error } = await adminClient
+    const { error, count } = await adminClient
       .from('leave_requests')
-      .delete()
+      .delete({ count: 'exact' })
       .eq('id', id)
       .eq('establishment_id', establishmentId)
 
     if (error) return { error: error.message }
+    if (!count) return { error: 'Aucune demande supprimee (verifiez les permissions)' }
 
     revalidateLeavePaths()
 
