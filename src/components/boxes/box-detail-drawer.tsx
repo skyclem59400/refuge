@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { X, Settings, Plus, Printer, Package, Move } from 'lucide-react'
+import { X, Settings, Plus, Printer, Package, Move, Footprints } from 'lucide-react'
 import type { ZoneColor } from '@/lib/zone-colors'
 import type { BoxAnimal, EnrichedBox, BoxSummary } from './types'
 import { MoveAnimalMenu } from './move-animal-menu'
+import { AssignOutingModal } from './assign-outing-modal'
 import { SPECIES_LABELS_PLURAL } from '@/lib/species'
 import type { AnimalSpecies } from '@/lib/types/database'
 
@@ -255,6 +256,11 @@ function AnimalRow({
 }) {
   const status = statusColor(animal.status)
   const age = ageLabel(animal.birth_date)
+  const [showOutingModal, setShowOutingModal] = useState(false)
+  // Bouton sortie : utile pour les chiens présents au refuge / fourrière / FA
+  const canAssignOuting = animal.species === 'dog' && (
+    animal.status === 'shelter' || animal.status === 'pound' || animal.status === 'boarding'
+  )
 
   return (
     <li className="flex items-center gap-3 px-3 py-2 rounded-xl bg-surface border border-border hover:border-primary/30 transition-colors group">
@@ -305,6 +311,17 @@ function AnimalRow({
         </div>
       </Link>
 
+      {canAssignOuting && (
+        <button
+          onClick={() => setShowOutingModal(true)}
+          type="button"
+          title="Assigner une sortie / défouloir à un bénévole"
+          className="shrink-0 p-1.5 rounded-md text-muted hover:bg-primary/10 hover:text-primary opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+        >
+          <Footprints size={13} />
+        </button>
+      )}
+
       {canManage && (
         <button
           onClick={onOpenMove}
@@ -324,6 +341,16 @@ function AnimalRow({
           currentBoxId={boxId}
           allBoxes={allBoxes}
           onClose={onCloseMove}
+        />
+      )}
+
+      {showOutingModal && (
+        <AssignOutingModal
+          animalId={animal.id}
+          animalName={animal.name}
+          animalPhotoUrl={animal.photo_url ?? null}
+          animalSpeciesEmoji={speciesEmoji(animal.species)}
+          onClose={() => setShowOutingModal(false)}
         />
       )}
     </li>
