@@ -1,6 +1,6 @@
 # Optimus - Logiciel de refuge
 
-Application de gestion multi-etablissement pour **La Ferme O 4 Vents** (exploitation agricole) et **SDA Estormel** (refuge animalier).
+Application de gestion multi-etablissement pour **La Ferme Ô 4 Vents** (ferme refuge pédagogique) et **SDA Estormel** (refuge animalier).
 
 Facturation, gestion d'animaux, suivi sanitaire, dons avec recus fiscaux CERFA, declarations I-CAD, generation de posts IA.
 

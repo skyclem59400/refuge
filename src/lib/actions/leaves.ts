@@ -471,7 +471,6 @@ export async function refuseLeaveRequest(id: string, comment: string) {
 export async function deleteLeaveRequest(id: string) {
   try {
     const { establishmentId } = await requirePermission('manage_leaves')
-    const supabase = await createClient()
     const adminClient = createAdminClient()
 
     const { data: request, error: fetchError } = await adminClient
@@ -513,10 +512,11 @@ export async function deleteLeaveRequest(id: string) {
       }
     }
 
-    const { error } = await supabase
+    const { error } = await adminClient
       .from('leave_requests')
       .delete()
       .eq('id', id)
+      .eq('establishment_id', establishmentId)
 
     if (error) return { error: error.message }
 
