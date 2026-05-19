@@ -4,7 +4,7 @@ export type ClientKind = 'person' | 'organization'
 export type DocumentType = 'devis' | 'facture' | 'avoir'
 export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'converted' | 'validated'
 export type DocumentPaymentMethod = 'cheque' | 'virement' | 'especes' | 'cb' | 'prelevement' | 'autre'
-export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings' | 'manage_outing_assignments' | 'manage_adoptions' | 'manage_planning' | 'manage_leaves' | 'view_own_leaves' | 'manage_payslips' | 'manage_veterinarians'
+export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings' | 'manage_outing_assignments' | 'manage_adoptions' | 'manage_planning' | 'manage_leaves' | 'view_own_leaves' | 'manage_payslips' | 'manage_veterinarians' | 'view_animal_news'
 
 export interface LineItem {
   description: string
@@ -118,6 +118,7 @@ export interface PermissionGroup {
   view_own_leaves: boolean
   manage_payslips: boolean
   manage_veterinarians: boolean
+  view_animal_news: boolean
   created_at: string
   updated_at: string
 }
@@ -170,6 +171,7 @@ export interface Permissions {
   canViewOwnLeaves: boolean
   canManagePayslips: boolean
   canManageVeterinarians: boolean
+  canViewAnimalNews: boolean
   isAdmin: boolean
   isOwner: boolean
 }
@@ -284,6 +286,8 @@ export interface Animal {
   exit_date: string | null
   adoptable: boolean
   reserved: boolean
+  /** Adoptant pré-réservé (certificat d'engagement en cours). NULL si pas de pré-réservation. */
+  pre_reservation_client_id: string | null
   retirement_basket: boolean
   ok_cats: boolean | null
   ok_males: boolean | null
@@ -583,6 +587,44 @@ export interface AdoptionContract {
   signature_viewed_at: string | null
   signed_at_via_documenso: string | null
   signed_pdf_url: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ============================================
+// Engagement Certificate (Certificat d'engagement et de connaissance)
+// Premier document obligatoire en France depuis la loi du 30 nov. 2021
+// (arrêté du 30 mai 2022). Délai légal de 7 jours après signature avant
+// la finalisation de l'adoption.
+// ============================================
+
+export type EngagementCertificateStatus =
+  | 'draft'      // Créé, pas encore envoyé
+  | 'sent'       // Envoyé via Documenso, en attente de signature
+  | 'signed'     // Signé par l'adoptant
+  | 'expired'    // Délai dépassé sans signature
+  | 'cancelled'  // Pré-réservation annulée
+
+export interface EngagementCertificate {
+  id: string
+  establishment_id: string
+  animal_id: string
+  adopter_client_id: string
+  certificate_number: string
+  status: EngagementCertificateStatus
+  delivered_at: string | null
+  signed_at: string | null
+  /** signed_at + 7 jours : date à partir de laquelle l'adoption peut être finalisée */
+  can_finalize_at: string | null
+  documenso_document_id: number | null
+  documenso_recipient_id: number | null
+  documenso_signing_url: string | null
+  signed_pdf_url: string | null
+  signature_sent_at: string | null
+  signature_viewed_at: string | null
+  signed_at_via_documenso: string | null
+  notes: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -1374,3 +1416,73 @@ export const SPONSORSHIP_ENDED_REASON_LABELS: Record<SponsorshipEndedReason, str
   sponsor_deceased: 'Parrain décédé',
   other: 'Autre',
 }
+
+// ============================================================
+// Partenaires sorties (Akéla & co)
+// ============================================================
+export type OutingPartnerKind = 'educator' | 'club' | 'walker' | 'foster_pro' | 'other'
+
+export interface OutingPartner {
+  id: string
+  establishment_id: string
+  name: string
+  kind: OutingPartnerKind
+  default_outing_label: string | null
+  contact_phone: string | null
+  contact_email: string | null
+  notes: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export const OUTING_PARTNER_KIND_LABELS: Record<OutingPartnerKind, string> = {
+  educator: 'Éducateur canin',
+  club: 'Club canin',
+  walker: 'Promeneur',
+  foster_pro: 'FA pro',
+  other: 'Autre',
+}
+
+// ============================================
+// Animal News (Nouvelles post-adoption / FA)
+// ============================================
+
+export interface AnimalNewsPhoto {
+  url: string
+  path: string
+}
+
+export interface AnimalNews {
+  id: string
+  establishment_id: string
+  animal_id: string
+  photos: AnimalNewsPhoto[]
+  text: string | null
+  received_from: string | null
+  received_at: string
+  posted_at: string | null
+  posted_in_mosaic_id: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AnimalNewsWithAnimal extends AnimalNews {
+  animal: Pick<Animal, 'id' | 'name' | 'species' | 'sex' | 'status' | 'exit_date' | 'photo_url' | 'birth_date'>
+}
+
+export interface AnimalNewsMosaic {
+  id: string
+  establishment_id: string
+  news_ids: string[]
+  title: string | null
+  generated_image_url: string | null
+  posted_at: string | null
+  created_by: string | null
+  created_at: string
+}
+
+/** Animaux éligibles à recevoir des nouvelles : déjà sortis du refuge. */
+export const ANIMAL_NEWS_ELIGIBLE_STATUSES: AnimalStatus[] = ['adopted', 'foster_family', 'transferred', 'returned']
+

@@ -403,7 +403,7 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
                       {reserved && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/90 text-white backdrop-blur-sm">
                           <Bookmark className="w-3 h-3 fill-current" />
-                          Reserve
+                          {animal.pre_reservation_client_id ? 'Pré-réservé' : 'Reserve'}
                         </span>
                       )}
                       {retirementBasket && (

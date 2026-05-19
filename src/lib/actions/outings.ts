@@ -603,13 +603,22 @@ export async function getAssignments(filters?: {
 
 export async function createAssignment(data: {
   animal_id: string
-  assigned_to: string
+  // Soit on assigne à un membre de l'équipe (assigned_to), soit à un partenaire
+  // externe (partner_id). Exactement un des deux est requis.
+  assigned_to?: string | null
+  partner_id?: string | null
   date?: string
   notes?: string | null
 }) {
   try {
     const { userId, establishmentId } = await requirePermission('manage_outing_assignments')
     const supabase = createAdminClient()
+
+    const hasMember = !!data.assigned_to
+    const hasPartner = !!data.partner_id
+    if (hasMember === hasPartner) {
+      return { error: 'Spécifier exactement un membre OU un partenaire externe' }
+    }
 
     const targetDate = data.date || new Date().toISOString().split('T')[0]
 
@@ -618,7 +627,8 @@ export async function createAssignment(data: {
       .insert({
         establishment_id: establishmentId,
         animal_id: data.animal_id,
-        assigned_to: data.assigned_to,
+        assigned_to: data.assigned_to ?? null,
+        partner_id: data.partner_id ?? null,
         assigned_by: userId,
         date: targetDate,
         notes: data.notes ?? null,
@@ -628,7 +638,7 @@ export async function createAssignment(data: {
 
     if (error) {
       if (error.code === '23505') {
-        return { error: 'Ce chien est deja assigne a cette personne pour ce jour' }
+        return { error: 'Ce chien est deja assigne pour ce jour' }
       }
       return { error: error.message }
     }
@@ -646,6 +656,27 @@ export async function createAssignment(data: {
     })
 
     return { data: assignment }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Partenaires externes (Akéla & co)
+// ---------------------------------------------------------------------------
+
+export async function getOutingPartners() {
+  try {
+    const { establishmentId } = await requireEstablishment()
+    const supabase = createAdminClient()
+    const { data, error } = await supabase
+      .from('outing_partners')
+      .select('*')
+      .eq('establishment_id', establishmentId)
+      .eq('is_active', true)
+      .order('name')
+    if (error) return { error: error.message }
+    return { data: data ?? [] }
   } catch (e) {
     return { error: (e as Error).message }
   }

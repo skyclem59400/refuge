@@ -31,6 +31,7 @@ const PERMISSION_LABELS: { key: Permission; label: string }[] = [
   { key: 'manage_leaves', label: 'Gestion conges' },
   { key: 'view_own_leaves', label: 'Voir ses conges' },
   { key: 'manage_payslips', label: 'Bulletins de paie' },
+  { key: 'view_animal_news', label: 'Nouvelles (FA / adoptants)' },
 ]
 
 function ToggleSwitch({ checked, onChange, pending }: Readonly<{ checked: boolean; onChange: () => void; pending?: boolean }>) {

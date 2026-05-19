@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { createAdminClient } from '@/lib/supabase/server'
 import { downloadSignedPdf } from '@/lib/documenso/client'
 import { finalizeMovementOnSignature } from '@/lib/actions/movement-with-contract'
+import { markEngagementCertificateSigned } from '@/lib/actions/engagement-certificates'
 import type { SignatureStatus } from '@/lib/types/database'
 
 // Documenso webhook events we care about:
@@ -103,30 +104,44 @@ export async function POST(request: NextRequest) {
   // Documents from Optimus carry an externalId. The prefix distinguishes the type:
   //   "adoption_<uuid>"     → adoption_contracts
   //   "abandonment_<uuid>"  → abandonment_contracts
+  //   "engagement_<uuid>"   → engagement_certificates (certificat d'engagement loi 30/11/2021)
   //   "<uuid>" (no prefix)  → foster_contracts (legacy)
   const externalId = payload.data?.externalId
   const isAdoption = typeof externalId === 'string' && externalId.startsWith('adoption_')
   const isAbandonment = typeof externalId === 'string' && externalId.startsWith('abandonment_')
+  const isEngagement = typeof externalId === 'string' && externalId.startsWith('engagement_')
 
-  const tableName: 'adoption_contracts' | 'foster_contracts' | 'abandonment_contracts' =
+  type SupportedTable = 'adoption_contracts' | 'foster_contracts' | 'abandonment_contracts' | 'engagement_certificates'
+  type SupportedBucket = 'adoption-contracts' | 'foster-contracts' | 'abandonment-contracts' | 'engagement-certificates'
+
+  const tableName: SupportedTable =
     isAdoption ? 'adoption_contracts'
     : isAbandonment ? 'abandonment_contracts'
+    : isEngagement ? 'engagement_certificates'
     : 'foster_contracts'
-  const bucketName: 'adoption-contracts' | 'foster-contracts' | 'abandonment-contracts' =
+  const bucketName: SupportedBucket =
     isAdoption ? 'adoption-contracts'
     : isAbandonment ? 'abandonment-contracts'
+    : isEngagement ? 'engagement-certificates'
     : 'foster-contracts'
 
+  // Le certificat d'engagement utilise `status` (draft|sent|signed|...) au lieu de
+  // `signature_status` (not_sent|pending|signed|...). On lit donc le champ adapté.
   type ContractRow = { id: string; animal_id: string; signature_status: string; documenso_document_id: number | null }
 
   // Find the contract by Documenso document id (preferred) or by id from externalId.
   // We type the select results explicitly because Supabase narrows the runtime type to `never`
   // when the table name is a union literal and not a hardcoded string.
+  // Pour engagement_certificates, le champ d'état est `status` (pas signature_status).
+  // On l'aliase pour garder un type unique côté TS.
+  const stateColumn = isEngagement ? 'status' : 'signature_status'
+  const selectCols = `id, animal_id, ${stateColumn} as signature_status, documenso_document_id`
+
   let contract: ContractRow | null = null
   {
     const { data } = await admin
       .from(tableName)
-      .select('id, animal_id, signature_status, documenso_document_id')
+      .select(selectCols)
       .eq('documenso_document_id', documensoDocId)
       .maybeSingle<ContractRow>()
     contract = data
@@ -136,9 +151,10 @@ export async function POST(request: NextRequest) {
     let idLookup = externalId
     if (isAdoption) idLookup = externalId.replace(/^adoption_/, '')
     else if (isAbandonment) idLookup = externalId.replace(/^abandonment_/, '')
+    else if (isEngagement) idLookup = externalId.replace(/^engagement_/, '')
     const { data } = await admin
       .from(tableName)
-      .select('id, animal_id, signature_status, documenso_document_id')
+      .select(selectCols)
       .eq('id', idLookup)
       .maybeSingle<ContractRow>()
     contract = data
@@ -148,10 +164,71 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, ignored: 'contract not found' })
   }
 
-  const updateData: Record<string, unknown> = { signature_status: newStatus }
-
   const recipients = payload.data?.recipients ?? payload.data?.Recipient ?? []
   const firstSigned = recipients.find((r) => r.signedAt)
+  const finalEvent = payload.event === 'document.completed' || payload.event === 'document.signed'
+
+  // ============================================
+  // Cas spécial : engagement_certificates
+  // — utilise `status` (draft|sent|signed|...) au lieu de `signature_status`
+  // — pas de mouvement à finaliser
+  // — déclenche calcul de can_finalize_at = signed_at + 7 jours (via markEngagementCertificateSigned)
+  // ============================================
+  if (isEngagement) {
+    if (newStatus === 'signed' && finalEvent && contract.signature_status !== 'signed') {
+      // 1. Télécharge + stocke le PDF signé
+      let signedPdfUrl: string | null = null
+      try {
+        const buf = await downloadSignedPdf(documensoDocId)
+        const fileName = `signed_${contract.id}_${Date.now()}.pdf`
+        const { data: upload, error: uploadErr } = await admin.storage
+          .from(bucketName)
+          .upload(fileName, Buffer.from(buf), {
+            contentType: 'application/pdf',
+            upsert: false,
+          })
+        if (!uploadErr && upload) {
+          const { data: pub } = admin.storage.from(bucketName).getPublicUrl(upload.path)
+          signedPdfUrl = pub.publicUrl
+        }
+      } catch (e) {
+        console.warn('Webhook (engagement): could not download signed PDF:', (e as Error).message)
+      }
+
+      // 2. Marque signé + calcule J+7
+      const signedAt = firstSigned?.signedAt ? new Date(firstSigned.signedAt) : new Date()
+      await markEngagementCertificateSigned(contract.id, signedAt)
+      if (signedPdfUrl) {
+        await admin
+          .from('engagement_certificates')
+          .update({ signed_pdf_url: signedPdfUrl })
+          .eq('id', contract.id)
+      }
+    } else if (newStatus === 'rejected') {
+      await admin
+        .from('engagement_certificates')
+        .update({ status: 'cancelled' })
+        .eq('id', contract.id)
+      // Remet l'animal disponible si on a une pré-réservation pointant sur cet adoptant
+      await admin
+        .from('animals')
+        .update({ pre_reservation_client_id: null, reserved: false })
+        .eq('id', contract.animal_id)
+    } else if (newStatus === 'viewed') {
+      await admin
+        .from('engagement_certificates')
+        .update({ signature_viewed_at: new Date().toISOString() })
+        .eq('id', contract.id)
+    }
+
+    return NextResponse.json({ ok: true, contractId: contract.id, type: 'engagement', newStatus })
+  }
+
+  // ============================================
+  // Cas standard : foster_contracts | adoption_contracts | abandonment_contracts
+  // ============================================
+  const updateData: Record<string, unknown> = { signature_status: newStatus }
+
   if (firstSigned?.signedAt) {
     updateData.signed_at_via_documenso = firstSigned.signedAt
   }
@@ -159,7 +236,6 @@ export async function POST(request: NextRequest) {
     updateData.signature_viewed_at = new Date().toISOString()
   }
 
-  const finalEvent = payload.event === 'document.completed' || payload.event === 'document.signed'
   if (newStatus === 'signed' && finalEvent && contract.signature_status !== 'signed') {
     try {
       const buf = await downloadSignedPdf(documensoDocId)

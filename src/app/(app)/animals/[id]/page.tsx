@@ -12,6 +12,8 @@ import { getHealthProtocols } from '@/lib/actions/health-protocols'
 import { getActivityLogs } from '@/lib/actions/activity-log'
 import { getOutings } from '@/lib/actions/outings'
 import { getSponsorshipsForAnimal } from '@/lib/actions/sponsorships'
+import { getEngagementCertificateForAnimal } from '@/lib/actions/engagement-certificates'
+import { PreReservationBanner } from '@/components/engagement-certificates/pre-reservation-banner'
 import { ArrowLeft } from 'lucide-react'
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>
@@ -111,16 +113,18 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
   const data = await fetchAnimalData(admin, id, estabId)
   if (!data.animal) notFound()
 
-  const [outingsResult, treatmentsResult, protocolsResult, sponsorshipsResult] = await Promise.all([
+  const [outingsResult, treatmentsResult, protocolsResult, sponsorshipsResult, engagementCertResult] = await Promise.all([
     getOutings({ animalId: id, limit: 100 }),
     getTreatments({ animalId: id }),
     getHealthProtocols({ activeOnly: true, species: data.animal.species }),
     getSponsorshipsForAnimal(id),
+    getEngagementCertificateForAnimal(id),
   ])
   const outings = outingsResult.data || []
   const treatments = (treatmentsResult.data || []) as AnimalTreatment[]
   const healthProtocols = protocolsResult.data || []
   const sponsorships = sponsorshipsResult.data || []
+  const engagementCertificate = ('error' in engagementCertResult ? null : engagementCertResult.data) || null
 
   // Collect user IDs from movements, health records, and outings
   const allCreatedByIds = [
@@ -192,6 +196,17 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
           </div>
         </div>
       </div>
+
+      {/* Pré-réservation / Certificat d'engagement (loi 30/11/2021) */}
+      <PreReservationBanner
+        animalId={data.animal.id}
+        animalName={data.animal.name}
+        animalStatus={data.animal.status}
+        preReservationClientId={data.animal.pre_reservation_client_id}
+        certificate={engagementCertificate}
+        establishmentId={estabId}
+        canManage={ctx!.permissions.canManageAdoptions}
+      />
 
       {/* Tabbed content */}
       <AnimalDetailTabs

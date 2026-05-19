@@ -110,6 +110,7 @@ export async function createEstablishment(data: {
       manage_veterinarians: true,
       view_pound: true,
       view_statistics: true,
+      view_animal_news: true,
     })
     .select()
     .single()
@@ -213,6 +214,7 @@ export async function createPermissionGroup(data: {
         manage_veterinarians: data.manage_veterinarians ?? false,
         view_pound: data.view_pound ?? false,
         view_statistics: data.view_statistics ?? false,
+        view_animal_news: data.view_animal_news ?? false,
       })
       .select()
       .single()

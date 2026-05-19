@@ -23,6 +23,7 @@ import {
   Wallet,
   MapPin,
   KeyRound,
+  Sparkles,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -67,6 +68,7 @@ const shelterSections: NavSection[] = [
     items: [
       { href: '/clients', label: 'Répertoire', Icon: Users, permission: 'canManageClients' },
       { href: '/publications', label: 'Publications', Icon: Share2, permission: 'canManagePosts' },
+      { href: '/nouvelles', label: 'Nouvelles', Icon: Sparkles, permission: 'canViewAnimalNews' },
       { href: '/appels', label: 'Appels', Icon: PhoneCall, permission: 'canManageEstablishment' },
       { href: '/contacts-entrants', label: 'Contacts entrants', Icon: Inbox, permission: 'isOwner' },
     ],

@@ -4,10 +4,14 @@ import { useEffect, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { X, Loader2, Footprints, Search } from 'lucide-react'
-import { createAssignment } from '@/lib/actions/outings'
+import { X, Loader2, Footprints, Search, Handshake } from 'lucide-react'
+import { createAssignment, getOutingPartners } from '@/lib/actions/outings'
 import { getEstablishmentMembers } from '@/lib/actions/establishments'
-import type { EstablishmentMember } from '@/lib/types/database'
+import type { EstablishmentMember, OutingPartner } from '@/lib/types/database'
+
+type Selection =
+  | { kind: 'member'; userId: string; display: string }
+  | { kind: 'partner'; partnerId: string; display: string; label: string | null }
 
 interface Props {
   animalId: string
@@ -25,53 +29,67 @@ function todayIso(): string {
 export function AssignOutingModal({ animalId, animalName, animalPhotoUrl, animalSpeciesEmoji, onClose }: Props) {
   const router = useRouter()
   const [members, setMembers] = useState<EstablishmentMember[] | null>(null)
+  const [partners, setPartners] = useState<OutingPartner[] | null>(null)
   const [search, setSearch] = useState('')
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [selection, setSelection] = useState<Selection | null>(null)
   const [date, setDate] = useState<string>(todayIso())
   const [notes, setNotes] = useState('')
   const [pending, startTransition] = useTransition()
 
   useEffect(() => {
     let cancelled = false
-    getEstablishmentMembers()
-      .then((res) => {
+    Promise.all([getEstablishmentMembers(), getOutingPartners()])
+      .then(([memRes, partRes]) => {
         if (cancelled) return
-        if ('error' in res && res.error) {
-          toast.error(res.error)
+        if ('error' in memRes && memRes.error) {
+          toast.error(memRes.error)
           setMembers([])
-        } else if ('data' in res) {
-          setMembers(res.data ?? [])
+        } else if ('data' in memRes) {
+          setMembers(memRes.data ?? [])
         } else {
           setMembers([])
+        }
+        if ('error' in partRes && partRes.error) {
+          setPartners([])
+        } else if ('data' in partRes) {
+          setPartners((partRes.data ?? []) as OutingPartner[])
+        } else {
+          setPartners([])
         }
       })
       .catch((err) => {
         if (cancelled) return
-        console.error('getEstablishmentMembers failed:', err)
-        toast.error("Impossible de charger l'équipe.")
+        console.error('Loading members/partners failed:', err)
+        toast.error('Impossible de charger les choix.')
         setMembers([])
+        setPartners([])
       })
     return () => {
       cancelled = true
     }
   }, [])
 
-  const filtered = (members ?? []).filter((m) => {
-    if (!search.trim()) return true
-    const q = search.toLowerCase()
+  const q = search.trim().toLowerCase()
+  const filteredMembers = (members ?? []).filter((m) => {
+    if (!q) return true
     const name = (m.full_name ?? m.email ?? '').toLowerCase()
     return name.includes(q)
   })
+  const filteredPartners = (partners ?? []).filter((p) => {
+    if (!q) return true
+    return p.name.toLowerCase().includes(q) || (p.default_outing_label?.toLowerCase().includes(q) ?? false)
+  })
 
   function handleSubmit() {
-    if (!selectedUserId) {
+    if (!selection) {
       toast.error('Sélectionnez la personne qui sort le chien.')
       return
     }
     startTransition(async () => {
       const result = await createAssignment({
         animal_id: animalId,
-        assigned_to: selectedUserId,
+        assigned_to: selection.kind === 'member' ? selection.userId : null,
+        partner_id: selection.kind === 'partner' ? selection.partnerId : null,
         date,
         notes: notes.trim() || null,
       })
@@ -79,7 +97,8 @@ export function AssignOutingModal({ animalId, animalName, animalPhotoUrl, animal
         toast.error(result.error)
         return
       }
-      toast.success(`Sortie assignée pour ${animalName}.`)
+      const tagSuffix = selection.kind === 'partner' && selection.label ? ` (${selection.label})` : ''
+      toast.success(`Sortie assignée pour ${animalName}${tagSuffix}.`)
       router.refresh()
       onClose()
     })
@@ -137,54 +156,103 @@ export function AssignOutingModal({ animalId, animalName, animalPhotoUrl, animal
             />
           </div>
 
-          {/* Liste membres */}
-          <div className="max-h-64 overflow-y-auto -mx-1 px-1">
-            {members === null && (
+          {/* Liste membres + partenaires */}
+          <div className="max-h-72 overflow-y-auto -mx-1 px-1 space-y-3">
+            {(members === null || partners === null) && (
               <div className="flex items-center gap-2 text-sm text-muted py-4">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Chargement de l'équipe…
+                Chargement…
               </div>
             )}
-            {members && filtered.length === 0 && (
-              <div className="text-sm text-muted py-4 text-center">
-                {search ? 'Personne ne correspond.' : 'Aucun membre dans l\'établissement.'}
-              </div>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {filtered.map((m) => {
-                const isSelected = selectedUserId === m.user_id
-                const display = m.full_name || m.email || m.user_id
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setSelectedUserId(m.user_id)}
-                    className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
-                      isSelected
-                        ? 'bg-primary/15 border border-primary'
-                        : 'bg-surface-dark hover:bg-surface-dark/70 border border-transparent'
-                    }`}
-                  >
-                    <div className="w-8 h-8 rounded-full overflow-hidden bg-muted/15 shrink-0">
-                      {m.avatar_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={m.avatar_url} alt={display} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[11px] font-bold text-muted">
-                          {display.slice(0, 2).toUpperCase()}
+
+            {/* Partenaires externes (Akéla & co) */}
+            {partners && filteredPartners.length > 0 && (
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted px-1 mb-1.5 flex items-center gap-1.5">
+                  <Handshake className="w-3 h-3" /> Partenaires
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {filteredPartners.map((p) => {
+                    const isSelected = selection?.kind === 'partner' && selection.partnerId === p.id
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setSelection({ kind: 'partner', partnerId: p.id, display: p.name, label: p.default_outing_label })}
+                        className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
+                          isSelected
+                            ? 'bg-primary/15 border border-primary'
+                            : 'bg-surface-dark hover:bg-surface-dark/70 border border-transparent'
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-full bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
+                          <Handshake className="w-4 h-4" />
                         </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium truncate">{display}</div>
-                      {m.full_name && m.email && (
-                        <div className="text-[11px] text-muted truncate">{m.email}</div>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium truncate">{p.name}</div>
+                          {p.default_outing_label && (
+                            <div className="text-[11px] text-amber-500 truncate font-medium">
+                              {p.default_outing_label}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Équipe */}
+            {members && (
+              <div>
+                {(partners?.length ?? 0) > 0 && (
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted px-1 mb-1.5">
+                    Équipe
+                  </div>
+                )}
+                {filteredMembers.length === 0 && filteredPartners.length === 0 && (
+                  <div className="text-sm text-muted py-4 text-center">
+                    {search ? 'Personne ne correspond.' : 'Aucun membre dans l\'établissement.'}
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {filteredMembers.map((m) => {
+                    const isSelected = selection?.kind === 'member' && selection.userId === m.user_id
+                    const display = m.full_name || m.email || m.user_id
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setSelection({ kind: 'member', userId: m.user_id, display })}
+                        className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
+                          isSelected
+                            ? 'bg-primary/15 border border-primary'
+                            : 'bg-surface-dark hover:bg-surface-dark/70 border border-transparent'
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-muted/15 shrink-0">
+                          {m.avatar_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={m.avatar_url} alt={display} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-[11px] font-bold text-muted">
+                              {display.slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium truncate">{display}</div>
+                          {m.full_name && m.email && (
+                            <div className="text-[11px] text-muted truncate">{m.email}</div>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Date + notes */}
@@ -231,7 +299,7 @@ export function AssignOutingModal({ animalId, animalName, animalPhotoUrl, animal
           </button>
           <button
             onClick={handleSubmit}
-            disabled={pending || !selectedUserId}
+            disabled={pending || !selection}
             className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
           >
             {pending && <Loader2 className="w-4 h-4 animate-spin" />}
