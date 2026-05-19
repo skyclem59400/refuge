@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { X, Loader2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { createSchedule } from '@/lib/actions/schedule'
+import { DatePicker } from '@/components/ui/date-picker'
 
 interface Member {
   user_id: string
@@ -100,13 +101,11 @@ export function ScheduleForm({ members, userNames, onClose }: Readonly<ScheduleF
           <label htmlFor="schedule-date" className="block text-xs font-medium text-muted mb-1">
             Date *
           </label>
-          <input
+          <DatePicker
             id="schedule-date"
-            type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(v) => setDate(v ?? '')}
             required
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
             disabled={isPending}
           />
         </div>

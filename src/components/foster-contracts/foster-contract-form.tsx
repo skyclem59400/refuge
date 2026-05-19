@@ -7,6 +7,7 @@ import { Loader2, Plus } from 'lucide-react'
 import { updateFosterContract } from '@/lib/actions/foster-contracts'
 import { searchClientsByCategory, createClientAction } from '@/lib/actions/clients'
 import { getClientDisplayName, type ClientKind, type FosterContract, type FosterContractStatus } from '@/lib/types/database'
+import { DatePicker } from '@/components/ui/date-picker'
 
 interface FosterFamilyOption {
   id: string
@@ -209,15 +210,15 @@ export function FosterContractForm({ animalId, contract, onClose }: Readonly<Fos
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label htmlFor="fc-start-date" className={labelClass}>Date de debut *</label>
-          <input id="fc-start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className={inputClass} />
+          <DatePicker id="fc-start-date" value={startDate} onChange={(v) => setStartDate(v ?? '')} required />
         </div>
         <div>
           <label htmlFor="fc-expected-end" className={labelClass}>Fin previsionnelle</label>
-          <input id="fc-expected-end" type="date" value={expectedEndDate} onChange={(e) => setExpectedEndDate(e.target.value)} className={inputClass} />
+          <DatePicker id="fc-expected-end" value={expectedEndDate} onChange={(v) => setExpectedEndDate(v ?? '')} />
         </div>
         <div>
           <label htmlFor="fc-actual-end" className={labelClass}>Fin reelle</label>
-          <input id="fc-actual-end" type="date" value={actualEndDate} onChange={(e) => setActualEndDate(e.target.value)} className={inputClass} />
+          <DatePicker id="fc-actual-end" value={actualEndDate} onChange={(v) => setActualEndDate(v ?? '')} />
         </div>
       </div>
 
@@ -271,7 +272,7 @@ export function FosterContractForm({ animalId, contract, onClose }: Readonly<Fos
         </div>
         <div>
           <label htmlFor="fc-signed-at" className={labelClass}>Date de signature</label>
-          <input id="fc-signed-at" type="date" value={signedAt} onChange={(e) => setSignedAt(e.target.value)} className={inputClass} />
+          <DatePicker id="fc-signed-at" value={signedAt} onChange={(v) => setSignedAt(v ?? '')} />
         </div>
       </div>
 

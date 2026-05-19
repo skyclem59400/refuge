@@ -13,6 +13,7 @@ import { getSocialPostTypeLabel } from '@/lib/sda-utils'
 import { VideoPreview } from './video-preview'
 import { VideoControls } from './video-controls'
 import { getSpeciesEmoji, getSpeciesLabel } from '@/lib/species'
+import { DatePicker } from '@/components/ui/date-picker'
 import type { VideoProps } from '@/remotion/types'
 import type { SocialPost, SocialPostType, SocialPlatform } from '@/lib/types/database'
 
@@ -437,8 +438,6 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
     })
   }
 
-  const today = new Date().toISOString().split('T')[0]
-
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Animal selector */}
@@ -805,13 +804,11 @@ export function PublicationForm({ animals, establishmentName, establishmentPhone
               <label htmlFor="pub-schedule-date" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                 Date
               </label>
-              <input
+              <DatePicker
                 id="pub-schedule-date"
-                type="date"
                 value={scheduleDate}
-                min={today}
-                onChange={(e) => setScheduleDate(e.target.value)}
-                className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                onChange={(v) => setScheduleDate(v ?? '')}
+                ariaLabel="Date de programmation"
               />
             </div>
             <div>

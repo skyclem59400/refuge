@@ -18,6 +18,7 @@ import {
   type Client,
   type ClientKind,
 } from '@/lib/types/database'
+import { DatePicker } from '@/components/ui/date-picker'
 
 type CedantOption = Pick<Client, 'id' | 'kind' | 'name' | 'first_name' | 'email' | 'phone' | 'address' | 'postal_code' | 'city'>
 
@@ -126,13 +127,13 @@ export function AbandonmentContractForm({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="ab-sig-date" className={labelClass}>Date du contrat *</label>
-          <input id="ab-sig-date" type="date" required value={signatureDate}
-            onChange={(e) => setSignatureDate(e.target.value)} className={inputClass} />
+          <DatePicker id="ab-sig-date" value={signatureDate}
+            onChange={(v) => setSignatureDate(v ?? '')} required />
         </div>
         <div>
           <label htmlFor="ab-handover" className={labelClass}>Date de remise prévue</label>
-          <input id="ab-handover" type="date" value={expectedHandoverDate}
-            onChange={(e) => setExpectedHandoverDate(e.target.value)} className={inputClass} />
+          <DatePicker id="ab-handover" value={expectedHandoverDate}
+            onChange={(v) => setExpectedHandoverDate(v ?? '')} />
           <p className="text-[10px] text-muted/70 mt-1">Quand l&apos;animal arrivera physiquement</p>
         </div>
       </div>

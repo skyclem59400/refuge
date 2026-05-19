@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Stethoscope, Filter, FileDown, Printer } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { getHealthTypeLabel } from '@/lib/sda-utils'
+import { DatePicker } from '@/components/ui/date-picker'
 import type { PassageVeto } from '@/lib/actions/passages-veto'
 import type { VeterinaryClinicWithVets } from '@/lib/types/database'
 
@@ -95,11 +96,21 @@ export function PassagesVetoClient({ passages, stats, clinics, initialFilters }:
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-sm">
           <div>
             <label htmlFor="pv-start" className="block text-xs text-muted mb-1">Du</label>
-            <input id="pv-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full px-2 py-1.5 bg-surface-dark border border-border rounded-lg text-xs" />
+            <DatePicker
+              id="pv-start"
+              value={startDate}
+              onChange={(v) => setStartDate(v ?? '')}
+              ariaLabel="Date de début"
+            />
           </div>
           <div>
             <label htmlFor="pv-end" className="block text-xs text-muted mb-1">Au</label>
-            <input id="pv-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full px-2 py-1.5 bg-surface-dark border border-border rounded-lg text-xs" />
+            <DatePicker
+              id="pv-end"
+              value={endDate}
+              onChange={(v) => setEndDate(v ?? '')}
+              ariaLabel="Date de fin"
+            />
           </div>
           <div>
             <label htmlFor="pv-clinic" className="block text-xs text-muted mb-1">Cabinet</label>

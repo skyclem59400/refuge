@@ -7,6 +7,7 @@ import { Loader2, Plus } from 'lucide-react'
 import { updateAdoptionContract } from '@/lib/actions/adoption-contracts'
 import { searchClientsByCategory, createClientAction } from '@/lib/actions/clients'
 import { getClientDisplayName, type AdoptionContract, type AdoptionContractStatus, type ClientKind } from '@/lib/types/database'
+import { DatePicker } from '@/components/ui/date-picker'
 
 interface AdopterOption {
   id: string
@@ -208,7 +209,7 @@ export function AdoptionContractForm({ animalId, contract, onClose }: Readonly<A
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label htmlFor="ac-date" className={labelClass}>Date d'adoption *</label>
-          <input id="ac-date" type="date" value={adoptionDate} onChange={(e) => setAdoptionDate(e.target.value)} required className={inputClass} />
+          <DatePicker id="ac-date" value={adoptionDate} onChange={(v) => setAdoptionDate(v ?? '')} required />
         </div>
         <div>
           <label htmlFor="ac-fee" className={labelClass}>Frais d'adoption (€)</label>
@@ -235,7 +236,7 @@ export function AdoptionContractForm({ animalId, contract, onClose }: Readonly<A
           <div className="ml-6 grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label htmlFor="ac-ster-deadline" className={labelClass}>Échéance stérilisation</label>
-              <input id="ac-ster-deadline" type="date" value={sterilizationDeadline} onChange={(e) => setSterilizationDeadline(e.target.value)} className={inputClass} />
+              <DatePicker id="ac-ster-deadline" value={sterilizationDeadline} onChange={(v) => setSterilizationDeadline(v ?? '')} />
             </div>
             <div>
               <label htmlFor="ac-ster-deposit" className={labelClass}>Caution (€)</label>
@@ -274,7 +275,7 @@ export function AdoptionContractForm({ animalId, contract, onClose }: Readonly<A
         </div>
         <div>
           <label htmlFor="ac-signed-at" className={labelClass}>Date de signature</label>
-          <input id="ac-signed-at" type="date" value={signedAt} onChange={(e) => setSignedAt(e.target.value)} className={inputClass} />
+          <DatePicker id="ac-signed-at" value={signedAt} onChange={(v) => setSignedAt(v ?? '')} />
         </div>
       </div>
 

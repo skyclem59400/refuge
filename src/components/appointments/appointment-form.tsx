@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { CalendarDays, Clock, User, Phone, Mail, PawPrint, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { createAppointment } from '@/lib/actions/appointments'
+import { DatePicker } from '@/components/ui/date-picker'
 import type { AppointmentType, AppointmentStatus } from '@/lib/types/database'
 
 interface AppointmentFormProps {
@@ -286,13 +287,11 @@ export function AppointmentForm({ animals = [], members = [], userNames = {}, on
             <CalendarDays className="w-3.5 h-3.5 inline mr-1" />
             Date {!showCustomType && <span className="text-error">*</span>}
           </label>
-          <input
-            type="date"
+          <DatePicker
             id="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(v) => setDate(v ?? '')}
             required={!showCustomType}
-            className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
 

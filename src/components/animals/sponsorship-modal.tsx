@@ -8,7 +8,6 @@ import {
   Loader2,
   Search,
   Euro,
-  CalendarDays,
   HandHeart,
   Heart,
   UserPlus,
@@ -20,6 +19,7 @@ import {
   endSponsorship,
 } from '@/lib/actions/sponsorships'
 import { searchAllClients, createClientAction } from '@/lib/actions/clients'
+import { DatePicker } from '@/components/ui/date-picker'
 import {
   getClientDisplayName,
   SPONSORSHIP_ENDED_REASON_LABELS,
@@ -524,14 +524,11 @@ export function SponsorshipModal(props: Props) {
             <label className="block text-xs font-medium text-muted mb-1.5 uppercase tracking-wider">
               Date de début
             </label>
-            <div className="relative max-w-[220px]">
-              <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
-              <input
-                type="date"
+            <div className="max-w-[220px]">
+              <DatePicker
                 value={startedAt}
-                onChange={(e) => setStartedAt(e.target.value)}
+                onChange={(v) => setStartedAt(v ?? '')}
                 disabled={mode === 'edit'}
-                className="w-full pl-9 pr-3 py-2 bg-surface-dark border border-border rounded-md text-sm disabled:opacity-60"
               />
             </div>
             {mode === 'edit' && (
@@ -688,11 +685,9 @@ export function EndSponsorshipModal({ sponsorshipId, sponsorName, onClose }: End
             <label className="block text-xs font-medium text-muted mb-1.5 uppercase tracking-wider">
               Date de fin
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={endedAt}
-              onChange={(e) => setEndedAt(e.target.value)}
-              className="w-full px-3 py-2 bg-surface-dark border border-border rounded-md text-sm"
+              onChange={(v) => setEndedAt(v ?? '')}
             />
           </div>
         </div>

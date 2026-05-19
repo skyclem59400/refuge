@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { X, Loader2, Footprints, Search, Handshake } from 'lucide-react'
 import { createAssignment, getOutingPartners } from '@/lib/actions/outings'
 import { getEstablishmentMembers } from '@/lib/actions/establishments'
+import { DatePicker } from '@/components/ui/date-picker'
 import type { EstablishmentMember, OutingPartner } from '@/lib/types/database'
 
 type Selection =
@@ -259,11 +260,9 @@ export function AssignOutingModal({ animalId, animalName, animalPhotoUrl, animal
           <div className="grid grid-cols-[auto_1fr] gap-3 items-end">
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Date</label>
-              <input
-                type="date"
+              <DatePicker
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="px-3 py-2 bg-surface-dark border border-border rounded-md text-sm"
+                onChange={(v) => setDate(v ?? todayIso())}
               />
               {!isToday && (
                 <button

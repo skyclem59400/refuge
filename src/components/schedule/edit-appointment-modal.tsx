@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateAppointment } from '@/lib/actions/appointments'
+import { DatePicker } from '@/components/ui/date-picker'
 import type { Appointment, AppointmentStatus } from '@/lib/types/database'
 
 interface EditAppointmentModalProps {
@@ -252,13 +253,11 @@ export function EditAppointmentModal({
               <label htmlFor="date" className="block text-sm font-medium mb-2">
                 Date <span className="text-error">*</span>
               </label>
-              <input
-                type="date"
+              <DatePicker
                 id="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(v) => setDate(v ?? '')}
                 required
-                className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
 

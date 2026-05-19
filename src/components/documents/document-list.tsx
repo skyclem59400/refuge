@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { deleteDocument, convertDevisToFacture, updateDocumentStatus, cancelFactureWithAvoir } from '@/lib/actions/documents'
 import { StatusBadge, TypeBadge } from './status-badge'
+import { DatePicker } from '@/components/ui/date-picker'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
 import type { Document, DocumentStatus, DocumentPaymentMethod } from '@/lib/types/database'
 
@@ -360,11 +361,9 @@ export function DocumentList({ initialData, canEdit, establishmentId }: Document
                 <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1">
                   Date de paiement
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-surface-dark border border-border rounded-lg text-sm focus:border-primary"
+                  onChange={(v) => setPaymentDate(v ?? new Date().toISOString().split('T')[0])}
                 />
               </div>
             </div>

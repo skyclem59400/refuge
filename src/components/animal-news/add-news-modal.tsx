@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { addAnimalNews } from '@/lib/actions/animal-news'
 import { SPECIES_LABELS } from '@/lib/species'
 import { getStatusLabel } from '@/lib/sda-utils'
+import { DatePicker } from '@/components/ui/date-picker'
 import type { AnimalNewsPhoto } from '@/lib/types/database'
 
 interface EligibleAnimal {
@@ -400,12 +401,11 @@ export function AddNewsModal({
               <label htmlFor="news-date" className="block text-sm font-semibold mb-2">
                 Date de réception
               </label>
-              <input
+              <DatePicker
                 id="news-date"
-                type="date"
                 value={receivedAt}
-                onChange={(e) => setReceivedAt(e.target.value)}
-                className="w-full px-3 py-2 bg-surface-dark border border-border rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                onChange={(v) => setReceivedAt(v ?? '')}
+                ariaLabel="Date de réception"
               />
             </div>
           </div>

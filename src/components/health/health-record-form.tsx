@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createHealthRecord, updateHealthRecord } from '@/lib/actions/health'
 import { VeterinarianSelect } from '@/components/health/veterinarian-select'
+import { DatePicker } from '@/components/ui/date-picker'
 import type { HealthRecordType } from '@/lib/types/database'
 
 const typeLabels: Record<HealthRecordType, string> = {
@@ -170,13 +171,11 @@ export function HealthRecordForm({ animalId, record, onClose, judicialAnimal = f
 
         <div>
           <label htmlFor="health-date" className={labelClass}>Date *</label>
-          <input
+          <DatePicker
             id="health-date"
-            type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(v) => setDate(v ?? '')}
             required
-            className={inputClass}
           />
         </div>
       </div>
@@ -265,12 +264,10 @@ export function HealthRecordForm({ animalId, record, onClose, judicialAnimal = f
       {/* Row 4: Prochain rappel (full width) */}
       <div>
         <label htmlFor="health-next-due-date" className={labelClass}>Prochain rappel</label>
-        <input
+        <DatePicker
           id="health-next-due-date"
-          type="date"
           value={nextDueDate}
-          onChange={(e) => setNextDueDate(e.target.value)}
-          className={inputClass}
+          onChange={(v) => setNextDueDate(v ?? '')}
         />
       </div>
 

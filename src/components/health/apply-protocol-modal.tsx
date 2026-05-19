@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Loader2, X, ListChecks } from 'lucide-react'
 import { applyProtocolToAnimal } from '@/lib/actions/health-protocols'
+import { DatePicker } from '@/components/ui/date-picker'
 import type { AnimalSpecies, HealthProtocolWithSteps } from '@/lib/types/database'
 
 interface ApplyProtocolModalProps {
@@ -111,7 +112,12 @@ export function ApplyProtocolModal({ animalId, animalSpecies, protocols, onClose
 
               <div>
                 <label htmlFor="apply-start-date" className={labelClass}>Date de debut *</label>
-                <input id="apply-start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className={inputClass} />
+                <DatePicker
+                  id="apply-start-date"
+                  value={startDate}
+                  onChange={(v) => setStartDate(v ?? '')}
+                  required
+                />
               </div>
 
               {selectedProtocol && (

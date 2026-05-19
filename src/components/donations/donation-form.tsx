@@ -7,6 +7,7 @@ import { Plus, Loader2, X, Search } from 'lucide-react'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
 import { createDonation, updateDonation } from '@/lib/actions/donations'
 import { createClientAction } from '@/lib/actions/clients'
+import { DatePicker } from '@/components/ui/date-picker'
 import {
   getClientDisplayName,
   type Client,
@@ -174,13 +175,12 @@ export function DonationForm({ donation, establishmentId }: Readonly<DonationFor
 
           <div>
             <label htmlFor="donation-date" className={labelClass}>Date du don *</label>
-            <input
+            <DatePicker
               id="donation-date"
-              type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(v) => setDate(v ?? '')}
               required
-              className={inputClass}
+              ariaLabel="Date du don"
             />
           </div>
 

@@ -1,8 +1,9 @@
 'use client'
 
-import { useActionState, useEffect } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { CheckCircle2, AlertCircle, Save } from 'lucide-react'
 import { updateCommune, type UpdateCommuneState } from '@/app/(app)/astreinte/communes/actions'
+import { DatePicker } from '@/components/ui/date-picker'
 
 interface Commune {
   code_insee: string
@@ -23,6 +24,8 @@ const initialState: UpdateCommuneState = { status: 'idle' }
 
 export function CommuneForm({ commune }: { commune: Commune }) {
   const [state, action, pending] = useActionState(updateCommune, initialState)
+  const [startDate, setStartDate] = useState<string | null>(commune.convention_start_date)
+  const [endDate, setEndDate] = useState<string | null>(commune.convention_end_date)
 
   // Auto-clear du statut success après 3s
   useEffect(() => {
@@ -70,19 +73,21 @@ export function CommuneForm({ commune }: { commune: Commune }) {
       <Section title="Période de validité">
         <div className="grid grid-cols-2 gap-4">
           <Field label="Date de début">
-            <input
-              type="date"
+            <DatePicker
               name="convention_start_date"
-              defaultValue={commune.convention_start_date ?? ''}
-              className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+              value={startDate}
+              onChange={setStartDate}
+              placeholder="Sélectionner une date"
+              ariaLabel="Date de début de la convention"
             />
           </Field>
           <Field label="Date de fin">
-            <input
-              type="date"
+            <DatePicker
               name="convention_end_date"
-              defaultValue={commune.convention_end_date ?? ''}
-              className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+              value={endDate}
+              onChange={setEndDate}
+              placeholder="Sélectionner une date"
+              ariaLabel="Date de fin de la convention"
             />
           </Field>
         </div>

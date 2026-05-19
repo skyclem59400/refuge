@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { X } from 'lucide-react'
+import { DatePicker } from '@/components/ui/date-picker'
 
 interface ScheduleDialogProps {
   isOpen: boolean
@@ -52,8 +53,6 @@ function ScheduleDialogContent({ onClose, onConfirm, initialDate, isPending }: R
   const [time, setTime] = useState(() => getInitialTime(initialDate))
   const [error, setError] = useState('')
 
-  const today = new Date().toISOString().split('T')[0]
-
   function handleConfirm() {
     if (!date || !time) {
       setError('Veuillez remplir la date et l\'heure')
@@ -94,13 +93,11 @@ function ScheduleDialogContent({ onClose, onConfirm, initialDate, isPending }: R
             <label htmlFor="schedule-dialog-date" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
               Date
             </label>
-            <input
+            <DatePicker
               id="schedule-dialog-date"
-              type="date"
               value={date}
-              min={today}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              onChange={(v) => setDate(v ?? '')}
+              ariaLabel="Date de programmation"
             />
           </div>
 

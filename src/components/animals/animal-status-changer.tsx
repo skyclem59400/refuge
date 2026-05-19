@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { ArrowRightLeft, Loader2, X, AlertTriangle } from 'lucide-react'
 import { recordMovement } from '@/lib/actions/animals'
 import { ClientSearch } from '@/components/clients/client-search'
+import { DatePicker } from '@/components/ui/date-picker'
 import type { AnimalStatus, MovementType, IcadStatus, Client } from '@/lib/types/database'
 
 interface AnimalStatusChangerProps {
@@ -234,13 +235,11 @@ export function AnimalStatusChanger({ animalId, animalName, currentStatus, estab
                     <label htmlFor="status-date" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                       Date *
                     </label>
-                    <input
+                    <DatePicker
                       id="status-date"
-                      type="date"
                       value={date}
-                      onChange={(e) => setDate(e.target.value)}
+                      onChange={(v) => setDate(v ?? '')}
                       required
-                      className={inputClass}
                     />
                   </div>
 

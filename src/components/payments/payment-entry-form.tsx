@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createPaymentEntry, updatePaymentEntry } from '@/lib/actions/payment-entries'
 import { searchClientsByCategory } from '@/lib/actions/clients'
+import { DatePicker } from '@/components/ui/date-picker'
 import type {
   PaymentEntry,
   PaymentEntryMethod,
@@ -136,13 +137,12 @@ export function PaymentEntryForm({ entry }: Readonly<PaymentEntryFormProps>) {
           </div>
           <div>
             <label htmlFor="pe-date" className={labelClass}>Date *</label>
-            <input
+            <DatePicker
               id="pe-date"
-              type="date"
-              required
               value={paymentDate}
-              onChange={(e) => setPaymentDate(e.target.value)}
-              className={inputClass}
+              onChange={(v) => setPaymentDate(v ?? '')}
+              required
+              ariaLabel="Date du règlement"
             />
           </div>
           <div>

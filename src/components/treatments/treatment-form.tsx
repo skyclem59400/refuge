@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Loader2, X } from 'lucide-react'
 import { createTreatment, updateTreatment } from '@/lib/actions/treatments'
+import { DatePicker } from '@/components/ui/date-picker'
 import type { AnimalTreatment, TreatmentFrequency, AnimalHealthRecord } from '@/lib/types/database'
 
 const frequencyOptions: { value: TreatmentFrequency; label: string; description: string }[] = [
@@ -294,27 +295,21 @@ export function TreatmentForm({
           <label htmlFor="startDate" className="block text-sm font-medium mb-1.5">
             Date de debut <span className="text-error">*</span>
           </label>
-          <input
-            type="date"
+          <DatePicker
             id="startDate"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(v) => setStartDate(v ?? '')}
             required
-            className="w-full px-3 py-2 bg-surface-dark border border-border rounded-lg text-sm
-              focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
           />
         </div>
         <div>
           <label htmlFor="endDate" className="block text-sm font-medium mb-1.5">
             Date de fin <span className="text-xs text-muted">(optionnel)</span>
           </label>
-          <input
-            type="date"
+          <DatePicker
             id="endDate"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-full px-3 py-2 bg-surface-dark border border-border rounded-lg text-sm
-              focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+            onChange={(v) => setEndDate(v ?? '')}
           />
         </div>
 

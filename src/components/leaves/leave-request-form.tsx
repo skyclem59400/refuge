@@ -4,6 +4,7 @@ import { useState, useTransition, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createLeaveRequest } from '@/lib/actions/leaves'
+import { DatePicker } from '@/components/ui/date-picker'
 import type { LeaveType, LeaveBalance } from '@/lib/types/database'
 
 interface LeaveRequestFormProps {
@@ -133,13 +134,10 @@ export function LeaveRequestForm({ leaveTypes, balances }: LeaveRequestFormProps
           <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
             Date de debut *
           </label>
-          <input
-            type="date"
+          <DatePicker
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(v) => setStartDate(v ?? '')}
             required
-            className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm
-              focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
           />
           <label className="flex items-center gap-2 mt-2 cursor-pointer">
             <input
@@ -156,14 +154,10 @@ export function LeaveRequestForm({ leaveTypes, balances }: LeaveRequestFormProps
           <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
             Date de fin *
           </label>
-          <input
-            type="date"
+          <DatePicker
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={(v) => setEndDate(v ?? '')}
             required
-            min={startDate || undefined}
-            className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm
-              focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
           />
           <label className="flex items-center gap-2 mt-2 cursor-pointer">
             <input
