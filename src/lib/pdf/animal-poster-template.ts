@@ -110,7 +110,7 @@ export function buildAnimalPosterHtml(data: AnimalPosterData): string {
 <meta charset="utf-8" />
 <title>Affiche - ${escapeHtml(a.name ?? 'Animal')}</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap');
 
   @page { size: 1080px 1350px; margin: 0; }
 
@@ -153,15 +153,15 @@ export function buildAnimalPosterHtml(data: AnimalPosterData): string {
   }
   .placeholder-emoji { font-size: 400px; opacity: 0.3; }
 
-  /* === OVERLAY GRADIENT BAS === */
+  /* === OVERLAY GRADIENT BAS — un poil plus marqué pour lisibilité sur fonds clairs (chiens blancs) === */
   .gradient-overlay {
     position: absolute; inset: 0;
     background: linear-gradient(
       to bottom,
       transparent 0%,
-      transparent 40%,
-      rgba(15, 27, 42, 0.4) 60%,
-      rgba(15, 27, 42, 0.95) 90%,
+      transparent 32%,
+      rgba(15, 27, 42, 0.55) 50%,
+      rgba(15, 27, 42, 0.92) 78%,
       rgba(15, 27, 42, 1) 100%
     );
     z-index: 2;
@@ -189,13 +189,14 @@ export function buildAnimalPosterHtml(data: AnimalPosterData): string {
   .badge-eyebrow {
     background: var(--terracotta);
     color: var(--white);
-    padding: 10px 18px;
+    padding: 16px 28px;
     border-radius: 999px;
-    font-size: 16px;
-    letter-spacing: 0.18em;
-    font-weight: 800;
+    font-family: 'Baloo 2', system-ui, sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.14em;
+    font-weight: 700;
     text-transform: uppercase;
-    box-shadow: 0 4px 16px rgba(201, 107, 60, 0.5);
+    box-shadow: 0 8px 24px rgba(201, 107, 60, 0.55), 0 0 0 4px rgba(255, 255, 255, 0.12);
   }
 
   /* === CONTENU BAS === */
@@ -207,39 +208,40 @@ export function buildAnimalPosterHtml(data: AnimalPosterData): string {
   }
 
   .headline-prefix {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Baloo 2', system-ui, sans-serif;
     font-size: 22px;
     letter-spacing: 0.22em;
     font-weight: 600;
     text-transform: uppercase;
     color: var(--teal);
     margin-bottom: 12px;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.4);
   }
 
   .headline {
-    font-family: 'Fraunces', 'Georgia', serif;
-    font-size: 112px;
+    font-family: 'Baloo 2', system-ui, sans-serif;
+    font-size: 108px;
     line-height: 0.95;
-    font-weight: 500;
-    letter-spacing: -0.025em;
+    font-weight: 800;
+    letter-spacing: -0.015em;
     margin-bottom: 8px;
     color: var(--white);
-    text-shadow: 0 2px 24px rgba(0,0,0,0.5);
+    text-shadow: 0 4px 28px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.4);
   }
   .headline .name {
-    font-style: italic;
-    font-weight: 400;
+    font-weight: 800;
     color: var(--teal);
   }
 
   .location {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Baloo 2', system-ui, sans-serif;
     font-size: 28px;
-    font-weight: 500;
-    color: rgba(255,255,255,0.9);
+    font-weight: 600;
+    color: rgba(255,255,255,0.95);
     margin-top: 18px;
     margin-bottom: 28px;
     letter-spacing: 0.02em;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.35);
   }
   .location-pin { color: var(--terracotta); font-weight: 700; margin-right: 6px; }
   .location strong {
@@ -251,39 +253,41 @@ export function buildAnimalPosterHtml(data: AnimalPosterData): string {
 
   /* Meta principale : espèce · sexe · âge */
   .meta-main {
-    font-family: 'Inter', sans-serif;
-    font-size: 24px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
+    font-family: 'Baloo 2', system-ui, sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--white);
     margin-bottom: 8px;
     padding-bottom: 18px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
+    border-bottom: 1px solid rgba(255,255,255,0.22);
+    text-shadow: 0 2px 8px rgba(0,0,0,0.35);
   }
   .meta-main-sep { color: var(--teal); margin: 0 12px; }
 
   .meta-secondary {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Baloo 2', system-ui, sans-serif;
     font-size: 19px;
-    color: rgba(255,255,255,0.85);
+    color: rgba(255,255,255,0.9);
     line-height: 1.5;
     margin-top: 14px;
     margin-bottom: 18px;
-    font-weight: 400;
+    font-weight: 500;
   }
   .meta-secondary span { display: inline-block; }
   .meta-secondary .sep { color: var(--teal); margin: 0 10px; opacity: 0.6; }
 
   .circumstances {
-    font-family: 'Fraunces', serif;
+    font-family: 'Baloo 2', system-ui, sans-serif;
     font-style: italic;
     font-size: 20px;
-    color: rgba(255,255,255,0.75);
+    color: rgba(255,255,255,0.78);
     line-height: 1.4;
     margin-bottom: 24px;
     padding-left: 14px;
     border-left: 2px solid var(--teal);
+    font-weight: 500;
   }
 
   /* === CTA Phone === */
@@ -307,21 +311,22 @@ export function buildAnimalPosterHtml(data: AnimalPosterData): string {
     flex: 1;
   }
   .cta-label {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Baloo 2', system-ui, sans-serif;
     font-size: 14px;
     letter-spacing: 0.18em;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     color: var(--teal);
     margin-bottom: 4px;
   }
   .cta-phone {
-    font-family: 'Fraunces', serif;
+    font-family: 'Baloo 2', system-ui, sans-serif;
     font-size: 48px;
-    font-weight: 500;
+    font-weight: 700;
     color: var(--white);
     line-height: 1;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.4);
   }
 </style>
 </head>
