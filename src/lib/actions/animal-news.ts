@@ -165,6 +165,25 @@ export async function addAnimalNews(input: AddNewsInput) {
       return { error: error.message }
     }
 
+    const typedNews = news as AnimalNews
+
+    // Synchronise les photos vers animal_photos pour qu'elles apparaissent
+    // dans le tab Photos de la fiche animal (même après sortie/adoption).
+    // ON DELETE CASCADE depuis animal_news.id nettoiera auto en cas de suppression.
+    if (input.photos.length > 0) {
+      const photoRows = input.photos.map((p) => ({
+        animal_id: input.animal_id,
+        url: p.url,
+        is_primary: false, // les photos de nouvelles ne deviennent jamais photo principale
+        source_news_id: typedNews.id,
+      }))
+      // best-effort : si ça échoue, la news existe quand même, juste pas la sync
+      const { error: photoErr } = await admin.from('animal_photos').insert(photoRows)
+      if (photoErr) {
+        console.error('Failed to sync news photos to animal_photos:', photoErr.message)
+      }
+    }
+
     logActivity({
       action: 'create',
       entityType: 'animal_news',
