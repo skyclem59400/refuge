@@ -148,6 +148,67 @@
 - ✅ Dashboard ([dashboard/](src/app/(app)/dashboard/page.tsx)) : KPIs, CA, courbes
 - ✅ Page stats détaillée ([statistiques/](src/app/(app)/statistiques/page.tsx))
 
+### Parrainage d'animaux
+- ✅ Table `sponsorships` : un animal peut avoir N parrains, un parrain N filleuls
+- ✅ 3 kinds : `financial_monthly` (engagement récurrent), `financial_punctual` (don fléché), `symbolic` (lien moral sans flux financier)
+- ✅ Champs RGPD : `public_alias` + `show_publicly` (consentement affichage public sur portail)
+- ✅ Trigger DB `close_sponsorships_on_animal_exit` : ferme automatiquement les parrainages quand l'animal sort, avec raison adaptée (animal_adopted / animal_deceased / animal_transferred / animal_returned)
+- ✅ Dons fléchés via `donations.sponsorship_id` (cumul automatique par parrainage)
+- ✅ UI fiche animal : onglet « Parrains » avec compteur + résumé €/mois + modal create/edit/end
+- ✅ UI fiche client : section « Parrainages » avec grille filleuls + statut animal en cours + lien « Proposer un autre filleul » sur ended
+
+### Archive Hunimalis (contacts historiques)
+- ✅ Table `legacy_contacts` séparée de `clients` pour ne pas polluer le répertoire actif
+- ✅ Recherche fuzzy via `pg_trgm` GIN trigram index sur `full_name_normalized`
+- ✅ 28 306 contacts importés depuis l'XLSX Hunimalis (script Python réutilisable `scripts/import_legacy_contacts.py`)
+- ✅ Onglet « Archive Hunimalis » sur `/clients` avec recherche / pagination / filtre converti
+- ✅ Bouton « Convertir en client » avec détection automatique des doublons (phone OR nom+ville) → propose de lier au client existant plutôt que créer un doublon
+- ✅ Source flag `hunimalis_2026` pour purge/migration future
+- ✅ Heuristique Person vs Organization à la conversion (marqueurs ASSOCIATION/SOCIETE/MAIRIE/VETERINAIRE...)
+
+### Visuels réseaux sociaux animaux (poster + nouvelles)
+- ✅ **Poster fourrière / adoption** : format 1080×1350 (ratio 4:5, Facebook + Insta fil), photo plein cadre + gradient sombre overlay, badge AVIS pastille terracotta haut-droit, logo en cercle blanc avec halo, typo **Baloo 2** + Inter. Titre adaptatif : `AVIS · CHERCHONS PROPRIÉTAIRE` si origine `found`/`divagation`, sinon `À L'ADOPTION`. Bouton « Visuel » sur la fiche animal → `/api/pdf/animal-poster/[id]` (PNG défaut, PDF via `?format=pdf`, HTML preview via `?format=html`).
+- ✅ **Visuel Nouvelles solo** : format 1080×1350, eyebrow « Adopté il y a X mois » (calculé auto depuis `exit_date`), headline « Quoi de neuf, NomAnimal ? », citation italique border-left teal, footer SDA + handle réseaux.
+- ✅ **Visuel Nouvelles mosaïque** : grille 2×2 (2-4 animaux) ou 2×3 (5-6) sur fond paper, bandeau « QUELQUES NOUVELLES DE NOS ANCIENS », footer « Adoptez vous aussi → sda-nord.com ».
+- ✅ Helper `renderHtmlToImage()` dans `lib/pdf/render.ts` (Puppeteer custom-sized PNG/PDF).
+
+### Rubrique Nouvelles (post-adoption / FA)
+- ✅ Table `animal_news` : photos JSONB + texte + source (ex. « FA Mme Dupont ») + dates
+- ✅ Permission dédiée `view_animal_news` (off par défaut, activable membre par membre dans `/etablissement`) — bénévoles « promeneurs » n'y ont pas accès
+- ✅ Page `/nouvelles` : Inbox (non publiées) + Publié, multi-sélection pour publier en mosaïque
+- ✅ Storage : préfixe `news/` dans bucket `animal-photos` existant (pas de nouveau bucket)
+- ✅ **Synchronisation auto avec fiche animal** : photos insérées également dans `animal_photos` avec `source_news_id` (`is_primary=false` toujours) → apparaissent dans le tab Photos même pour animaux sortis. `ON DELETE CASCADE` garantit cleanup auto.
+- ✅ Éligibles : animaux avec status ∈ {adopted, foster_family, transferred, returned}
+
+### Certificat d'engagement (loi 30 nov 2021)
+- ✅ Premier document à signer avant adoption, délai légal 7 jours calendaires
+- ✅ Table `engagement_certificates` + colonne `pre_reservation_client_id` sur `animals` (badge « Pré-réservé » au lieu de « Réservé »)
+- ✅ Workflow : bouton « Pré-réserver pour adoption » sur fiche animal → envoi Documenso → bandeau d'état avec compteur J/7 (sent → signed J+X → ✓ prêt à finaliser à J+7) → bouton « Finaliser l'adoption »
+- ✅ PDF officiel Puppeteer (4 sections + délai 7j mis en avant, charte SDA)
+- ✅ Email branded SDA via Brevo (pas Documenso générique)
+- ✅ Webhook Documenso routé sur prefix `engagement_*` pour mise à jour `signed_at` + calcul `can_finalize_at`
+- ✅ Bouton « Annuler la pré-réservation » remet l'animal disponible
+
+### Partenaires externes pour sorties (Akéla)
+- ✅ Table `outing_partners` (5 kinds : educator, club, walker, foster_pro, other) avec label par défaut (ex. « Canicross ») et contact
+- ✅ `outing_assignments.assigned_to` nullable + `partner_id` nullable, CHECK exactement-un-des-deux
+- ✅ Modal d'assignation refondu en 2 sections « Partenaires » + « Équipe »
+- ✅ Seed Akéla pour SDA Estourmel (éducatrice canine partenaire, label `Canicross`)
+- ✅ Unique partielle : un animal peut être assigné à un partenaire ET un membre le même jour
+
+### Workflow adoption portail public (contact.sda-nord.com)
+- ✅ 5 endpoints REST publics avec CORS allowlist + Cloudflare Turnstile anti-bot + auth Bearer Supabase
+- ✅ Table `adoption_inquiries` avec workflow CRM 7 statuts (pending → contacted → rdv_confirmed → rdv_completed → accepted / refused / cancelled)
+- ✅ Page CRM `/adoptions` avec onglets par statut + actions inline (valider, refuser, ajouter note, replanifier RDV)
+- ✅ 3 templates email Brevo (confirmation, validation, refus)
+- ✅ Moteur de créneaux RDV : slots alignés 45 min, horaires configurables, J+2 minimum, exclusion jours fériés FR, table `adoption_appointment_settings` jsonb sur `establishments`
+- ✅ Page admin `/etablissement/adoption-rdv` pour configurer horaires & durée
+
+### UX globale — DatePicker partout
+- ✅ Composant `<DatePicker>` (popover + react-day-picker v9 + date-fns) déployé sur **tous** les forms (22 fichiers migrés depuis `<input type="date">` natif)
+- ✅ Navigation rapide année + mois en dropdowns (captionLayout="dropdown") avec bornes -30 ans / +5 ans
+- ✅ Recherche debounce 300 ms + recherche fuzzy partout où c'est pertinent
+
 ## Routes API (génération PDF)
 
 | Path | Description |
@@ -163,6 +224,15 @@
 | `/api/pdf/animal/[id]/cession` | Certificat avant cession L.214-8 |
 | `/api/pdf/judicial/[animalId]` | Dossier procédure tribunal |
 | `/api/pdf/passages-veto` | Liste passages vétérinaires (filtres dans query string) |
+| `/api/pdf/animal-poster/[id]` | Affiche animal (`?format=html\|pdf` — PNG ratio 4:5 social) |
+| `/api/pdf/engagement-certificate/[id]` | Certificat d'engagement L214 |
+| `/api/visuels/animal-news/[newsId]` | Visuel solo « Quoi de neuf, X ? » (1080×1350, png/pdf/html) |
+| `/api/visuels/animal-news/mosaic` | Visuel mosaïque 2×2 ou 2×3 (`?ids=uuid1,uuid2,...`) |
+| `/api/public/adoption/animals` | Liste animaux adoptables (portail public) |
+| `/api/public/adoption/animals/[id]` | Détail animal (portail public) |
+| `/api/public/adoption/slots` | Créneaux RDV disponibles (portail public) |
+| `/api/public/adoption/inquiry` | Création demande adoption (portail public, CORS + Turnstile) |
+| `/api/public/adoption/my-inquiries` | Mes demandes (Bearer Supabase, portail public) |
 
 ## Base de données — tables principales
 
@@ -179,6 +249,15 @@
 | `animal_health_records` | Actes vétérinaires (avec champs `judicial_procedure`, `billed_to`, `invoice_reference`) |
 | `health_protocols`, `health_protocol_steps`, `animal_protocol_instances` | Protocoles de soins |
 | `animal_treatments`, `treatment_administrations` | Traitements quotidiens |
+| `adoption_inquiries` | Demandes d'adoption depuis portail public (workflow CRM 7 statuts) |
+| `adoption_contracts`, `foster_contracts`, `abandonment_contracts` | Contrats signés via Documenso |
+| `engagement_certificates` | Certificat d'engagement L214 (pré-adoption, délai 7j) |
+| `sponsorships` | Parrainage animal ↔ client (financier mensuel/ponctuel ou symbolique) |
+| `legacy_contacts` | Archive ancien logiciel Hunimalis (28 306 contacts, recherche trigram) |
+| `animal_news`, `animal_news_mosaics` | Nouvelles post-adoption (photos + texte, génération visuels social) |
+| `outing_partners` | Partenaires externes pour sorties (éducateurs canins type Akéla) |
+| `appointments`, `vet_visits`, `vet_visit_lines` | Agenda RDV + passages véto quotidiens |
+| `donations` (avec `sponsorship_id`, `adoption_contract_id`) | Dons + CERFA, fléchage parrainage / adoption |
 | `boxes` | Box du refuge |
 | `veterinary_clinics`, `veterinarians` | Cabinets et praticiens |
 | `foster_contracts` | Conventions FA + workflow signature Documenso |
@@ -247,6 +326,15 @@
   - CHECK constraints étendus sur `animals.species`, `boxes.species_type`, `health_protocols.applicable_species`, `astreinte_tickets.animal_species` → support des 23 espèces (chien, chat, lapin, cochon d'Inde, hamster, rat, furet, chinchilla, chèvre, mouton, cochon, vache, cheval, âne, poney, poule, canard, oie, perruche, perroquet, canari, tortue, other)
   - Nouvelles colonnes sur `animals` : `sire_number` (équidés), `ede_number` (bovins/ovins/caprins/porcins), `ring_number` (oiseaux)
   - Nouvelles valeurs `farm` (mixte ferme) et `other` sur `boxes.species_type`
+- `20260516a_adoption_appointment_settings` ([fichier](supabase/migrations/20260516a_adoption_appointment_settings.sql)) — JSONB `adoption_appointment_settings` sur `establishments` + status `pending_validation` sur `appointments` + colonne `source`
+- `20260517a_adoption_inquiries` ([fichier](supabase/migrations/20260517a_adoption_inquiries.sql)) — table `adoption_inquiries` (workflow CRM demandes adoption avec 7 statuts)
+- `20260517b_animals_box_invariant` ([fichier](supabase/migrations/20260517b_animals_box_invariant.sql)) — trigger `enforce_animals_box_invariant` qui force `box_id=NULL` pour tout animal hors statuts shelter/pound/boarding
+- `20260517c_legacy_contacts` ([fichier](supabase/migrations/20260517c_legacy_contacts.sql)) — table `legacy_contacts` (archive Hunimalis) + extension `pg_trgm` + GIN trigram index sur `full_name_normalized`
+- `20260517d_sponsorships` ([fichier](supabase/migrations/20260517d_sponsorships.sql)) — table `sponsorships` (animal ↔ client) + trigger `close_sponsorships_on_animal_exit` + colonne `donations.sponsorship_id`
+- `20260519a_outing_partners` ([fichier](supabase/migrations/20260519a_outing_partners.sql)) — table `outing_partners` (Akéla & co) + `outing_assignments.assigned_to` nullable + `partner_id` + CHECK exactly-one-of
+- `20260519b_engagement_certificates` ([fichier](supabase/migrations/20260519b_engagement_certificates.sql)) — table `engagement_certificates` (loi 30 nov 2021) + colonne `pre_reservation_client_id` sur `animals` + bucket `engagement-certificates`
+- `20260519c_animal_news` ([fichier](supabase/migrations/20260519c_animal_news.sql)) — tables `animal_news` + `animal_news_mosaics` + permission `view_animal_news` sur `permission_groups`
+- `20260519d_animal_photos_source_news` ([fichier](supabase/migrations/20260519d_animal_photos_source_news.sql)) — colonne `source_news_id` sur `animal_photos` (FK animal_news, ON DELETE CASCADE)
 
 ## Infrastructure & Déploiement
 
@@ -272,18 +360,42 @@
 | 2026-05-14 (suite) | **Envoi du reçu fiscal CERFA par email** : nouvelle action `sendCerfaEmailAction(donationId)` qui regénère le PDF via Puppeteer et l'envoie au donateur via Brevo SMTP. Expéditeur dédié `noreply@sda-nord.com` (Reply-To `contact@sda-nord.com`), template HTML SDA propre (couleurs marine/teal/orange, mention article 200 CGI + réduction d'impôt 66 %). Helper PDF extrait dans `lib/pdf/cerfa-pdf.ts` (réutilisable côté action ET route HTTP). Nouvelles colonnes `cerfa_sent_at` + `cerfa_sent_to` sur `donations` pour tracer l'envoi. Bouton dédié dans la liste des dons (Mail vs MailCheck selon état). Validation : envoi bloqué si CERFA pas encore généré. Pré-requis prod : variables `BREVO_SMTP_USER` et `BREVO_SMTP_KEY` déjà setup dans Coolify (réutilisées du flow astreinte + Documenso). | TS check ✅ + build ✅ |
 | 2026-05-14 | **Scission nom/prénom + distinction personne/organisation** : table `clients` étendue avec `kind` (`person`/`organization`), `first_name`, `contact_person`. Formulaire client refondu avec toggle Particulier/Organisation (champs adaptés : Nom + Prénom obligatoires pour les particuliers, Nom de l'organisation + Personne référente optionnelle pour les organisations). Helper `getClientDisplayName()` centralisé (rend "NOM Prénom" pour les particuliers, raison sociale seule pour les orgas). Migration data : 73 lignes mises à jour — 33 personnes splittées manuellement (16 SDA, 2 réels Prénom Nom, 15 seed Test) + 39 organisations détectées (12 Ferme, 2 Dr.clean, 25 seed Test). Modals création rapide adoption/foster mises à jour avec champs Nom + Prénom séparés. Snapshots `client_name` dans documents/donations passent par le display name complet. | TS check ✅ + build ✅ |
 | 2026-05-13 | **Extension espèces ferme + NAC** : drop-down passé de 2 (chien/chat) à 23 espèces (chèvres, moutons, cochons, vaches, chevaux, ânes, poneys, poules, canards, oies, lapins, cochons d'Inde, hamsters, rats, furets, chinchillas, perruches, perroquets, canaris, tortues + `other`). Migration SQL applique les CHECK constraints étendus + 3 nouvelles colonnes d'identification : `sire_number` (équidés), `ede_number` (bovins/ovins/caprins/porcins), `ring_number` (oiseaux). Formulaire animal affiche les champs d'identification adaptés selon l'espèce (transpondeur SIRE + passeport SIRE pour équidés, n° EDE + boucle d'oreille pour bovins/ovins/caprins, n° de bague pour oiseaux…). Sélecteur de box étendu avec valeurs `farm` (mixte ferme) et `other`. Helper `lib/species.ts` centralise labels, emojis, helpers conditionnels (`getIdentificationFieldsForSpecies`, `supportsCompatibility`, `isIcadEligible`, etc.). | commit `9047ce5` (33 fichiers, +714 −202 lignes) |
+| 2026-05-15 | **Retours Franck + finition contrat abandon** : ajustements UX sur les contrats d'abandon suite revue terrain (Franck), corrections wording / clauses. | commit `7329722` |
+| 2026-05-16 | **Moteur de créneaux pour RDV adoption (lot 0)** : algorithme de calcul des slots disponibles pour les rendez-vous d'adoption sur 1 mois glissant. Slots alignés 45 min, horaires configurables, J+2 minimum, exclusion auto des jours fériés FR. Table `adoption_appointment_settings` jsonb sur `establishments` (avec `DEFAULT_ADOPTION_APPOINTMENT_SETTINGS`). Status `pending_validation` ajouté à `appointments`. Page admin `/etablissement/adoption-rdv` pour configurer horaires & durée. | commit `7897297` |
+| 2026-05-17 (matin) | **Tri naturel des box + 2 lignes affichage** : SQL backfill 178 box avec `sort_order` calculé via regex sur le nom (numéros d'abord par valeur, puis lettres). Layout grille passe de `flex overflow-x-auto snap-x` à 2 lignes séparées : numériques en haut (Box 1-11), alphabétiques en dessous (Box A-M). `createBox()` auto-calcule désormais `sort_order = MAX(zone) + 10`. | commit `bd401e2` |
+| 2026-05-17 (matin) | **Onglets Présents / Sortis sur la liste animaux** : la liste `/animals` ne montre plus tous les animaux pêle-mêle (>600). Onglet par défaut `Présents` (statuts shelter/pound/foster_family/boarding) + onglet `Sortis` (adopted/returned/transferred/deceased/euthanized). Compteurs stables indépendants de la recherche. Sur `Sortis` : tri DESC par `exit_date`, masque les filtres adoption (adoptable/réservé/retraite/procédure), affiche la date de sortie, photo grisée à 35 %. Empty state propose de basculer sur l'autre onglet quand recherche ne donne rien. | commit `4e39c54` |
+| 2026-05-17 (midi) | **Trigger DB invariant box_id** : `close_sponsorships_on_animal_exit` n'existait pas encore, mais on a posé `enforce_animals_box_invariant` qui force `box_id = NULL` pour tout animal dont le statut sort de {shelter, pound, boarding}. Couvre tous les chemins d'écriture (server actions, SQL direct, futurs composants) — invariant garanti au niveau base, pas au niveau code. Backfill : 0 ligne à corriger sur SDA (la donnée était propre). | migration `20260517b_animals_box_invariant`, commit `b8f75e6` |
+| 2026-05-17 (midi) | **Retrait du bouton Hunimalis sync** : la sync était devenue inutile (les animaux sortis ne devaient pas revenir, et le code l'imposait déjà). Bouton + composant `HunimalisSyncButton` + action `hunimalis-sync.ts` + client API supprimés (515 lignes). Champs `hunimalis_id` et `last_synced_at` conservés en base pour l'historique ; les références `url.includes('hunimalis.com')` dans les composants photo restent pour les vieilles URLs déjà en base. | commit `59c0ef3` |
+| 2026-05-17 (après-midi) | **Archive Hunimalis — import 28 306 contacts** : table `legacy_contacts` dédiée (séparée de `clients` pour ne pas polluer le répertoire actif). Recherche fuzzy via extension `pg_trgm` (GIN trigram index sur `full_name_normalized`), phone normalisé en E.164 français, dédup intra-fichier sur (nom, phone, CP). Script Python réutilisable `scripts/import_legacy_contacts.py` qui parse XLSX → normalise → batch INSERT API REST (28 306 lignes en 19 s, 0 échec). 12 Mo en base. Source flag `hunimalis_2026` pour purge/migration future. | commits `413c64e` (import) + `f43a499` (UI archive) |
+| 2026-05-17 (après-midi) | **Onglet Archive Hunimalis + conversion en client** : onglet sur `/clients` (visible si `legacyCount > 0`), recherche débouncée 300 ms (nom via trigram, ville, téléphone), pagination 50/page, filtre « Inclure déjà convertis ». Bouton « Convertir » → modal qui détecte automatiquement les doublons existants (par phone OR nom+ville) — si match, propose de **lier** au client existant plutôt que de créer un doublon. Sinon, formulaire de création pré-rempli (heuristique Person vs Organization sur marqueurs ASSOCIATION/SOCIETE/MAIRIE…). Marque `legacy_contacts.converted_to_client_id` + `converted_by` après conversion (la ligne reste pour traçabilité). | commit `f43a499` |
+| 2026-05-17 (après-midi) | **API publique pour portail contact.sda-nord.com** : 5 endpoints REST publics (`/api/public/adoption/animals`, `/animals/[id]`, `/slots`, `/inquiry`, `/my-inquiries`) avec CORS allowlist + Cloudflare Turnstile anti-bot + auth Bearer Supabase. Middleware whitelist `/api/public/` et `/api/webhooks/`. Email Brevo SMTP `signature@sda-nord.com` / `noreply@sda-nord.com` pour confirmation des demandes. | commit `360ba07` |
+| 2026-05-17 (après-midi) | **Workflow CRM adoption + emails** : nouvelle table `adoption_inquiries` (statuts `pending`/`contacted`/`rdv_confirmed`/`rdv_completed`/`accepted`/`refused`/`cancelled`), page `/adoptions` avec onglets par statut + actions inline (valider, refuser, ajouter note, changer date RDV), 3 templates email (confirmation, validation, refus) via Brevo. Formulaire admin `/etablissement/adoption-rdv` pour configurer horaires/durée. | commit `2354b26` |
+| 2026-05-17 (soir) | **Système de parrainage d'animaux** : table `sponsorships` (un animal peut avoir N parrains), 3 types `financial_monthly`/`financial_punctual`/`symbolic`, champs RGPD (`public_alias` + `show_publicly`). Trigger DB `close_sponsorships_on_animal_exit` qui ferme automatiquement les parrainages quand l'animal sort (statut → `ended` + `ended_reason` adaptée). Ajout `donations.sponsorship_id` pour flécher les dons. UI : nouvel onglet « Parrains » sur fiche animal avec modal create/edit (sélecteur client + création à la volée + 3 kinds visuels + RGPD), section « Parrainages » sur fiche client (grille filleuls avec photo + statut + ancienneté + bouton « Proposer un autre filleul » sur ended). | commit `833b8b6` |
+| 2026-05-17 (soir) | **Visuel PDF poster animal (V1)** : génération via Puppeteer d'une affiche A4 portrait « magazine éditorial » pour entrée fourrière / adoption. Adapte le titre selon contexte (`AVIS · CHERCHONS PROPRIÉTAIRE` si origine `found`/`divagation`, sinon `À L'ADOPTION`). Photo, méta (espèce/sexe/âge), race/couleur/identification, lieu/circonstances de capture, CTA téléphone. Route GET `/api/pdf/animal-poster/[id]?format=html\|pdf` (HTML preview pour itérer le design rapidement). | commit `6410194` |
+| 2026-05-17 (soir) | **Visuel V2 — direction photo immersive 1080×1350** : refonte du poster en ratio 4:5 social-ready (Facebook/Insta fil). Photo plein cadre + gradient sombre overlay pour lisibilité, badge AVIS en pastille terracotta haut-droit. Helper `renderHtmlToImage()` ajouté dans `lib/pdf/render.ts` (Puppeteer custom-sized PNG/PDF). Lecture phone/email depuis `establishments` table (fallback email avec icône enveloppe si phone vide — plus aucun hardcode). | commit `78b9610` |
+| 2026-05-17 (soir) | **Visuel V3 — simplification + logo rond** : retrait des 3 boutons redondants (Visuel/PDF/aperçu), un seul bouton « Visuel » qui ouvre le PNG (le PDF reste accessible via `?format=pdf` sur l'URL). Logo établissement passe en cercle blanc avec halo subtil (border-radius 50% + padding 10px) pour ressortir sur la photo plein cadre. | commit `4d3dd16` |
+| 2026-05-18 | **Petits fixes** : README précise « Ferme Ô 4 Vents » (accent), `deleteLeaveRequest` utilise désormais adminClient + scoping `establishment_id` (bug RLS qui empêchait la suppression silencieusement). Suppression du résidu `MIGRATION_TO_RUN_2026_04_27.sql` à la racine (déjà appliqué en base). | commits `fcbc2c1` (fixes) + `c9a3c94` (404 bandeau fourrière `/animaux/` → `/animals/`) |
+| 2026-05-18 | **Assigner une sortie depuis un box** : nouveau bouton « Sortie » (icône `Footprints`) sur chaque ligne d'animal dans le drawer de détail d'un box. Modal léger avec photo + nom de rappel, picker membres équipe (recherche débouncée), date par défaut aujourd'hui, note libre optionnelle. Réutilise `createAssignment` existante. Visible uniquement pour chiens en statut shelter/pound/boarding. Gain : ~30 s par assignation depuis le workflow quotidien. | commit `9ba2cdc` |
+| 2026-05-19 (matin) | **Affinage visuel poster** : badge « AVIS · CHERCHONS PROPRIÉTAIRE » agrandi (font-size +37 %, padding +60 %, halo blanc 4px), gradient overlay un peu plus marqué pour lisibilité sur chiens à robe claire (transition démarre à 32 % au lieu de 40 %), text-shadow ajouté partout. Typo passe de Fraunces à **Baloo 2** (utilisée par la SDA pour ses supports). | commit `0fe0f98` |
+| 2026-05-19 (matin) | **Fixes modal sortie** : z-index passé de `z-50` à `z-[200]` pour passer au-dessus du drawer box ; robustesse chargement équipe (flag `cancelled` anti-setState après unmount, catch erreurs réseau, toast explicite) ; propagation clic stoppée sur overlay + contenu (close uniquement si target = currentTarget). | commits `298fb61` + `1996518` (Clément depuis autre poste) |
+| 2026-05-19 (après-midi) | **3 chantiers parallèles** dispatchés en agents : <ul><li>**Akéla (partenaires externes)** : nouvelle table `outing_partners` (educator/club/walker/foster_pro/other), `outing_assignments.assigned_to` nullable + colonne `partner_id`, CHECK constraint exactement-un-des-deux. Modal d'assignation refondu avec 2 sections « Équipe » + « Partenaires ». Seed Akéla pour SDA Estourmel (label « Canicross »). Migration `20260519a_outing_partners`.</li><li>**Certificat d'engagement** (loi 30 nov 2021, arrêté 30 mai 2022) : nouvelle table `engagement_certificates` + colonne `pre_reservation_client_id` sur `animals`. PDF officiel généré via Puppeteer (4 sections + délai 7j mis en avant, charte SDA). Workflow : bouton « Pré-réserver pour adoption » → envoi Documenso (email branded SDA via Brevo) → badge « Pré-réservé » + bandeau compteur J/7 → bouton « Finaliser » à J+7. Webhook Documenso routé sur prefix `engagement_*`. Migration `20260519b_engagement_certificates`.</li><li>**Rubrique Nouvelles** (cf. ligne dédiée).</li></ul> | commit `be1f6a1` (28 fichiers, +4340 lignes) |
+| 2026-05-19 (après-midi) | **Sync photos Nouvelles → fiche animal** : colonne `source_news_id UUID REFERENCES animal_news(id) ON DELETE CASCADE` sur `animal_photos`. À chaque création de nouvelle, les photos sont aussi insérées dans `animal_photos` (avec `is_primary=false` toujours) pour apparaître dans le tab Photos de la fiche animal — y compris sortis/adoptés. ON DELETE CASCADE garantit le cleanup auto. Backfill 1 photo migrée. Migration `20260519d_animal_photos_source_news`. | commit `755a55e` |
+| 2026-05-19 (soir) | **DatePicker partout — navigation année/mois rapide** : composant `ui/calendar.tsx` activé en `captionLayout="dropdown"` (dropdowns mois + année dans le header), bornes par défaut -30 ans / +5 ans (couvre date de naissance d'animaux âgés + RDV futurs). 22 fichiers migrés de `<input type="date">` natif vers `<DatePicker>` du design system via 5 agents en parallèle (~35 inputs date remplacés). UX uniforme partout, plus de fallback navigateur, dropdowns rapides pour les dates anciennes (date de naissance). | commits `e1543a3` (calendar) + `d9eab2d` (22 fichiers) |
 | 2026-05-19 | **Rubrique Nouvelles (FA + adoptants)** : nouveau module pour archiver les photos et messages reçus des familles après adoption / placement FA, puis générer des visuels publi-ready (solo ou mosaïque). <ul><li>Migration `20260519c_animal_news` (appliquée via MCP) : tables `animal_news` (photos JSONB + texte + source) et `animal_news_mosaics` (regroupement de N nouvelles), permission `view_animal_news` ajoutée à `permission_groups` (désactivée par défaut sauf groupe Administrateur), RLS multi-établissement.</li><li>Storage : préfixe `news/` dans le bucket `animal-photos` existant — pas de nouveau bucket, les policies existantes (paths préfixés par `establishmentId`) sont réutilisées.</li><li>Page `/nouvelles` : onglets Inbox / Publiées, multi-sélection, CTAs « Publier en solo » (1 sélection) / « Publier en mosaïque » (2-6 sélections). Modal d'ajout avec picker animal (filtré sur statuts adopted / foster_family / transferred / returned), upload multi-photos direct browser → Storage avec conversion HEIC + compression.</li><li>Visuels : format social 1080×1350, typo Baloo 2 + Inter, charte SDA (navy / teal / terracotta). Solo : photo plein cadre + eyebrow « Adopté il y a X mois » + headline « Quoi de neuf, NomAnimal ? » + citation italique en border-left teal. Mosaïque : grille 2×2 (2-4 animaux) ou 2×3 (5-6) sur fond paper, bandeau « QUELQUES NOUVELLES DE NOS ANCIENS », footer « Adoptez vous aussi → sda-nord.com ».</li><li>Routes API : `/api/visuels/animal-news/[newsId]?format=png\|pdf\|html` (solo) et `/api/visuels/animal-news/mosaic?ids=uuid1,uuid2&format=png` (mosaïque).</li><li>Server actions : `addAnimalNews`, `getAnimalNewsInbox`, `getAnimalNewsHistory`, `getAnimalNewsForAnimal`, `getEligibleAnimalsForNews`, `markNewsAsPosted`, `deleteAnimalNews` — toutes scopées par `view_animal_news`.</li><li>Sidebar : nouvel item « Nouvelles » (icône `Sparkles`) dans la section Communication, visible uniquement si `canViewAnimalNews`. Bénévoles « promeneurs » sans la perm n'y ont donc pas accès.</li><li>Tab « Nouvelles » sur la fiche animal volontairement non câblé en V1 (scope tab-system multi-props lourd) — accessible via `/nouvelles` global.</li></ul> | TS check ✅ + build ✅ |
 
 ## Problèmes connus / Dette technique
 
 - ⚠️ Branch git locale `feature/avril-2026-features` pas supprimée après merge dans `main`
-- ⚠️ Modifications non commitées en cours sur d'autres chantiers : module `contacts-entrants` (page + actions + composants), `lib/actions/leaves.ts`, mises à jour `README.md` — laissées dans le working tree, à finaliser plus tard
+- ⚠️ Modifications non commitées en cours sur d'autres chantiers : module `contacts-entrants` (page + actions + composants — sans doute en cours sur l'autre poste de Clément), laissées dans le working tree
 - ⚠️ Avertissement build Next.js : `metadataBase` non défini (cosmétique)
-- ⚠️ Lien sidebar `/contacts-entrants` réservé aux owners mais la route n'est pas encore committée → 404 pour Clément
-- ⚠️ `MIGRATION_TO_RUN_2026_04_27.sql` à la racine : déjà appliqué en prod, à archiver dans `supabase/migrations/`
+- ⚠️ Lien sidebar `/contacts-entrants` réservé aux owners mais la route n'est pas encore committée → 404 pour Clément (à committer depuis l'autre poste)
 - ⚠️ **Branding global Documenso reporté** : la création d'organisation dans l'admin Documenso self-hosted (image `:latest`) plante sur un appel Stripe absent en self-hosted. Solution acceptée : contournement via UI/SQL direct quand le besoin sera prioritaire. En attendant, la personnalisation passe par le sujet + le corps de l'email (déjà customisés par établissement). Logo SDA disponible sur https://sda.optimus-services.fr/logo-sda.png pour quand on s'y attaquera.
 - ⚠️ Fichier orphelin HEIC dans le bucket `animal-photos` (`fbf2ebf8-…/167c7f2b-….heic`) — la ligne DB a été supprimée mais Supabase bloque le DELETE direct sur `storage.objects` (sécurité). Suppression à faire via l'API Storage si on veut faire le ménage
 - ⚠️ **11 contrats orphelins en base** (CA-2026-001/002, CFA-2026-001 à 009) créés avant la suppression du double workflow le 2026-05-10 : pas de mouvement associé, donc invisibles dans la timeline mais visibles dans l'onglet *Contrat*. Régularisation au cas par cas reportée. Aucun document/CERFA généré → pas de risque comptable.
+- ⚠️ **Doublon de numéro de contrat** : 2 contrats portent `CFA-2026-002` en base (un pour Tupac, un pour un autre animal). Bug de séquençage de numérotation, à investiguer dans `lib/actions/foster-contracts.ts`.
+- ⚠️ **Téléphone SDA non renseigné en base** : l'établissement SDA a un `phone` vide → le visuel poster animal affiche l'email `accueil@sda-nord.com` à la place. À renseigner dans `/etablissement`.
+- ⚠️ **Tab « Nouvelles » sur fiche animal pas câblé en V1** : la rubrique Nouvelles est accessible globalement via `/nouvelles`, mais pas comme onglet sur la fiche individuelle d'un animal sorti. À ajouter en V2 si pertinent (la donnée est là via `getAnimalNewsForAnimal`).
+- ⚠️ **Postiz / publication directe réseaux sociaux** : reporté. Décision : utiliser Postiz cloud (≈$3-9/mois) quand le besoin se présente, plutôt que self-host (overkill : 5 services Docker dont Elasticsearch) ou Meta Graph API direct (App Review 2-4 semaines).
 
 ## Prochaines étapes (TODO V2 demandées par l'équipe)
 
@@ -294,9 +406,27 @@
 - Permissions « Répertoire » à activer sur les groupes de **Carole** et **Marina** (à faire en UI Établissement → Groupes)
 - « Loulous adoptés en accueil » — sera résolu progressivement par les nouvelles syncs Hunimalis (le fix protège, mais il faut quand même que les statuts d'adoption soient remontés correctement par Hunimalis)
 
+**Parrainages V2** :
+- Page publique de parrainage sur `contact.sda-nord.com` (liste animaux à parrainer + formulaire)
+- CERFA cumulé annuel pour les parrains financiers (article 200 CGI)
+- Emails périodiques aux parrains (newsletter trimestrielle avec photos partagées)
+- Notifications « parrains orphelins à recontacter » suite à sortie animal
+
+**Nouvelles V2** :
+- Onglet « Nouvelles » sur la fiche animal individuelle (déjà câblé côté action `getAnimalNewsForAnimal`, manque juste l'intégration UI dans `animal-detail-tabs.tsx`)
+- Notifications « X jours qu'on n'a pas eu de nouvelles de Médor » (suggestion de relance FA/adoptant)
+- Édition des nouvelles déjà publiées
+- Intégration Postiz pour publication directe depuis l'inbox
+
+**Visuels** :
+- Format Story 9:16 (1080×1920) en plus du carré 4:5 pour publications stories Insta/FB
+- QR code vers la fiche animal publique (quand portail `contact.sda-nord.com` aura les pages animal)
+- Préréglage « Photo de profil » qui utilise une photo de nouvelle comme nouvelle photo principale (actuellement `is_primary` reste sur la photo d'arrivée)
+
 **Maintenance**
-- Finaliser et committer le module `contacts-entrants`
+- Finaliser et committer le module `contacts-entrants` (depuis l'autre poste de Clément)
 - Marquer rétroactivement les animaux SDA en procédure (Nicoletta, etc.)
 - Ajouter un export PDF « frais engagés global SDA » tous animaux en procédure confondus
 - Notifications quand un animal en procédure approche d'une échéance (audience, etc.)
 - Documenter la procédure pour Maryline / Céline / Caroline (mode d'emploi rapide)
+- Résoudre le doublon `CFA-2026-002` + auditer la fonction de séquençage des numéros de contrat
