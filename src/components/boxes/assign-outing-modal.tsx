@@ -32,14 +32,28 @@ export function AssignOutingModal({ animalId, animalName, animalPhotoUrl, animal
   const [pending, startTransition] = useTransition()
 
   useEffect(() => {
-    getEstablishmentMembers().then((res) => {
-      if ('error' in res && res.error) {
-        toast.error(res.error)
+    let cancelled = false
+    getEstablishmentMembers()
+      .then((res) => {
+        if (cancelled) return
+        if ('error' in res && res.error) {
+          toast.error(res.error)
+          setMembers([])
+        } else if ('data' in res) {
+          setMembers(res.data ?? [])
+        } else {
+          setMembers([])
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return
+        console.error('getEstablishmentMembers failed:', err)
+        toast.error("Impossible de charger l'équipe.")
         setMembers([])
-      } else if ('data' in res && res.data) {
-        setMembers(res.data)
-      }
-    })
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const filtered = (members ?? []).filter((m) => {
@@ -74,8 +88,18 @@ export function AssignOutingModal({ animalId, animalName, animalPhotoUrl, animal
   const isToday = date === todayIso()
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={(e) => {
+        e.stopPropagation()
+        if (e.target === e.currentTarget) onClose()
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <div
+        className="bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="sticky top-0 bg-surface border-b border-border px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
