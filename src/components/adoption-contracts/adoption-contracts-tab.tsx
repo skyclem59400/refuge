@@ -20,8 +20,10 @@ import {
   Clock,
   Euro,
   Info,
+  RotateCcw,
 } from 'lucide-react'
 import { AdoptionContractForm } from '@/components/adoption-contracts/adoption-contract-form'
+import { AdoptionReturnModal } from '@/components/adoption-contracts/adoption-return-modal'
 import { deleteAdoptionContract } from '@/lib/actions/adoption-contracts'
 import { sendAdoptionContractForSignature, syncAdoptionContractSignatureStatus } from '@/lib/actions/adoption-contract-signature'
 import { formatDateShort } from '@/lib/utils'
@@ -43,15 +45,19 @@ interface AdoptionContractsTabProps {
   canManage: boolean
 }
 
-const statusLabels: Record<AdoptionContractStatus, string> = {
+const statusLabels: Record<string, string> = {
   draft: 'Brouillon',
   active: 'Actif',
+  trial_returned: 'Retour periode d\'accueil',
+  finalized: 'Finalise',
   cancelled: 'Annulé',
 }
 
-const statusStyles: Record<AdoptionContractStatus, string> = {
+const statusStyles: Record<string, string> = {
   draft: 'bg-muted/15 text-muted',
   active: 'bg-success/15 text-success',
+  trial_returned: 'bg-amber-500/15 text-amber-500',
+  finalized: 'bg-success/15 text-success',
   cancelled: 'bg-warning/15 text-warning',
 }
 
@@ -74,6 +80,7 @@ export function AdoptionContractsTab({ animalId, contracts, canManage }: Readonl
   const [editingContract, setEditingContract] = useState<AdoptionContractWithRelations | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [actingId, setActingId] = useState<string | null>(null)
+  const [returningContract, setReturningContract] = useState<AdoptionContractWithRelations | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -245,6 +252,29 @@ export function AdoptionContractsTab({ animalId, contracts, canManage }: Readonl
                         </button>
                       )}
 
+                      {(c.status === 'active' || c.status === 'finalized') && (
+                        <button
+                          type="button"
+                          onClick={() => setReturningContract(c)}
+                          className="p-2 rounded-lg text-amber-500 hover:bg-amber-500/10 transition-colors"
+                          title="Retour pendant periode d'accueil"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {c.status === 'trial_returned' && (
+                        <a
+                          href={`/api/pdf/adoption-cancellation/${c.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 rounded-lg text-amber-500 hover:bg-amber-500/10 transition-colors"
+                          title="Avenant d'annulation (PDF)"
+                        >
+                          <FileDown className="w-4 h-4" />
+                        </a>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => handleEdit(c)}
@@ -292,6 +322,17 @@ export function AdoptionContractsTab({ animalId, contracts, canManage }: Readonl
                 </div>
               </div>
 
+              {c.status === 'trial_returned' && c.returned_at && (
+                <div className="mt-3 pt-3 border-t border-border text-xs text-muted">
+                  <span className="font-semibold text-amber-500">Retour pendant periode d&apos;accueil </span>
+                  enregistre le {formatDateShort(c.returned_at)}
+                  {c.refunded_amount != null && (
+                    <> - rembourse : <span className="font-semibold text-text">{formatEuros(c.refunded_amount)}</span></>
+                  )}
+                  {c.return_reason && <div className="mt-1">Motif : {c.return_reason}</div>}
+                </div>
+              )}
+
               {(c.special_conditions || c.sterilization_required) && (
                 <div className="mt-3 pt-3 border-t border-border space-y-1 text-xs text-muted">
                   {c.sterilization_required && c.sterilization_deadline && (
@@ -307,6 +348,16 @@ export function AdoptionContractsTab({ animalId, contracts, canManage }: Readonl
             </div>
           ))}
         </div>
+      )}
+
+      {returningContract && (
+        <AdoptionReturnModal
+          contractId={returningContract.id}
+          contractNumber={returningContract.contract_number}
+          animalName={(returningContract as { animal?: { name?: string } }).animal?.name ?? ''}
+          adopterName={returningContract.adopter?.name ?? ''}
+          onClose={() => setReturningContract(null)}
+        />
       )}
     </div>
   )

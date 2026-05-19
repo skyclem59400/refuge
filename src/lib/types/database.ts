@@ -521,7 +521,7 @@ export interface VeterinarianWithClinic extends Veterinarian {
 // ============================================
 
 export type FosterContractStatus = 'draft' | 'active' | 'ended' | 'cancelled'
-export type AdoptionContractStatus = 'draft' | 'active' | 'cancelled'
+export type AdoptionContractStatus = 'draft' | 'active' | 'trial_returned' | 'finalized' | 'cancelled'
 export type SignatureStatus = 'not_sent' | 'pending' | 'viewed' | 'signed' | 'rejected' | 'failed'
 
 export interface FosterContract {
@@ -587,6 +587,18 @@ export interface AdoptionContract {
   signature_viewed_at: string | null
   signed_at_via_documenso: string | null
   signed_pdf_url: string | null
+  // Trial period / return / refund
+  trial_period_days: number | null
+  trial_period_ends_at: string | null
+  non_refundable_amount: number | null
+  returned_at: string | null
+  refunded_amount: number | null
+  refunded_at: string | null
+  refund_payment_method: string | null
+  return_reason: string | null
+  cancellation_signature_status: SignatureStatus | null
+  cancellation_signed_pdf_url: string | null
+  cancellation_pdf_url: string | null
   created_by: string | null
   created_at: string
   updated_at: string
