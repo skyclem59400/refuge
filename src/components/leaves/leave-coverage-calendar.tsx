@@ -163,7 +163,7 @@ export function LeaveCoverageCalendar({
           Sous le seuil
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <Users className="w-3.5 h-3.5" /> Salaries / total dispo
+          <Users className="w-3.5 h-3.5" /> Salaries dispos / total sous contrat
         </span>
       </div>
 
@@ -187,12 +187,7 @@ export function LeaveCoverageCalendar({
                 (id) => !d.absent.map((a) => a.member_id).includes(id)
               ).length
             : d.available_salaried_count
-          const totalAvail = includePending
-            ? d.active_salaried.length +
-              d.active_auto.length +
-              d.active_other.length -
-              d.absent.length
-            : d.available_total_count
+          const totalAvail = d.total_salaried_count
           const statusBg =
             status === 'below'
               ? 'bg-red-500/15 border-red-500/40 hover:bg-red-500/25'

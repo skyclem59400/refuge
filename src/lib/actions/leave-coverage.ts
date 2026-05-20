@@ -47,6 +47,8 @@ export interface CoverageDay {
   absent: CoverageAbsence[]
   available_salaried_count: number
   available_total_count: number
+  /** Effectif salarié total sous contrat ce jour (présents + absents salariés). */
+  total_salaried_count: number
   threshold: number
   status_with_pending: CoverageStatus
   status_approved_only: CoverageStatus
@@ -177,6 +179,12 @@ export async function getCoverageRange(params: {
         active_auto.filter((id) => !approvedAbsentIds.has(id)).length +
         active_other.filter((id) => !approvedAbsentIds.has(id)).length
 
+      // Effectif salarié total sous contrat ce jour-là :
+      // présents (active_salaried) + absents salariés (arrêt long ou congé).
+      const totalSalaried =
+        active_salaried.length +
+        absent.filter((a) => a.contract_type === 'salarie').length
+
       days.push({
         date: day,
         weekday,
@@ -187,6 +195,7 @@ export async function getCoverageRange(params: {
         absent,
         available_salaried_count: salariedApprovedAvail,
         available_total_count: totalApprovedAvail,
+        total_salaried_count: totalSalaried,
         threshold,
         status_with_pending: statusFor(salariedWithPendingAvail, threshold),
         status_approved_only: statusFor(salariedApprovedAvail, threshold),
