@@ -307,6 +307,7 @@ export function AnimalDetailTabs({
             animal={animal}
             boxes={boxes}
             canManageAnimals={canManageAnimals}
+            judicialOwner={judicialOwner}
           />
         )}
 
@@ -530,10 +531,18 @@ function InfoTab({
   animal,
   boxes,
   canManageAnimals,
+  judicialOwner = null,
 }: Readonly<{
   animal: Animal
   boxes: BoxWithZone[]
   canManageAnimals: boolean
+  judicialOwner?: {
+    client_id: string
+    name: string
+    first_name: string | null
+    blacklist_reason: string | null
+    blacklist_source: string | null
+  } | null
 }>) {
   return (
     <div className="grid lg:grid-cols-2 gap-6">
