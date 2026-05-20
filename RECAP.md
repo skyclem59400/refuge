@@ -544,3 +544,45 @@ Server actions `medical-invoices.ts` : `uploadMedicalInvoice` (FormData) / `dele
 - Co-réalisé avec un autre poste (Akéla / certificat engagement / nouvelles, DatePicker migration) — historique linéaire conservé par rebases successifs
 - Pas de force-push sur main, force-push sur les feature branches uniquement (avant merge)
 
+### 8. Refonte du module Nouvelles (`feature/nouvelles-refonte` — merged commit `a67b24d`)
+
+Demandée par Clément : retravailler la rubrique Nouvelles pour distinguer 2 cas d'usage différents et supprimer la complication "inbox / publication différée".
+
+**Avant** : un seul onglet "Nouvelles" pour tous les animaux sortis (`adopted` / `foster_family` / `transferred` / `returned`), avec inbox (`posted_at IS NULL`) + workflow "Marquer comme publié" + mosaïques optionnelles.
+
+**Après** :
+- **Suppression du workflow inbox** : une news est désormais **publiée immédiatement** à sa création (`posted_at = now()`). Plus de bouton "Publier en solo" / "Publier en mosaïque" depuis l'inbox.
+- **2 onglets distincts** dans `/nouvelles`, basés sur le statut courant de l'animal :
+  - 🐾 **Suivi des protégés** : animaux encore au refuge (`shelter` / `pound` / `boarding` / `foster_family`) → visible par les parrains sur `parrainage.sda-nord.com`
+  - ❤️ **Nouvelles des sortis** : animaux partis (`adopted` / `transferred` / `returned`) → publication Facebook avec export visuel
+- **Filtres riches** dans chaque onglet : recherche textuelle (nom animal, texte, auteur), dropdown filtre par animal, range de dates "du / au", bouton "Réinitialiser"
+- **Modal d'ajout contextualisé** : prop `category` qui adapte la copy (titre, sous-titre, label "Auteur" vs "De qui")
+- **Mosaïques conservées** mais uniquement dans l'onglet "Sortis" (récap Facebook). L'action est exposée via `createMosaic({ newsIds, title?, generatedImageUrl? })`.
+- **Bande signature SDA** (`gradient orange→teal→navy` 8px) ajoutée en bas des templates visuels solo + mosaïque, cohérente avec la charte officielle des courriers (`sda-brand.ts`).
+
+**Migrations SQL appliquées** :
+- `20260520a_news_no_inbox` : backfill `posted_at = COALESCE(posted_at, created_at, now())` sur toutes les news existantes (les anciennes inbox passent en publié rétroactivement), `posted_at NOT NULL DEFAULT now()` pour les futures, index `(establishment_id, posted_at DESC)` + `(animal_id, received_at DESC)`.
+- `20260520b_news_public_select` : **policies RLS publiques** ouvrant la lecture de `animal_news` et `animals` aux requêtes anonymes pour les **animaux longs séjours uniquement** (statuts `shelter` / `pound` / `boarding` / `foster_family`). Permet à la plateforme parrainage (`parrainage.sda-nord.com`) de fetch les news en anon sans service role key.
+
+**Server actions refondues** (`lib/actions/animal-news.ts`) :
+- `getAnimalNewsByCategory({ category, animalIds?, dateFrom?, dateTo? })` — fetch unifié avec filtres
+- `getAnimalsForCategory(category)` — liste des animaux éligibles selon le contexte
+- `getMosaics()` — récaps multi-animaux publiés
+- `getAnimalNewsForAnimal(animalId)` — toutes les news d'un animal
+- `addAnimalNews({...})` — publication immédiate (`posted_at = now()`)
+- `createMosaic({ newsIds, title, generatedImageUrl })` — récap multi-animaux
+- `deleteAnimalNews(id)`
+- Supprimées : `getAnimalNewsInbox`, `getAnimalNewsHistory`, `getEligibleAnimalsForNews`, `markNewsAsPosted` (concept inbox disparu)
+
+**Types DB** (`lib/types/database.ts`) : ajout `SHELTERED_STATUSES`, `ALUMNI_STATUSES`, `NewsCategory`. `ANIMAL_NEWS_ELIGIBLE_STATUSES` conservé deprecated pour rétrocompat.
+
+**Composants refondus** :
+- `AnimalNewsClient` : 2 onglets avec compteurs, toolbar filtres, grille de cards, section Mosaïques en bas de l'onglet Sortis
+- `AddNewsModal` : prop `category` optionnelle, copy adaptative
+- `animal-news-client.tsx` simplifié : suppression de toute la logique multi-sélection / publish solo / publish mosaïque
+- Composants `NewsCard` et `MosaicCard` internalisés dans le client (présentation enrichie)
+
+**Plateforme parrainage** branchée en aval (cf. `parrainage/RECAP.md`) : fetch des vraies news en anonyme via les nouvelles RLS policies, fallback gracieux sur les mocks pour la démo Sophie.
+
+Fichiers modifiés : 9 (+537 / -419 lignes). Migrations : 2. TS check + build local OK avant push.
+
