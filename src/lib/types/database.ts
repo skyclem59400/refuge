@@ -88,9 +88,13 @@ export interface Establishment {
   google_calendar_id: string
   documenso_folder_id: string | null
   adoption_appointment_settings: AdoptionAppointmentSettings
+  min_daily_staff: number
   created_at: string
   updated_at: string
 }
+
+export type ContractType = 'salarie' | 'auto_entrepreneur' | 'benevole' | 'autre'
+export type AvailabilityStatus = 'active' | 'on_extended_leave'
 
 export interface PermissionGroup {
   id: string
@@ -140,6 +144,12 @@ export interface EstablishmentMember {
   role_type: RoleType
   is_pseudo_user: boolean
   password_set: boolean
+  // Coverage / staffing
+  contract_type: ContractType
+  availability_status: AvailabilityStatus
+  extended_leave_from: string | null
+  extended_leave_until: string | null
+  extended_leave_reason: string | null
   created_at: string
   updated_at: string
   // Enriched from auth.users via RPC
@@ -1202,6 +1212,8 @@ export interface LeaveBalance {
   updated_at: string
 }
 
+export type LeaveGranularity = 'full_day' | 'half_day' | 'hourly'
+
 export interface LeaveRequest {
   id: string
   establishment_id: string
@@ -1212,6 +1224,10 @@ export interface LeaveRequest {
   half_day_start: boolean
   half_day_end: boolean
   days_count: number
+  granularity: LeaveGranularity
+  start_time: string | null
+  end_time: string | null
+  duration_hours: number | null
   status: LeaveRequestStatus
   reason: string | null
   admin_comment: string | null
@@ -1219,6 +1235,24 @@ export interface LeaveRequest {
   reviewed_at: string | null
   created_at: string
   updated_at: string
+}
+
+export type LeaveAttachmentKind = 'sick_note' | 'extended_leave_proof' | 'other'
+
+export interface LeaveAttachment {
+  id: string
+  establishment_id: string
+  member_id: string
+  leave_request_id: string | null
+  kind: LeaveAttachmentKind
+  storage_path: string
+  file_name: string | null
+  mime_type: string | null
+  size_bytes: number | null
+  notes: string | null
+  uploaded_by: string | null
+  created_at: string
+  signed_url?: string
 }
 
 export interface LeaveRequestWithDetails extends LeaveRequest {

@@ -7,6 +7,9 @@ import { deleteLeaveRequest } from '@/lib/actions/leaves'
 import { LeaveStatusBadge } from './leave-status-badge'
 import { LeaveRequestReview } from './leave-request-review'
 import { LeaveTypeManager } from './leave-type-manager'
+import { LeaveCoverageCalendar } from './leave-coverage-calendar'
+import { AdminLeaveCreator } from './admin-leave-creator'
+import { CraLauncher } from './cra-launcher'
 import type { LeaveRequest, LeaveType, EstablishmentMember } from '@/lib/types/database'
 
 type FilterTab = 'all' | 'pending' | 'approved' | 'refused'
@@ -31,12 +34,19 @@ interface AdminLeavesViewProps {
   readonly leaveTypes: LeaveType[]
   readonly members: EstablishmentMember[]
   readonly pendingCount: number
+  readonly minDailyStaff: number
 }
 
-export function AdminLeavesView({ requests, leaveTypes, members, pendingCount }: AdminLeavesViewProps) {
+export function AdminLeavesView({
+  requests,
+  leaveTypes,
+  members,
+  pendingCount,
+  minDailyStaff,
+}: AdminLeavesViewProps) {
   const [reviewingRequest, setReviewingRequest] = useState<LeaveRequest | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'requests' | 'types'>('requests')
+  const [activeTab, setActiveTab] = useState<'requests' | 'coverage' | 'cra' | 'types'>('requests')
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -75,8 +85,8 @@ export function AdminLeavesView({ requests, leaveTypes, members, pendingCount }:
 
   return (
     <div className="space-y-6">
-      {/* Onglets principaux : Demandes | Types de conges */}
-      <div className="flex gap-2">
+      {/* Onglets principaux : Demandes | Couverture | Types de conges */}
+      <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => setActiveTab('requests')}
           className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
@@ -93,6 +103,26 @@ export function AdminLeavesView({ requests, leaveTypes, members, pendingCount }:
           )}
         </button>
         <button
+          onClick={() => setActiveTab('coverage')}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+            activeTab === 'coverage'
+              ? 'bg-primary text-white'
+              : 'bg-surface-dark text-muted hover:text-text'
+          }`}
+        >
+          Couverture
+        </button>
+        <button
+          onClick={() => setActiveTab('cra')}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+            activeTab === 'cra'
+              ? 'bg-primary text-white'
+              : 'bg-surface-dark text-muted hover:text-text'
+          }`}
+        >
+          CRA mensuel
+        </button>
+        <button
           onClick={() => setActiveTab('types')}
           className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
             activeTab === 'types'
@@ -105,6 +135,8 @@ export function AdminLeavesView({ requests, leaveTypes, members, pendingCount }:
       </div>
 
       {activeTab === 'requests' && (
+        <div className="space-y-4">
+          <AdminLeaveCreator members={members} leaveTypes={leaveTypes} />
         <div>
           {/* Filtres par statut */}
           <div className="flex gap-1 mb-4 bg-surface-dark rounded-lg p-1">
@@ -225,6 +257,19 @@ export function AdminLeavesView({ requests, leaveTypes, members, pendingCount }:
             </div>
           )}
         </div>
+        </div>
+      )}
+
+      {activeTab === 'coverage' && (
+        <LeaveCoverageCalendar
+          members={members}
+          leaveTypes={leaveTypes}
+          initialThreshold={minDailyStaff}
+        />
+      )}
+
+      {activeTab === 'cra' && (
+        <CraLauncher members={members} />
       )}
 
       {activeTab === 'types' && (
