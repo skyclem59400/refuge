@@ -200,6 +200,40 @@ export interface UnassignedUser {
   created_at: string
 }
 
+export interface UserProfile {
+  user_id: string
+  last_name: string | null
+  first_name: string | null
+  personal_email: string | null
+  phone: string | null
+  birth_date: string | null
+  address_label: string | null
+  address_postcode: string | null
+  address_city: string | null
+  address_lat: number | null
+  address_lng: number | null
+  address_ban_id: string | null
+  profile_completed: boolean
+  profile_completed_at: string | null
+  email_migrated: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface UserProfileInput {
+  last_name: string
+  first_name: string
+  personal_email: string
+  phone: string
+  birth_date?: string | null
+  address_label: string
+  address_postcode: string
+  address_city: string
+  address_lat: number | null
+  address_lng: number | null
+  address_ban_id: string | null
+}
+
 export interface CompanyInfo {
   name: string
   description: string
