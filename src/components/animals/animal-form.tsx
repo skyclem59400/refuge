@@ -178,7 +178,11 @@ export function AnimalForm({ animal, boxes = [], judicialOwner = null }: Readonl
         judicial_case_number: judicialProcedure ? (judicialCaseNumber.trim() || null) : null,
         judicial_jurisdiction: judicialProcedure ? (judicialJurisdiction.trim() || null) : null,
         judicial_seizure_date: judicialProcedure ? (judicialSeizureDate || null) : null,
-        judicial_owner_name: judicialProcedure ? (judicialOwnerName.trim() || null) : null,
+        // Si un propriétaire client est lié, on N\\'écrase PAS judicial_owner_name
+        // (mis à jour par upsertJudicialOwner via le picker). Sinon : saisie libre.
+        ...(animal?.judicial_owner_client_id
+          ? {}
+          : { judicial_owner_name: judicialProcedure ? (judicialOwnerName.trim() || null) : null }),
         judicial_billing_recipient: judicialProcedure ? (judicialBillingRecipient.trim() || null) : null,
         judicial_notes: judicialProcedure ? (judicialNotes.trim() || null) : null,
         judicial_hearing_date: judicialProcedure ? (judicialHearingDate || null) : null,
