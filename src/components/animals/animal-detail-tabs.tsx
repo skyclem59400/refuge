@@ -8,6 +8,7 @@ import { AnimalPhotos } from '@/components/animals/animal-photos'
 import { AnimalForm } from '@/components/animals/animal-form'
 import { AnimalIdentificationCard } from '@/components/animals/animal-identification-card'
 import { AnimalAttachmentsSection } from '@/components/animals/animal-attachments-section'
+import { JudicialDocumentsSection } from '@/components/animals/judicial-documents-section'
 import { HealthRecordForm } from '@/components/health/health-record-form'
 import { MovementForm } from '@/components/animals/movement-form'
 import { FosterContractsTab } from '@/components/foster-contracts/foster-contracts-tab'
@@ -86,9 +87,10 @@ import {
   Heart,
   HandHeart,
   ListChecks,
+  Scale,
 } from 'lucide-react'
 
-type TabId = 'info' | 'photos' | 'health' | 'movements' | 'foster' | 'adoption' | 'sponsorships' | 'abandonment' | 'documents' | 'outings' | 'posts' | 'icad' | 'activity'
+type TabId = 'info' | 'photos' | 'health' | 'movements' | 'foster' | 'adoption' | 'sponsorships' | 'abandonment' | 'judicial' | 'documents' | 'outings' | 'posts' | 'icad' | 'activity'
 
 interface AnimalOuting {
   id: string
@@ -133,7 +135,7 @@ interface AnimalDetailTabsProps {
   activityLogs?: ActivityLog[]
 }
 
-const baseTabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'outings' | 'socialPosts' | 'icadDeclarations' | 'activityLogs' | 'fosterContracts' | 'adoptionContracts' | 'abandonmentContracts' | 'sponsorshipsActive'; adminOnly?: boolean }[] = [
+const baseTabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'outings' | 'socialPosts' | 'icadDeclarations' | 'activityLogs' | 'fosterContracts' | 'adoptionContracts' | 'abandonmentContracts' | 'sponsorshipsActive'; adminOnly?: boolean; judicialOnly?: boolean }[] = [
   { id: 'info', label: 'Infos', icon: Info },
   { id: 'photos', label: 'Photos', icon: Camera, countKey: 'photos' },
   { id: 'health', label: 'Sante', icon: HeartPulse, countKey: 'healthRecords' },
@@ -142,6 +144,7 @@ const baseTabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 
   { id: 'adoption', label: 'Adoption', icon: Heart, countKey: 'adoptionContracts' },
   { id: 'sponsorships', label: 'Parrains', icon: HandHeart, countKey: 'sponsorshipsActive' },
   { id: 'abandonment', label: 'Abandon', icon: AlertTriangle, countKey: 'abandonmentContracts' },
+  { id: 'judicial', label: 'Procédure', icon: Scale, judicialOnly: true },
   { id: 'documents', label: 'Documents', icon: FileText },
   { id: 'outings', label: 'Sorties', icon: Footprints, countKey: 'outings' },
   { id: 'posts', label: 'Publications', icon: Share2, countKey: 'socialPosts' },
@@ -181,7 +184,7 @@ export function AnimalDetailTabs({
   const [showMovementForm, setShowMovementForm] = useState(false)
   const [showApplyProtocol, setShowApplyProtocol] = useState(false)
 
-  const tabs = baseTabs.filter(t => !t.adminOnly || isAdmin)
+  const tabs = baseTabs.filter(t => (!t.adminOnly || isAdmin) && (!t.judicialOnly || animal.judicial_procedure))
 
   const primaryPhoto = photos.find((p) => p.is_primary) || photos[0] || null
   const displayPhotoUrl = primaryPhoto?.url || animal.photo_url || null
@@ -373,6 +376,70 @@ export function AnimalDetailTabs({
             contracts={abandonmentContracts}
             canManage={canManageMovements}
           />
+        )}
+
+        {activeTab === 'judicial' && animal.judicial_procedure && (
+          <div className="space-y-4">
+            {/* Recap header */}
+            <div className="bg-error/5 border-2 border-error/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Scale className="w-5 h-5 text-error" />
+                <h3 className="text-sm font-bold text-error">Procédure judiciaire en cours</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                {animal.judicial_case_number && (
+                  <div><span className="text-muted">N° dossier :</span> <span className="font-semibold text-text">{animal.judicial_case_number}</span></div>
+                )}
+                {animal.judicial_jurisdiction && (
+                  <div><span className="text-muted">Juridiction :</span> <span className="font-semibold text-text">{animal.judicial_jurisdiction}</span></div>
+                )}
+                {animal.judicial_seizure_date && (
+                  <div><span className="text-muted">Date de saisine :</span> <span className="font-semibold text-text">{new Date(animal.judicial_seizure_date + 'T00:00:00').toLocaleDateString('fr-FR')}</span></div>
+                )}
+                {animal.judicial_pickup_location && (
+                  <div className="md:col-span-2"><span className="text-muted">Lieu de récupération :</span> <span className="font-semibold text-text">{animal.judicial_pickup_location}</span></div>
+                )}
+                {animal.judicial_owner_name && (
+                  <div><span className="text-muted">Propriétaire :</span> <span className="font-semibold text-text">{animal.judicial_owner_name}</span></div>
+                )}
+                {animal.judicial_lawyer_name && (
+                  <div><span className="text-muted">Avocat :</span> <span className="font-semibold text-text">{animal.judicial_lawyer_name}</span>{animal.judicial_lawyer_contact && <span className="text-muted"> · {animal.judicial_lawyer_contact}</span>}</div>
+                )}
+                {animal.judicial_hearing_date && (
+                  <div><span className="text-muted">Audience :</span> <span className="font-semibold text-text">{new Date(animal.judicial_hearing_date + 'T00:00:00').toLocaleDateString('fr-FR')}</span></div>
+                )}
+                {animal.judicial_decision_date && (
+                  <div><span className="text-muted">Jugement :</span> <span className="font-semibold text-text">{new Date(animal.judicial_decision_date + 'T00:00:00').toLocaleDateString('fr-FR')}</span></div>
+                )}
+                {animal.judicial_appeal_deadline && (
+                  <div><span className="text-muted">Délai d&apos;appel :</span> <span className="font-semibold text-text">{new Date(animal.judicial_appeal_deadline + 'T00:00:00').toLocaleDateString('fr-FR')}</span></div>
+                )}
+                {animal.judicial_billing_recipient && (
+                  <div className="md:col-span-2"><span className="text-muted">Facturation :</span> <span className="font-semibold text-text">{animal.judicial_billing_recipient}</span></div>
+                )}
+              </div>
+              {animal.judicial_notes && (
+                <div className="mt-3 pt-3 border-t border-error/20 text-xs">
+                  <span className="text-muted">Notes : </span>
+                  <span className="text-text whitespace-pre-wrap">{animal.judicial_notes}</span>
+                </div>
+              )}
+              <div className="mt-3 pt-3 border-t border-error/20 flex flex-wrap gap-2">
+                <a
+                  href={`/api/pdf/judicial/${animal.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-error/40 bg-error/10 text-error hover:bg-error/20 transition-colors font-semibold"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Dossier procédure (PDF)
+                </a>
+              </div>
+            </div>
+
+            {/* Documents uploadés */}
+            <JudicialDocumentsSection animalId={animal.id} canManage={canManageAnimals} />
+          </div>
         )}
 
         {activeTab === 'documents' && (

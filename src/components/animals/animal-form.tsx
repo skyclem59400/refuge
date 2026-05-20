@@ -83,6 +83,12 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
   const [judicialOwnerName, setJudicialOwnerName] = useState(animal?.judicial_owner_name || '')
   const [judicialBillingRecipient, setJudicialBillingRecipient] = useState(animal?.judicial_billing_recipient || '')
   const [judicialNotes, setJudicialNotes] = useState(animal?.judicial_notes || '')
+  const [judicialPickupLocation, setJudicialPickupLocation] = useState(animal?.judicial_pickup_location || '')
+  const [judicialHearingDate, setJudicialHearingDate] = useState(animal?.judicial_hearing_date || '')
+  const [judicialDecisionDate, setJudicialDecisionDate] = useState(animal?.judicial_decision_date || '')
+  const [judicialAppealDeadline, setJudicialAppealDeadline] = useState(animal?.judicial_appeal_deadline || '')
+  const [judicialLawyerName, setJudicialLawyerName] = useState(animal?.judicial_lawyer_name || '')
+  const [judicialLawyerContact, setJudicialLawyerContact] = useState(animal?.judicial_lawyer_contact || '')
 
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -137,6 +143,12 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
         judicial_owner_name: judicialProcedure ? (judicialOwnerName.trim() || null) : null,
         judicial_billing_recipient: judicialProcedure ? (judicialBillingRecipient.trim() || null) : null,
         judicial_notes: judicialProcedure ? (judicialNotes.trim() || null) : null,
+        judicial_pickup_location: judicialProcedure ? (judicialPickupLocation.trim() || null) : null,
+        judicial_hearing_date: judicialProcedure ? (judicialHearingDate || null) : null,
+        judicial_decision_date: judicialProcedure ? (judicialDecisionDate || null) : null,
+        judicial_appeal_deadline: judicialProcedure ? (judicialAppealDeadline || null) : null,
+        judicial_lawyer_name: judicialProcedure ? (judicialLawyerName.trim() || null) : null,
+        judicial_lawyer_contact: judicialProcedure ? (judicialLawyerContact.trim() || null) : null,
       }
 
       if (isEditing) {
@@ -805,13 +817,73 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
               </p>
             </div>
             <div className="md:col-span-2">
+              <label htmlFor="judicial-pickup" className={labelClass}>Lieu de saisie / récupération</label>
+              <input
+                id="judicial-pickup"
+                type="text"
+                value={judicialPickupLocation}
+                onChange={(e) => setJudicialPickupLocation(e.target.value)}
+                placeholder="Adresse complète : 12 rue X, 59400 Cambrai..."
+                className={inputClass}
+              />
+              <p className="text-xs text-muted mt-1">
+                Adresse précise où l&apos;animal a été récupéré (pour PV de saisie).
+              </p>
+            </div>
+            <div>
+              <label htmlFor="judicial-hearing" className={labelClass}>Date d&apos;audience</label>
+              <DatePicker
+                id="judicial-hearing"
+                value={judicialHearingDate}
+                onChange={(v) => setJudicialHearingDate(v ?? '')}
+              />
+            </div>
+            <div>
+              <label htmlFor="judicial-decision" className={labelClass}>Date du jugement</label>
+              <DatePicker
+                id="judicial-decision"
+                value={judicialDecisionDate}
+                onChange={(v) => setJudicialDecisionDate(v ?? '')}
+              />
+            </div>
+            <div>
+              <label htmlFor="judicial-appeal" className={labelClass}>Délai d&apos;appel (date limite)</label>
+              <DatePicker
+                id="judicial-appeal"
+                value={judicialAppealDeadline}
+                onChange={(v) => setJudicialAppealDeadline(v ?? '')}
+              />
+            </div>
+            <div>
+              <label htmlFor="judicial-lawyer-name" className={labelClass}>Avocat / représentant</label>
+              <input
+                id="judicial-lawyer-name"
+                type="text"
+                value={judicialLawyerName}
+                onChange={(e) => setJudicialLawyerName(e.target.value)}
+                placeholder="Maître X / Avocat de la SDA"
+                className={inputClass}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="judicial-lawyer-contact" className={labelClass}>Contact avocat (email / téléphone)</label>
+              <input
+                id="judicial-lawyer-contact"
+                type="text"
+                value={judicialLawyerContact}
+                onChange={(e) => setJudicialLawyerContact(e.target.value)}
+                placeholder="cabinet@avocat.fr / 03 27 ..."
+                className={inputClass}
+              />
+            </div>
+            <div className="md:col-span-2">
               <label htmlFor="judicial-notes" className={labelClass}>Notes procédure</label>
               <textarea
                 id="judicial-notes"
                 value={judicialNotes}
                 onChange={(e) => setJudicialNotes(e.target.value)}
                 rows={2}
-                placeholder="Avocat, contacts, audience..."
+                placeholder="Notes libres, contacts complémentaires..."
                 className={`${inputClass} resize-y`}
               />
             </div>

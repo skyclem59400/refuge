@@ -304,8 +304,39 @@ export interface Animal {
   judicial_owner_name: string | null
   judicial_billing_recipient: string | null
   judicial_notes: string | null
+  judicial_pickup_location: string | null
+  judicial_hearing_date: string | null
+  judicial_decision_date: string | null
+  judicial_appeal_deadline: string | null
+  judicial_lawyer_name: string | null
+  judicial_lawyer_contact: string | null
   created_at: string
   updated_at: string
+}
+
+export type JudicialAttachmentKind =
+  | 'seizure_pv'
+  | 'requisition_order'
+  | 'court_decision'
+  | 'vet_report'
+  | 'photo_evidence'
+  | 'invoice'
+  | 'other'
+
+export interface JudicialAttachment {
+  id: string
+  establishment_id: string
+  animal_id: string
+  kind: JudicialAttachmentKind
+  storage_path: string
+  file_name: string | null
+  mime_type: string | null
+  size_bytes: number | null
+  document_date: string | null
+  notes: string | null
+  uploaded_by: string | null
+  created_at: string
+  signed_url?: string
 }
 
 export interface AnimalPhoto {

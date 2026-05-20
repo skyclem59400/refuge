@@ -168,6 +168,12 @@ export async function createAnimal(data: {
   judicial_owner_name?: string | null
   judicial_billing_recipient?: string | null
   judicial_notes?: string | null
+  judicial_pickup_location?: string | null
+  judicial_hearing_date?: string | null
+  judicial_decision_date?: string | null
+  judicial_appeal_deadline?: string | null
+  judicial_lawyer_name?: string | null
+  judicial_lawyer_contact?: string | null
   /**
    * Si true, court-circuite la détection de doublon (même nom créé dans les 24h).
    * Utilisé quand l'utilisateur confirme explicitement qu'il s'agit bien d'un nouvel animal.
@@ -308,6 +314,12 @@ export async function updateAnimal(id: string, data: {
   judicial_owner_name?: string | null
   judicial_billing_recipient?: string | null
   judicial_notes?: string | null
+  judicial_pickup_location?: string | null
+  judicial_hearing_date?: string | null
+  judicial_decision_date?: string | null
+  judicial_appeal_deadline?: string | null
+  judicial_lawyer_name?: string | null
+  judicial_lawyer_contact?: string | null
 }) {
   try {
     const { establishmentId } = await requirePermission('manage_animals')
