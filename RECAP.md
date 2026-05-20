@@ -598,3 +598,16 @@ Le calcul de couverture (seuil 3 par défaut à la SDA) était déjà basé sur 
 
 1 fichier modifié (+14 / -17 lignes). TS check ✅.
 
+### 10. Couverture : dénominateur du compteur "X / Y" corrigé (commit `daa865c`)
+
+Bug visuel signalé par Clément sur la grille de couverture mensuelle : chaque jour affichait "X / Y" où Y était calculé comme `active_salaried + active_auto + active_other - absent` (~30-34 pour SDA, intégrant tous les bénévoles). Le numérateur X étant déjà sur les salariés uniquement, le ratio n'avait pas de sens.
+
+**Fix** :
+- Ajout d'un champ `total_salaried_count` dans `CoverageDay` (server) calculé comme `active_salaried.length + absent.filter(salarie).length` = effectif total sous contrat ce jour-là (incluant arrêts longs + congés).
+- Le composant client utilise désormais `d.total_salaried_count` comme dénominateur — peu importe le toggle "Inclure pending".
+- Légende mise à jour : "Salariés dispos / total sous contrat" (avant : "Salaries / total dispo").
+
+Pour SDA aujourd'hui, le dénominateur est désormais **6** (Carole, Franck, Marina, Mary, Yann + Eric en arrêt long), au lieu de 31-34 selon les jours.
+
+2 fichiers modifiés (+11 / -7). TS check ✅.
+
