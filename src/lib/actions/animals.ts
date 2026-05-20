@@ -159,6 +159,12 @@ export async function createAnimal(data: {
   description_external?: string | null
   capture_location?: string | null
   capture_circumstances?: string | null
+  pickup_address_label?: string | null
+  pickup_postcode?: string | null
+  pickup_city?: string | null
+  pickup_lat?: number | null
+  pickup_lng?: number | null
+  pickup_ban_id?: string | null
   origin_type: AnimalOrigin
   box_id?: string | null
   judicial_procedure?: boolean
@@ -305,6 +311,12 @@ export async function updateAnimal(id: string, data: {
   description_external?: string | null
   capture_location?: string | null
   capture_circumstances?: string | null
+  pickup_address_label?: string | null
+  pickup_postcode?: string | null
+  pickup_city?: string | null
+  pickup_lat?: number | null
+  pickup_lng?: number | null
+  pickup_ban_id?: string | null
   origin_type?: AnimalOrigin
   box_id?: string | null
   judicial_procedure?: boolean

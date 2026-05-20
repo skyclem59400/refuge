@@ -289,6 +289,13 @@ export interface Animal {
   description_external: string | null
   capture_location: string | null
   capture_circumstances: string | null
+  // Lieu de récupération structuré (autocomplétion BAN). Source de vérité depuis 2026-05.
+  pickup_address_label: string | null
+  pickup_postcode: string | null
+  pickup_city: string | null
+  pickup_lat: number | null
+  pickup_lng: number | null
+  pickup_ban_id: string | null
   origin_type: AnimalOrigin
   box_id: string | null
   pound_entry_date: string | null

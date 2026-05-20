@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Loader2, Sparkles } from 'lucide-react'
 import { createAnimal, updateAnimal } from '@/lib/actions/animals'
 import { CommuneAutocomplete } from '@/components/ui/commune-autocomplete'
+import { AddressAutocomplete } from '@/components/ui/address-autocomplete'
 import { DatePicker } from '@/components/ui/date-picker'
 import {
   Select,
@@ -83,7 +84,27 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
   const [judicialOwnerName, setJudicialOwnerName] = useState(animal?.judicial_owner_name || '')
   const [judicialBillingRecipient, setJudicialBillingRecipient] = useState(animal?.judicial_billing_recipient || '')
   const [judicialNotes, setJudicialNotes] = useState(animal?.judicial_notes || '')
-  const [judicialPickupLocation, setJudicialPickupLocation] = useState(animal?.judicial_pickup_location || '')
+  // judicialPickupLocation supprimé : remplacé par le champ générique pickupAddress
+  // (autocomplétion BAN, en haut du form, valable pour tous les animaux)
+  const [pickupAddress, setPickupAddress] = useState<{
+    label: string
+    postcode: string | null
+    city: string | null
+    lat: number | null
+    lng: number | null
+    banId: string | null
+  } | null>(
+    animal?.pickup_address_label
+      ? {
+          label: animal.pickup_address_label,
+          postcode: animal.pickup_postcode ?? null,
+          city: animal.pickup_city ?? null,
+          lat: animal.pickup_lat ?? null,
+          lng: animal.pickup_lng ?? null,
+          banId: animal.pickup_ban_id ?? null,
+        }
+      : null
+  )
   const [judicialHearingDate, setJudicialHearingDate] = useState(animal?.judicial_hearing_date || '')
   const [judicialDecisionDate, setJudicialDecisionDate] = useState(animal?.judicial_decision_date || '')
   const [judicialAppealDeadline, setJudicialAppealDeadline] = useState(animal?.judicial_appeal_deadline || '')
@@ -128,7 +149,13 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
         ring_number: ringNumber || null,
         identification_date: identificationDate || null,
         identifying_veterinarian_id: identifyingVetId || null,
-        capture_location: captureLocation || null,
+        capture_location: pickupAddress?.label ?? (captureLocation || null),
+        pickup_address_label: pickupAddress?.label ?? null,
+        pickup_postcode: pickupAddress?.postcode ?? null,
+        pickup_city: pickupAddress?.city ?? null,
+        pickup_lat: pickupAddress?.lat ?? null,
+        pickup_lng: pickupAddress?.lng ?? null,
+        pickup_ban_id: pickupAddress?.banId ?? null,
         capture_circumstances: captureCircumstances || null,
         ok_cats: supportsCompatibility(species) ? okCats : null,
         ok_males: supportsCompatibility(species) ? okMales : null,
@@ -143,7 +170,6 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
         judicial_owner_name: judicialProcedure ? (judicialOwnerName.trim() || null) : null,
         judicial_billing_recipient: judicialProcedure ? (judicialBillingRecipient.trim() || null) : null,
         judicial_notes: judicialProcedure ? (judicialNotes.trim() || null) : null,
-        judicial_pickup_location: judicialProcedure ? (judicialPickupLocation.trim() || null) : null,
         judicial_hearing_date: judicialProcedure ? (judicialHearingDate || null) : null,
         judicial_decision_date: judicialProcedure ? (judicialDecisionDate || null) : null,
         judicial_appeal_deadline: judicialProcedure ? (judicialAppealDeadline || null) : null,
@@ -700,8 +726,50 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
         </div>
       </div>
 
-      {/* Section: Lieu de capture (creation only) */}
-      {!isEditing && (
+      {/* Section: Lieu de récupération (toujours visible, édition possible post-création) */}
+      <div className="bg-surface rounded-xl border border-border p-5">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted mb-1">
+          Lieu de récupération
+        </h3>
+        <p className="text-xs text-muted mb-4">
+          Adresse précise où l&apos;animal a été récupéré (saisie judiciaire, divagation, abandon, transfert...).
+          Sélectionne obligatoirement une adresse dans la liste pour normaliser l&apos;écriture.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="animal-pickup-address" className={labelClass}>Adresse</label>
+            <AddressAutocomplete
+              id="animal-pickup-address"
+              value={pickupAddress}
+              onChange={setPickupAddress}
+              placeholder="12 rue Saint-Nicolas, 59400 Cambrai..."
+            />
+            {pickupAddress?.city && (
+              <p className="text-[11px] text-muted mt-1">
+                Code postal : <span className="text-text font-semibold">{pickupAddress.postcode ?? '—'}</span>
+                {' · '}
+                Ville : <span className="text-text font-semibold">{pickupAddress.city}</span>
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="animal-capture-circumstances" className={labelClass}>Circonstances</label>
+            <textarea
+              id="animal-capture-circumstances"
+              value={captureCircumstances}
+              onChange={(e) => setCaptureCircumstances(e.target.value)}
+              placeholder="Circonstances de la récupération..."
+              rows={3}
+              className={`${inputClass} resize-y`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Ancien bloc capture (compat) — supprimé : remplacé par la section ci-dessus */}
+      {false && (
         <div className="bg-surface rounded-xl border border-border p-5">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-muted mb-4">Lieu de capture</h3>
 
@@ -717,19 +785,6 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
                   className={inputClass}
                 />
               </label>
-            </div>
-
-            {/* Circonstances */}
-            <div>
-              <label htmlFor="animal-capture-circumstances" className={labelClass}>Circonstances</label>
-              <textarea
-                id="animal-capture-circumstances"
-                value={captureCircumstances}
-                onChange={(e) => setCaptureCircumstances(e.target.value)}
-                placeholder="Circonstances de la capture..."
-                rows={3}
-                className={`${inputClass} resize-y`}
-              />
             </div>
           </div>
         </div>
@@ -816,20 +871,7 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
                 Précisez à qui la clinique doit adresser sa facture (par défaut : SDA pour récupération auprès du tribunal).
               </p>
             </div>
-            <div className="md:col-span-2">
-              <label htmlFor="judicial-pickup" className={labelClass}>Lieu de saisie / récupération</label>
-              <input
-                id="judicial-pickup"
-                type="text"
-                value={judicialPickupLocation}
-                onChange={(e) => setJudicialPickupLocation(e.target.value)}
-                placeholder="Adresse complète : 12 rue X, 59400 Cambrai..."
-                className={inputClass}
-              />
-              <p className="text-xs text-muted mt-1">
-                Adresse précise où l&apos;animal a été récupéré (pour PV de saisie).
-              </p>
-            </div>
+            {/* Lieu de récupération désormais dans la section générique "Lieu de récupération" en haut du form */}
             <div>
               <label htmlFor="judicial-hearing" className={labelClass}>Date d&apos;audience</label>
               <DatePicker
