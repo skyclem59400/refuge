@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useTransition } from 'react'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, Ban } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { createClientAction, updateClientAction } from '@/lib/actions/clients'
@@ -209,6 +209,12 @@ export function ClientSearch({ onSelect, selected, establishmentId, category, pl
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium truncate">{clientDisplay}</p>
+                      {client.is_blacklisted && (
+                        <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-error/15 text-error border border-error/30">
+                          <Ban className="w-2.5 h-2.5" />
+                          LISTE NOIRE
+                        </span>
+                      )}
                       <span className={`shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${needsConversion ? 'bg-amber-500/15 text-amber-600' : 'bg-primary/15 text-primary'}`}>
                         {currentCategoryLabel}
                       </span>

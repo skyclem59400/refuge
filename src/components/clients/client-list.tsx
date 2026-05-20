@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { Ban } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { deleteClientAction } from '@/lib/actions/clients'
 import { getCategoryLabel, getCategoryColor, ALL_CONTACT_CATEGORIES } from '@/lib/sda-utils'
@@ -18,6 +19,7 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
   const [clients, setClients] = useState<Client[]>(initialData)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<ContactCategory | ''>('')
+  const [showBlacklisted, setShowBlacklisted] = useState(false)
 
   useEffect(() => { setClients(initialData) }, [initialData])
   const [isPending, startTransition] = useTransition()
@@ -56,12 +58,19 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
   }
 
   const displayed = (() => {
-    if (!categoryFilter) return clients
-    if (categoryFilter === 'foster_family') return clients.filter((c) => c.is_foster)
-    if (categoryFilter === 'member') return clients.filter((c) => c.is_member)
-    if (categoryFilter === 'client') return clients.filter((c) => c.is_adopter)
-    return clients.filter((c) => c.type === categoryFilter)
+    let base = clients
+    // Par défaut, on cache les blacklistés des recherches d'adopteurs ; toggle pour afficher.
+    if (!showBlacklisted) {
+      base = base.filter((c) => !c.is_blacklisted)
+    }
+    if (!categoryFilter) return base
+    if (categoryFilter === 'foster_family') return base.filter((c) => c.is_foster)
+    if (categoryFilter === 'member') return base.filter((c) => c.is_member)
+    if (categoryFilter === 'client') return base.filter((c) => c.is_adopter)
+    return base.filter((c) => c.type === categoryFilter)
   })()
+
+  const blacklistedCount = clients.filter((c) => c.is_blacklisted).length
 
   return (
     <div>
@@ -87,6 +96,16 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
             <option key={cat} value={cat}>{getCategoryLabel(cat)}</option>
           ))}
         </select>
+        {blacklistedCount > 0 && (
+          <label className="inline-flex items-center gap-2 px-3 py-2.5 bg-surface-dark border border-border rounded-lg text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showBlacklisted}
+              onChange={(e) => setShowBlacklisted(e.target.checked)}
+            />
+            <span className="text-muted">Afficher la liste noire ({blacklistedCount})</span>
+          </label>
+        )}
       </div>
 
       {/* Table */}
@@ -115,9 +134,9 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
                 const displayName = getClientDisplayName(client)
                 const secondary = client.kind === 'person' ? client.first_name : client.contact_person
                 return (
-                <tr key={client.id} className="hover:bg-surface-hover/30 transition-colors">
+                <tr key={client.id} className={`hover:bg-surface-hover/30 transition-colors ${client.is_blacklisted ? 'bg-error/5' : ''}`}>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-xs font-bold text-white shrink-0">
                         {(displayName[0] || '?').toUpperCase()}
                       </div>
@@ -125,6 +144,12 @@ export function ClientList({ initialData, canEdit, establishmentId }: ClientList
                       {client.kind === 'organization' && (
                         <span className="text-[10px] uppercase tracking-wider text-muted/70 bg-surface-hover/50 px-1.5 py-0.5 rounded">
                           Org
+                        </span>
+                      )}
+                      {client.is_blacklisted && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-error/15 text-error border border-error/30">
+                          <Ban className="w-2.5 h-2.5" />
+                          LISTE NOIRE
                         </span>
                       )}
                     </div>

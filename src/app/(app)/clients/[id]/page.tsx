@@ -4,11 +4,13 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { ClientForm } from '@/components/clients/client-form'
 import { ClientSponsorshipsSection } from '@/components/clients/client-sponsorships-section'
+import { ClientBlacklistSection } from '@/components/clients/client-blacklist-section'
 import { TypeBadge, StatusBadge } from '@/components/documents/status-badge'
 import { getSponsorshipsForClient } from '@/lib/actions/sponsorships'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
 import { getSpeciesEmoji } from '@/lib/species'
-import { getClientDisplayName, type Client, type Document } from '@/lib/types/database'
+import { getClientDisplayName, type Client, type Document, BLACKLIST_SOURCE_LABELS } from '@/lib/types/database'
+import { Ban, ShieldAlert } from 'lucide-react'
 
 interface AdoptionRow {
   id: string
@@ -108,7 +110,19 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const totalDonated = typedDonations.reduce((s, d) => s + Number(d.amount), 0)
 
   const canEditClients = ctx!.permissions.canManageClients
+  const isAdmin = ctx!.permissions.isAdmin
   const displayName = getClientDisplayName(typedClient)
+
+  // Animaux liés au propriétaire judiciaire (si la fiche est blacklistée)
+  let linkedJudicialAnimals: Array<{ id: string; name: string; medal_number: string | null }> = []
+  if (typedClient.is_blacklisted) {
+    const { data: animalsLinked } = await admin
+      .from('animals')
+      .select('id, name, medal_number')
+      .eq('judicial_owner_client_id', id)
+      .eq('establishment_id', estabId)
+    linkedJudicialAnimals = (animalsLinked ?? []) as Array<{ id: string; name: string; medal_number: string | null }>
+  }
 
   return (
     <div className="animate-fade-up">
@@ -116,13 +130,36 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <Link href="/clients" className="text-muted hover:text-text transition-colors">
           &larr; Retour
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold">{displayName}</h1>
+        <div className="flex-1">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-bold">{displayName}</h1>
+            {typedClient.is_blacklisted && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-error/15 text-error border border-error/30">
+                <Ban className="w-3.5 h-3.5" />
+                LISTE NOIRE SDA
+              </span>
+            )}
+          </div>
           <p className="text-sm text-muted mt-1">
             {typedClient.kind === 'organization' ? 'Fiche organisation' : 'Fiche contact'}
           </p>
         </div>
       </div>
+
+      {typedClient.is_blacklisted && (
+        <div className="mb-6 rounded-xl border-2 border-error/40 bg-error/10 p-4 flex items-start gap-3">
+          <ShieldAlert className="w-5 h-5 text-error shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-error text-sm">Contact inscrit sur la liste noire SDA</p>
+            <p className="text-xs text-muted mt-1">
+              Toute tentative d&apos;adoption par cette personne sera automatiquement bloquée.
+              {typedClient.blacklist_source && (
+                <> Source : <strong className="text-text">{BLACKLIST_SOURCE_LABELS[typedClient.blacklist_source]}</strong>.</>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Colonne gauche : carte contact + stats + edit */}
@@ -207,6 +244,15 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
         {/* Colonne droite : historique */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Liste noire SDA (si applicable) */}
+          {(typedClient.is_blacklisted || typedClient.blacklist_removed_at) && (
+            <ClientBlacklistSection
+              client={typedClient}
+              linkedAnimals={linkedJudicialAnimals}
+              isAdmin={isAdmin}
+            />
+          )}
+
           {/* Adoptions */}
           {typedAdoptions.length > 0 && (
             <Section title="Adoptions" count={typedAdoptions.length}>
