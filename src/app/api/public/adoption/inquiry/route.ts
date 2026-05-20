@@ -3,9 +3,12 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { jsonWithCors, preflightWithCors } from '@/lib/public/cors'
 import { verifyTurnstile } from '@/lib/public/turnstile'
 import { sendAdoptionInquiryConfirmation } from '@/lib/email/adoption-inquiry-email'
+import { checkAdopterBlacklist } from '@/lib/actions/blacklist'
 import {
   DEFAULT_ADOPTION_APPOINTMENT_SETTINGS,
+  BLOCKING_MATCH_STRENGTHS,
   type AdoptionAppointmentSettings,
+  type BlacklistMatch,
 } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
@@ -119,6 +122,78 @@ export async function POST(req: NextRequest) {
         { error: 'Une demande est déjà en cours pour cet animal avec cet email. Consultez votre espace ou contactez le refuge.' },
         origin,
         { status: 409 },
+      )
+    }
+
+    // 4b. Vérification liste noire SDA — match exact bloque silencieusement
+    const blacklistRes = await checkAdopterBlacklist({
+      establishment_id: animal.establishment_id,
+      last_name: body.last_name,
+      first_name: body.first_name,
+      email: body.email,
+      phone: body.phone,
+    })
+    const matches: BlacklistMatch[] = 'data' in blacklistRes ? blacklistRes.data : []
+    const blockingMatch = matches.find((m) => BLOCKING_MATCH_STRENGTHS.includes(m.match_strength))
+    const weakMatch = !blockingMatch && matches.some((m) => m.match_strength === 'name_only')
+
+    if (blockingMatch) {
+      // On enregistre une inquiry status='refused' avec message neutre côté
+      // demandeur (on ne révèle PAS la liste noire au public).
+      const emailLower = body.email.toLowerCase()
+      const refusalReason = 'Demande non retenue après vérification de nos registres. Pour toute question, contactez la direction SDA.'
+      await admin.from('adoption_inquiries').insert({
+        establishment_id: animal.establishment_id,
+        animal_id: animal.id,
+        client_id: blockingMatch.client_id,
+        appointment_id: null,
+        first_name: body.first_name,
+        last_name: body.last_name,
+        email: emailLower,
+        phone: body.phone,
+        address: body.address ?? null,
+        postal_code: body.postal_code ?? null,
+        city: body.city ?? null,
+        questionnaire: body.questionnaire ?? {},
+        status: 'refused',
+        source: 'public_portal',
+        team_notes: `[BLACKLIST AUTOBLOC] match=${blockingMatch.match_strength} client_id=${blockingMatch.client_id}. Motif liste noire : ${blockingMatch.blacklist_reason ?? '—'}`,
+        refusal_reason: refusalReason,
+        possible_blacklist_match: false,
+        ip_address: ip,
+        user_agent: userAgent,
+      })
+
+      // Notifier les admins de l'établissement (notifications internes)
+      try {
+        const { data: admins } = await admin
+          .from('establishment_members')
+          .select('user_id')
+          .eq('establishment_id', animal.establishment_id)
+        for (const m of (admins ?? []) as Array<{ user_id: string }>) {
+          await admin.from('notifications').insert({
+            establishment_id: animal.establishment_id,
+            user_id: m.user_id,
+            type: 'general',
+            title: '⛔ Demande adoption bloquée — liste noire',
+            body: `Une demande publique pour ${animal.name} a été automatiquement refusée (contact blacklisté : ${body.last_name} ${body.first_name}).`,
+            link: `/clients/${blockingMatch.client_id}`,
+            metadata: { match_strength: blockingMatch.match_strength, animal_id: animal.id },
+          })
+        }
+      } catch (e) {
+        console.error('[adoption-inquiry] notif blacklist échec', e)
+      }
+
+      // Réponse neutre côté demandeur
+      return jsonWithCors(
+        {
+          data: {
+            message: 'Demande enregistrée. Notre équipe la valide sous 48h ouvrées.',
+          },
+        },
+        origin,
+        { status: 201 },
       )
     }
 
@@ -237,7 +312,7 @@ export async function POST(req: NextRequest) {
       return jsonWithCors({ error: 'Création du rendez-vous impossible : ' + apptErr?.message }, origin, { status: 500 })
     }
 
-    // 8. Adoption inquiry
+    // 8. Adoption inquiry — on flag possible_blacklist_match si match faible
     const { data: inquiry, error: inqErr } = await admin
       .from('adoption_inquiries')
       .insert({
@@ -255,6 +330,7 @@ export async function POST(req: NextRequest) {
         questionnaire: body.questionnaire ?? {},
         status: 'pending',
         source: 'public_portal',
+        possible_blacklist_match: weakMatch,
         ip_address: ip,
         user_agent: userAgent,
       })

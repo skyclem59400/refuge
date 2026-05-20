@@ -9,7 +9,13 @@ import { createFosterContract } from '@/lib/actions/foster-contracts'
 import { createAdoptionContract } from '@/lib/actions/adoption-contracts'
 import { sendContractForSignature } from '@/lib/actions/foster-contract-signature'
 import { sendAdoptionContractForSignature } from '@/lib/actions/adoption-contract-signature'
-import type { AnimalStatus, IcadStatus } from '@/lib/types/database'
+import { checkAdopterBlacklist } from '@/lib/actions/blacklist'
+import {
+  BLOCKING_MATCH_STRENGTHS,
+  type AnimalStatus,
+  type BlacklistMatch,
+  type IcadStatus,
+} from '@/lib/types/database'
 
 // ============================================
 // Foster placement: movement + foster_contract + Documenso send
@@ -159,16 +165,19 @@ export interface AdoptionInput {
   specialConditions?: string | null
   signedAtLocation?: string | null
   skipElectronicSignature?: boolean
+  /** Force la création malgré un match liste noire — admin only, motif obligatoire. */
+  blacklistOverride?: { reason: string } | null
 }
 
 export async function recordAdoptionWithContract(input: AdoptionInput) {
   try {
-    const { establishmentId } = await requirePermission('manage_movements')
+    const ctx = await requirePermission('manage_movements')
+    const { establishmentId, userId } = ctx
     const admin = createAdminClient()
 
     const { data: adopter } = await admin
       .from('clients')
-      .select('id, name, email')
+      .select('id, name, first_name, email, phone, birth_date, is_blacklisted, blacklist_reason')
       .eq('id', input.adopterClientId)
       .eq('establishment_id', establishmentId)
       .single()
@@ -178,6 +187,70 @@ export async function recordAdoptionWithContract(input: AdoptionInput) {
     }
     if (!input.skipElectronicSignature && !adopter.email?.trim()) {
       return { error: "L'email de l'adoptant est obligatoire pour la signature électronique. Renseignez-le dans le répertoire ou cochez la signature papier." }
+    }
+
+    // Vérification liste noire SDA
+    // Cas 1 : l'adoptant choisi est lui-même blacklisté
+    // Cas 2 : un autre contact qui matche par email/phone/nom+date_naissance est blacklisté
+    const matches: BlacklistMatch[] = []
+    if (adopter.is_blacklisted) {
+      matches.push({
+        client_id: adopter.id,
+        match_strength: 'exact_email',
+        client_name: adopter.name,
+        client_first_name: adopter.first_name,
+        blacklist_reason: adopter.blacklist_reason,
+        blacklist_source: null,
+        blacklisted_at: null,
+      })
+    } else {
+      const checkRes = await checkAdopterBlacklist({
+        establishment_id: establishmentId,
+        last_name: adopter.name,
+        first_name: adopter.first_name,
+        email: adopter.email,
+        phone: adopter.phone,
+        birth_date: adopter.birth_date,
+      })
+      if ('data' in checkRes) {
+        for (const m of checkRes.data) {
+          if (BLOCKING_MATCH_STRENGTHS.includes(m.match_strength)) matches.push(m)
+        }
+      }
+    }
+
+    if (matches.length > 0 && !input.blacklistOverride) {
+      return {
+        error: 'BLACKLIST_BLOCK',
+        requireOverride: true,
+        blacklistMatches: matches,
+      }
+    }
+
+    if (matches.length > 0 && input.blacklistOverride) {
+      if (input.blacklistOverride.reason.trim().length < 10) {
+        return { error: 'Motif d\'override obligatoire (minimum 10 caractères).' }
+      }
+      // Vérification admin only pour override
+      if (!ctx.groups?.some((g) => g.is_system && g.name === 'Administrateur')) {
+        return { error: 'Override liste noire réservé aux administrateurs de l\'établissement.' }
+      }
+      // Audit log critique
+      logActivity({
+        action: 'create',
+        entityType: 'adoption_contract',
+        entityName: `Override liste noire — animal ${input.animalId}`,
+        parentType: 'animal',
+        parentId: input.animalId,
+        details: {
+          severity: 'critical',
+          action: 'blacklist_override',
+          adopter_client_id: input.adopterClientId,
+          matches: matches.map((m) => ({ client_id: m.client_id, strength: m.match_strength })),
+          reason: input.blacklistOverride.reason.trim(),
+          by_user: userId,
+        },
+      })
     }
 
     const contractRes = await createAdoptionContract({
