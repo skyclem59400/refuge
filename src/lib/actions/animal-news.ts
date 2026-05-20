@@ -9,24 +9,46 @@ import type {
   AnimalNewsPhoto,
   AnimalNewsWithAnimal,
   AnimalNewsMosaic,
+  NewsCategory,
 } from '@/lib/types/database'
-import { ANIMAL_NEWS_ELIGIBLE_STATUSES } from '@/lib/types/database'
+import { SHELTERED_STATUSES, ALUMNI_STATUSES } from '@/lib/types/database'
 
 // ============================================
 // Read actions
 // ============================================
 
-export async function getAnimalNewsInbox() {
+/**
+ * Récupère les news d'une catégorie ("sheltered" = au refuge / "alumni" = sortis),
+ * avec filtres optionnels par animaux et par range de dates.
+ * Plus d'inbox : toutes les news sont considérées publiées dès leur création.
+ */
+export async function getAnimalNewsByCategory(opts: {
+  category: NewsCategory
+  animalIds?: string[]
+  dateFrom?: string // YYYY-MM-DD
+  dateTo?: string // YYYY-MM-DD
+}) {
   try {
     const ctx = await requirePermission('view_animal_news')
     const admin = createAdminClient()
+    const statuses = opts.category === 'sheltered' ? SHELTERED_STATUSES : ALUMNI_STATUSES
 
-    const { data, error } = await admin
+    let query = admin
       .from('animal_news')
-      .select('*, animal:animals(id,name,species,sex,status,exit_date,photo_url,birth_date)')
+      .select(
+        '*, animal:animals!inner(id,name,species,sex,status,exit_date,photo_url,birth_date)',
+      )
       .eq('establishment_id', ctx.establishmentId)
-      .is('posted_at', null)
+      .in('animal.status', statuses)
       .order('received_at', { ascending: false })
+
+    if (opts.animalIds && opts.animalIds.length > 0) {
+      query = query.in('animal_id', opts.animalIds)
+    }
+    if (opts.dateFrom) query = query.gte('received_at', opts.dateFrom)
+    if (opts.dateTo) query = query.lte('received_at', opts.dateTo)
+
+    const { data, error } = await query
 
     if (error) return { error: error.message }
     return { data: (data as AnimalNewsWithAnimal[]) || [] }
@@ -35,36 +57,21 @@ export async function getAnimalNewsInbox() {
   }
 }
 
-export async function getAnimalNewsHistory() {
+/** Mosaïques publiées (uniquement côté Alumni — récap Facebook multi-animaux). */
+export async function getMosaics() {
   try {
     const ctx = await requirePermission('view_animal_news')
     const admin = createAdminClient()
 
-    const [{ data: solos, error: e1 }, { data: mosaics, error: e2 }] = await Promise.all([
-      admin
-        .from('animal_news')
-        .select('*, animal:animals(id,name,species,sex,status,exit_date,photo_url,birth_date)')
-        .eq('establishment_id', ctx.establishmentId)
-        .not('posted_at', 'is', null)
-        .is('posted_in_mosaic_id', null)
-        .order('posted_at', { ascending: false }),
-      admin
-        .from('animal_news_mosaics')
-        .select('*')
-        .eq('establishment_id', ctx.establishmentId)
-        .not('posted_at', 'is', null)
-        .order('posted_at', { ascending: false }),
-    ])
+    const { data, error } = await admin
+      .from('animal_news_mosaics')
+      .select('*')
+      .eq('establishment_id', ctx.establishmentId)
+      .not('posted_at', 'is', null)
+      .order('posted_at', { ascending: false })
 
-    if (e1) return { error: e1.message }
-    if (e2) return { error: e2.message }
-
-    return {
-      data: {
-        solos: (solos as AnimalNewsWithAnimal[]) || [],
-        mosaics: (mosaics as AnimalNewsMosaic[]) || [],
-      },
-    }
+    if (error) return { error: error.message }
+    return { data: (data as AnimalNewsMosaic[]) || [] }
   } catch (e) {
     return { error: (e as Error).message }
   }
@@ -89,17 +96,18 @@ export async function getAnimalNewsForAnimal(animalId: string) {
   }
 }
 
-/** Animaux éligibles : statut adopted / foster_family / transferred / returned. */
-export async function getEligibleAnimalsForNews() {
+/** Liste les animaux éligibles à recevoir une nouvelle pour une catégorie donnée. */
+export async function getAnimalsForCategory(category: NewsCategory) {
   try {
     const ctx = await requirePermission('view_animal_news')
     const admin = createAdminClient()
+    const statuses = category === 'sheltered' ? SHELTERED_STATUSES : ALUMNI_STATUSES
 
     const { data, error } = await admin
       .from('animals')
       .select('id, name, species, sex, status, exit_date, photo_url, birth_date')
       .eq('establishment_id', ctx.establishmentId)
-      .in('status', ANIMAL_NEWS_ELIGIBLE_STATUSES)
+      .in('status', statuses)
       .order('name', { ascending: true })
 
     if (error) return { error: error.message }
@@ -115,18 +123,22 @@ export async function getEligibleAnimalsForNews() {
 
 interface AddNewsInput {
   animal_id: string
-  photos: AnimalNewsPhoto[] // uploadées côté client direct vers Storage
+  photos: AnimalNewsPhoto[]
   text: string | null
   received_from: string | null
   received_at: string // YYYY-MM-DD
 }
 
+/**
+ * Ajoute une news et la publie immédiatement (plus d'inbox).
+ * Synchronise les photos vers animal_photos pour qu'elles apparaissent dans
+ * l'onglet Photos de la fiche animal (cf. migration 20260519d).
+ */
 export async function addAnimalNews(input: AddNewsInput) {
   try {
     const ctx = await requirePermission('view_animal_news')
     const admin = createAdminClient()
 
-    // Vérifier que l'animal appartient bien à l'établissement
     const { data: animal } = await admin
       .from('animals')
       .select('id, name, establishment_id')
@@ -136,13 +148,13 @@ export async function addAnimalNews(input: AddNewsInput) {
 
     if (!animal) return { error: 'Animal introuvable' }
 
-    // Sanity-check : tous les paths doivent commencer par {establishmentId}/news/
     for (const p of input.photos) {
       if (!p.path.startsWith(`${ctx.establishmentId}/news/`)) {
         return { error: 'Chemin de stockage invalide pour cet établissement' }
       }
     }
 
+    const now = new Date().toISOString()
     const { data: news, error } = await admin
       .from('animal_news')
       .insert({
@@ -152,13 +164,13 @@ export async function addAnimalNews(input: AddNewsInput) {
         text: input.text,
         received_from: input.received_from,
         received_at: input.received_at,
+        posted_at: now, // publication immédiate
         created_by: ctx.userId,
       })
       .select()
       .single()
 
     if (error) {
-      // Best-effort cleanup des photos uploadées si insert échoue
       if (input.photos.length > 0) {
         await admin.storage.from('animal-photos').remove(input.photos.map((p) => p.path))
       }
@@ -167,17 +179,13 @@ export async function addAnimalNews(input: AddNewsInput) {
 
     const typedNews = news as AnimalNews
 
-    // Synchronise les photos vers animal_photos pour qu'elles apparaissent
-    // dans le tab Photos de la fiche animal (même après sortie/adoption).
-    // ON DELETE CASCADE depuis animal_news.id nettoiera auto en cas de suppression.
     if (input.photos.length > 0) {
       const photoRows = input.photos.map((p) => ({
         animal_id: input.animal_id,
         url: p.url,
-        is_primary: false, // les photos de nouvelles ne deviennent jamais photo principale
+        is_primary: false,
         source_news_id: typedNews.id,
       }))
-      // best-effort : si ça échoue, la news existe quand même, juste pas la sync
       const { error: photoErr } = await admin.from('animal_photos').insert(photoRows)
       if (photoErr) {
         console.error('Failed to sync news photos to animal_photos:', photoErr.message)
@@ -187,7 +195,7 @@ export async function addAnimalNews(input: AddNewsInput) {
     logActivity({
       action: 'create',
       entityType: 'animal_news',
-      entityId: (news as AnimalNews).id,
+      entityId: typedNews.id,
       entityName: `Nouvelle de ${animal.name}`,
       parentType: 'animal',
       parentId: input.animal_id,
@@ -216,8 +224,6 @@ export async function deleteAnimalNews(id: string) {
     if (!news) return { error: 'Nouvelle introuvable' }
 
     const typed = news as AnimalNews
-
-    // Cleanup photos in storage
     const paths = (typed.photos || []).map((p) => p.path).filter(Boolean)
     if (paths.length > 0) {
       await admin.storage.from('animal-photos').remove(paths)
@@ -246,24 +252,25 @@ export async function deleteAnimalNews(id: string) {
 }
 
 /**
- * Marque les nouvelles comme publiées. Si mosaicTitle fourni, crée la mosaïque
- * et lie toutes les nouvelles à elle. Sinon, c'est une publication solo (1 ID).
+ * Crée une mosaïque (récap Facebook combinant plusieurs news d'animaux différents).
+ * Réservé au module Alumni — usage : poster hebdomadaire "Les sortis de la semaine".
  */
-export async function markNewsAsPosted(params: {
+export async function createMosaic(params: {
   newsIds: string[]
-  mosaicTitle?: string | null
+  title?: string | null
   generatedImageUrl?: string | null
 }) {
   try {
     const ctx = await requirePermission('view_animal_news')
     const admin = createAdminClient()
 
-    if (params.newsIds.length === 0) return { error: 'Aucune nouvelle sélectionnée' }
+    if (params.newsIds.length < 2) {
+      return { error: 'Une mosaïque doit contenir au moins 2 nouvelles' }
+    }
 
-    // Vérifier que toutes les news appartiennent à l'établissement
     const { data: existing, error: checkErr } = await admin
       .from('animal_news')
-      .select('id, establishment_id, animal_id')
+      .select('id, establishment_id')
       .in('id', params.newsIds)
 
     if (checkErr) return { error: checkErr.message }
@@ -277,45 +284,35 @@ export async function markNewsAsPosted(params: {
     }
 
     const now = new Date().toISOString()
-    let mosaicId: string | null = null
-
-    if (params.newsIds.length > 1) {
-      // Création de la mosaïque
-      const { data: mosaic, error: mErr } = await admin
-        .from('animal_news_mosaics')
-        .insert({
-          establishment_id: ctx.establishmentId,
-          news_ids: params.newsIds,
-          title: params.mosaicTitle ?? null,
-          generated_image_url: params.generatedImageUrl ?? null,
-          posted_at: now,
-          created_by: ctx.userId,
-        })
-        .select()
-        .single()
-
-      if (mErr) return { error: mErr.message }
-      mosaicId = (mosaic as AnimalNewsMosaic).id
-    }
-
-    const { error: updErr } = await admin
-      .from('animal_news')
-      .update({
+    const { data: mosaic, error: mErr } = await admin
+      .from('animal_news_mosaics')
+      .insert({
+        establishment_id: ctx.establishmentId,
+        news_ids: params.newsIds,
+        title: params.title ?? null,
+        generated_image_url: params.generatedImageUrl ?? null,
         posted_at: now,
-        posted_in_mosaic_id: mosaicId,
+        created_by: ctx.userId,
       })
+      .select()
+      .single()
+
+    if (mErr) return { error: mErr.message }
+
+    await admin
+      .from('animal_news')
+      .update({ posted_in_mosaic_id: (mosaic as AnimalNewsMosaic).id })
       .in('id', params.newsIds)
 
-    if (updErr) return { error: updErr.message }
-
     logActivity({
-      action: 'update',
-      entityType: 'animal_news',
-      details: { posted: params.newsIds.length, mosaic_id: mosaicId },
+      action: 'create',
+      entityType: 'animal_news_mosaic',
+      entityId: (mosaic as AnimalNewsMosaic).id,
+      details: { news_count: params.newsIds.length },
     })
 
     revalidatePath('/nouvelles')
-    return { success: true, mosaicId }
+    return { data: mosaic as AnimalNewsMosaic }
   } catch (e) {
     return { error: (e as Error).message }
   }

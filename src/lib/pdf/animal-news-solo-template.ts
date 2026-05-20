@@ -242,6 +242,15 @@ export function buildAnimalNewsSoloHtml(data: AnimalNewsSoloData): string {
     letter-spacing: 0.01em;
     white-space: nowrap;
   }
+
+  /* === BANDE SIGNATURE SDA (orange → teal → navy) === */
+  .signature-strip {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 8px;
+    z-index: 4;
+    background: linear-gradient(90deg, var(--terracotta) 0%, var(--teal) 50%, var(--navy) 100%);
+  }
 </style>
 </head>
 <body>
@@ -263,6 +272,8 @@ export function buildAnimalNewsSoloHtml(data: AnimalNewsSoloData): string {
         <div class="cta-handle">${escapeHtml(handle)}</div>
       </div>
     </div>
+
+    <div class="signature-strip"></div>
   </div>
 </body>
 </html>`

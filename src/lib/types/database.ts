@@ -1483,6 +1483,18 @@ export interface AnimalNewsMosaic {
   created_at: string
 }
 
-/** Animaux éligibles à recevoir des nouvelles : déjà sortis du refuge. */
-export const ANIMAL_NEWS_ELIGIBLE_STATUSES: AnimalStatus[] = ['adopted', 'foster_family', 'transferred', 'returned']
+/** Animaux encore sous responsabilité du refuge — module "Suivi des protégés". */
+export const SHELTERED_STATUSES: AnimalStatus[] = ['shelter', 'pound', 'boarding', 'foster_family']
+
+/** Animaux sortis du refuge — module "Nouvelles des sortis". */
+export const ALUMNI_STATUSES: AnimalStatus[] = ['adopted', 'transferred', 'returned']
+
+/** Catégorie d'une news, dérivée du statut de l'animal. */
+export type NewsCategory = 'sheltered' | 'alumni'
+
+/**
+ * @deprecated Utilisez SHELTERED_STATUSES ou ALUMNI_STATUSES selon le contexte.
+ * Conservé pour rétrocompatibilité de l'ancien onglet unique "Nouvelles".
+ */
+export const ANIMAL_NEWS_ELIGIBLE_STATUSES: AnimalStatus[] = [...SHELTERED_STATUSES, ...ALUMNI_STATUSES]
 

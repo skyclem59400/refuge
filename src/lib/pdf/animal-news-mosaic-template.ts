@@ -244,6 +244,15 @@ export function buildAnimalNewsMosaicHtml(data: AnimalNewsMosaicData): string {
     border-radius: 999px;
     border: 2px solid var(--teal);
   }
+
+  /* === BANDE SIGNATURE SDA (orange → teal → navy) === */
+  .signature-strip {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 8px;
+    z-index: 5;
+    background: linear-gradient(90deg, var(--terracotta) 0%, var(--teal) 50%, var(--navy) 100%);
+  }
 </style>
 </head>
 <body>
@@ -264,6 +273,8 @@ export function buildAnimalNewsMosaicHtml(data: AnimalNewsMosaicData): string {
       <div class="footer-cta">Adoptez vous aussi <span class="accent">→</span></div>
       <div class="footer-handle">${escapeHtml(handle)}</div>
     </footer>
+
+    <div class="signature-strip"></div>
   </div>
 </body>
 </html>`

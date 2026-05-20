@@ -23,6 +23,8 @@ interface EligibleAnimal {
 }
 
 interface AddNewsModalProps {
+  /** Catégorie courante — détermine la copy du modal. */
+  category?: 'sheltered' | 'alumni'
   eligibleAnimals: EligibleAnimal[]
   establishmentId: string
   onClose: () => void
@@ -35,11 +37,24 @@ interface UploadedPhoto extends AnimalNewsPhoto {
 }
 
 export function AddNewsModal({
+  category = 'alumni',
   eligibleAnimals,
   establishmentId,
   onClose,
   onSuccess,
 }: Readonly<AddNewsModalProps>) {
+  const copy =
+    category === 'sheltered'
+      ? {
+          title: 'Nouvelle d’un protégé',
+          subtitle: 'Photo + anecdote d’un animal encore au refuge',
+          receivedFromLabel: 'Auteur (bénévole ou photographe)',
+        }
+      : {
+          title: 'Nouvelle d’un sorti',
+          subtitle: 'Photo + récit envoyé par l’adoptant ou la famille d’accueil',
+          receivedFromLabel: 'De qui (adoptant, famille d’accueil)',
+        }
   const [animalId, setAnimalId] = useState<string>('')
   const [animalSearch, setAnimalSearch] = useState('')
   const [photos, setPhotos] = useState<UploadedPhoto[]>([])
@@ -219,7 +234,10 @@ export function AddNewsModal({
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-surface rounded-xl border border-border shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-surface border-b border-border p-4 flex items-center justify-between z-10">
-          <h2 className="text-lg font-bold">Ajouter une nouvelle</h2>
+          <div>
+            <h2 className="text-lg font-bold">{copy.title}</h2>
+            <p className="text-xs text-muted mt-0.5">{copy.subtitle}</p>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -386,14 +404,18 @@ export function AddNewsModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="news-from" className="block text-sm font-semibold mb-2">
-                Reçu de
+                {copy.receivedFromLabel}
               </label>
               <input
                 id="news-from"
                 type="text"
                 value={receivedFrom}
                 onChange={(e) => setReceivedFrom(e.target.value)}
-                placeholder="Famille adoptante, FA Mme Dupont..."
+                placeholder={
+                  category === 'sheltered'
+                    ? 'Charly, Mary, Franck...'
+                    : 'Famille adoptante, FA Mme Dupont...'
+                }
                 className="w-full px-3 py-2 bg-surface-dark border border-border rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
               />
             </div>
