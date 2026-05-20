@@ -44,12 +44,15 @@ function dayCellHtml(d: DayStatus): string {
       <div class="label">1/2 ${d.leave_type_label.slice(0, 8)}</div>
     </td>`
   }
-  // absent_hours
-  return `<td class="cell hourly" title="${d.leave_type_label}">
-    <div class="num">${dayNum}</div>
-    <div class="label">${d.start_time}-${d.end_time}</div>
-    <div class="sub">${d.hours.toFixed(1)} h ${d.leave_type_label.slice(0, 8)}</div>
-  </td>`
+  if (d.kind === 'absent_hours') {
+    return `<td class="cell hourly" title="${d.leave_type_label}">
+      <div class="num">${dayNum}</div>
+      <div class="label">${d.start_time}-${d.end_time}</div>
+      <div class="sub">${d.hours.toFixed(1)} h ${d.leave_type_label.slice(0, 8)}</div>
+    </td>`
+  }
+  // Unreachable: tous les kind sont gérés au-dessus. Fallback de sécurité.
+  return `<td class="cell empty"><div class="num">${dayNum}</div></td>`
 }
 
 function buildCalendarTable(cra: MonthlyCra): string {
