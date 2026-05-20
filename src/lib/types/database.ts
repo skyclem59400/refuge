@@ -1667,3 +1667,178 @@ export type NewsCategory = 'sheltered' | 'alumni'
  */
 export const ANIMAL_NEWS_ELIGIBLE_STATUSES: AnimalStatus[] = [...SHELTERED_STATUSES, ...ALUMNI_STATUSES]
 
+
+// ============================================================
+// CRA — Compte-Rendu d'Activité (heures travaillées)
+// ============================================================
+
+/** Jour de la semaine (0=dim, 6=sam) */
+export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6
+
+/** Semaine type d'un salarié — base de pré-remplissage des CRA mensuels */
+export interface MemberWorkSchedule {
+  id: string
+  member_id: string
+  establishment_id: string
+  day_of_week: DayOfWeek
+  is_rest_day: boolean
+  start_am: string | null   // 'HH:MM:SS'
+  end_am: string | null
+  start_pm: string | null
+  end_pm: string | null
+  valid_from: string        // 'YYYY-MM-DD'
+  valid_until: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Surcharge d'un jour précis dans le CRA (uniquement si différent du template) */
+export interface CraEntry {
+  id: string
+  member_id: string
+  establishment_id: string
+  date: string              // 'YYYY-MM-DD'
+  is_rest_day: boolean
+  start_am: string | null
+  end_am: string | null
+  start_pm: string | null
+  end_pm: string | null
+  hours_total: number       // computed côté SQL
+  notes: string | null
+  entered_by: string | null
+  entered_at: string
+  updated_at: string
+}
+
+/** Statut du workflow CRA pour un (membre, mois) */
+export type CraStatus =
+  | 'draft'                  // Mary en train de saisir
+  | 'submitted'              // Mary a soumis au collaborateur
+  | 'validated_by_member'    // Collaborateur a validé — en attente validation admin
+  | 'validated_by_admin'     // Admin (Clément/Céline) a validé — prêt pour envoi comptable
+  | 'change_requested'       // Collaborateur a demandé modif
+  | 'sent'                   // Envoyé au comptable
+
+export interface CraMonthlyStatus {
+  id: string
+  member_id: string
+  establishment_id: string
+  year: number
+  month: number             // 1-12
+  status: CraStatus
+  submitted_at: string | null
+  submitted_by: string | null
+  validated_at: string | null
+  validated_by: string | null
+  admin_validated_at: string | null
+  admin_validated_by: string | null
+  change_requested_at: string | null
+  change_request_comment: string | null
+  sent_at: string | null
+  sent_by: string | null
+  sent_to: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Trace d'une demande de modification — Clément est notifié */
+export interface CraChangeRequest {
+  id: string
+  cra_status_id: string
+  member_id: string
+  establishment_id: string
+  requested_at: string
+  requested_by: string | null
+  comment: string
+  resolved_at: string | null
+  resolved_by: string | null
+  resolution_notes: string | null
+}
+
+export const CRA_STATUS_LABELS: Record<CraStatus, string> = {
+  draft: 'Brouillon',
+  submitted: 'Soumis au collaborateur',
+  validated_by_member: 'Validé collaborateur — en attente admin',
+  validated_by_admin: 'Validé admin — prêt à envoyer',
+  change_requested: 'Modification demandée',
+  sent: 'Envoyé au comptable',
+}
+
+export const CRA_STATUS_COLORS: Record<CraStatus, string> = {
+  draft: 'gray',
+  submitted: 'blue',
+  validated_by_member: 'teal',
+  validated_by_admin: 'green',
+  change_requested: 'orange',
+  sent: 'purple',
+}
+
+export const DAY_OF_WEEK_LABELS: Record<DayOfWeek, string> = {
+  0: 'Dimanche',
+  1: 'Lundi',
+  2: 'Mardi',
+  3: 'Mercredi',
+  4: 'Jeudi',
+  5: 'Vendredi',
+  6: 'Samedi',
+}
+
+export const DAY_OF_WEEK_LABELS_SHORT: Record<DayOfWeek, string> = {
+  0: 'Dim',
+  1: 'Lun',
+  2: 'Mar',
+  3: 'Mer',
+  4: 'Jeu',
+  5: 'Ven',
+  6: 'Sam',
+}
+
+/** Source d'un jour dans le CRA mensuel pré-rempli */
+export type CraDaySource = 'template' | 'override' | 'leave' | 'holiday' | 'extended_leave'
+
+/** Un jour du CRA mensuel (vue dérivée combinant template + overrides + congés) */
+export interface CraDay {
+  date: string              // 'YYYY-MM-DD'
+  weekday: DayOfWeek
+  source: CraDaySource
+  is_rest_day: boolean
+  start_am: string | null
+  end_am: string | null
+  start_pm: string | null
+  end_pm: string | null
+  hours_total: number
+  leave_label?: string
+  leave_type_id?: string
+  leave_status?: 'approved' | 'pending'
+  holiday_name?: string
+  notes?: string | null
+}
+
+/** Vue complète d'un mois pour un salarié */
+export interface CraMonthlyView {
+  member_id: string
+  member_name: string
+  member_pseudo: string | null
+  year: number
+  month: number
+  days: CraDay[]
+  total_worked_hours: number
+  total_leave_hours: number
+  total_rest_days: number
+  status: CraStatus
+  status_record_id: string | null
+  submitted_at: string | null
+  validated_at: string | null
+  admin_validated_at: string | null
+  change_request_comment: string | null
+  sent_at: string | null
+  sent_to: string | null
+}
+
+// Étend NotificationType avec les types CRA (au runtime, c'est juste du TEXT en DB)
+export type CraNotificationType =
+  | 'cra_change_requested'
+  | 'cra_submitted'
+  | 'cra_validated'
+  | 'cra_sent'

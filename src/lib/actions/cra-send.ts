@@ -1,0 +1,117 @@
+'use server'
+
+import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { requirePermission } from '@/lib/establishment/permissions'
+import { buildCraSaisiePdf } from '@/lib/pdf/cra-saisie-pdf'
+import { sendEmail } from '@/lib/email/client'
+
+const MONTH_FR = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+]
+
+/**
+ * Envoie le CRA validé au comptable :
+ * 1. Vérifie statut = validated_by_admin
+ * 2. Génère le PDF
+ * 3. Envoie un email au comptable de l'établissement (établissement.accountant_email)
+ * 4. Met à jour le statut → sent
+ */
+export async function sendCraToAccountant(
+  memberId: string,
+  year: number,
+  month: number
+): Promise<{ data?: { sentTo: string }; error?: string }> {
+  try {
+    const { establishmentId } = await requirePermission('manage_leaves')
+    const admin = createAdminClient()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // 1. Vérifier le statut
+    const { data: status } = await admin
+      .from('cra_monthly_status')
+      .select('*')
+      .eq('member_id', memberId)
+      .eq('year', year)
+      .eq('month', month)
+      .maybeSingle()
+    if (!status) return { error: 'CRA introuvable' }
+    if (status.status !== 'validated_by_admin') {
+      return { error: 'Le CRA doit être validé par un administrateur avant envoi.' }
+    }
+
+    // 2. Récupérer le comptable de l'établissement
+    const { data: est } = await admin
+      .from('establishments')
+      .select('name, accountant_email, accountant_name')
+      .eq('id', establishmentId)
+      .single()
+
+    if (!est?.accountant_email) {
+      return {
+        error: "Aucun email de comptable n'est configuré. Renseignez-le dans Établissement → Paramètres.",
+      }
+    }
+
+    // 3. Générer le PDF
+    let pdfBuffer: Buffer
+    let filename: string
+    try {
+      const r = await buildCraSaisiePdf(memberId, year, month)
+      pdfBuffer = r.buffer
+      filename = r.filename
+    } catch (e) {
+      return { error: 'Génération PDF impossible : ' + (e as Error).message }
+    }
+
+    // 4. Récupérer le nom du collaborateur
+    const { data: memberRow } = await admin
+      .from('establishment_members')
+      .select('user_id, pseudo')
+      .eq('id', memberId)
+      .single()
+    let memberName = memberRow?.pseudo || 'Collaborateur'
+    if (memberRow?.user_id) {
+      const { data: usersInfo } = await admin.rpc('get_users_info', { user_ids: [memberRow.user_id] })
+      if (usersInfo && Array.isArray(usersInfo) && usersInfo[0]?.full_name) {
+        memberName = usersInfo[0].full_name
+      }
+    }
+
+    const monthLabel = `${MONTH_FR[month - 1]} ${year}`
+    const subject = `CRA ${memberName} — ${monthLabel}`
+    const html = `<p>Bonjour${est.accountant_name ? ' ' + est.accountant_name : ''},</p>
+      <p>Vous trouverez ci-joint le compte-rendu d'activité de <strong>${memberName}</strong> pour <strong>${monthLabel}</strong>.</p>
+      <p>Ce CRA a été validé par le collaborateur puis contrôlé par un administrateur de l'association.</p>
+      <p>Pour toute question, n'hésitez pas à nous contacter.</p>
+      <p>Cordialement,<br/>L'équipe ${est.name || 'SDA'}</p>`
+
+    try {
+      await sendEmail({
+        to: est.accountant_email,
+        toName: est.accountant_name || undefined,
+        subject,
+        html,
+        attachments: [{ filename, content: pdfBuffer, contentType: 'application/pdf' }],
+      })
+    } catch (e) {
+      return { error: 'Envoi email impossible : ' + (e as Error).message }
+    }
+
+    // 5. Mettre à jour le statut
+    await admin
+      .from('cra_monthly_status')
+      .update({
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        sent_by: user?.id || null,
+        sent_to: est.accountant_email,
+      })
+      .eq('id', status.id)
+
+    return { data: { sentTo: est.accountant_email } }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}

@@ -25,6 +25,10 @@ import {
   KeyRound,
   Sparkles,
   Ban,
+  Clock,
+  ClipboardList,
+  ShieldCheck,
+  AlertCircle,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -87,7 +91,12 @@ const shelterSections: NavSection[] = [
     items: [
       { href: '/planning', label: 'Planning', Icon: CalendarDays, permission: 'canManageEstablishment' },
       { href: '/espace-collaborateur', label: 'Mon espace', Icon: Briefcase, permission: 'canViewOwnLeaves', roles: ['admin', 'salarie'] },
+      { href: '/espace-collaborateur/cra', label: 'Mes CRA', Icon: ClipboardList, permission: 'canViewOwnLeaves', roles: ['admin', 'salarie'] },
       { href: '/admin/conges', label: 'Congés', Icon: CalendarCheck, permission: 'canManageLeaves' },
+      { href: '/admin/cra/saisie', label: 'Saisie CRA', Icon: ClipboardList, permission: 'canManageLeaves' },
+      { href: '/admin/cra/horaires', label: 'Horaires de référence', Icon: Clock, permission: 'canManageLeaves' },
+      { href: '/admin/cra/validations', label: 'Validations admin CRA', Icon: ShieldCheck, permission: 'canManageEstablishment' },
+      { href: '/admin/cra/demandes', label: 'Demandes modif CRA', Icon: AlertCircle, permission: 'canManageLeaves' },
     ],
   },
   {

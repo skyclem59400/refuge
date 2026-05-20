@@ -695,3 +695,58 @@ Builds Coolify successifs cassés par des erreurs TypeScript strict sur des inte
 - 3 cycles de build Coolify pour atterrir — build non testé en local (pas de node_modules dans les worktrees)
 - `pseudo` à supprimer dans 2 mois (~juillet 2026) une fois tout le monde migré
 
+---
+
+## Session 2026-05-20 (fin après-midi) — Module CRA complet
+
+### 11. Module CRA — saisie complète et workflow de validation (2026-05-20)
+
+Module entièrement nouveau. Le précédent "CRA" (`src/lib/actions/cra.ts` + `src/lib/pdf/cra-template.ts`) était un **calcul automatique** des absences à partir des `leave_requests` — il restera utilisé pour le PDF rapide accessible depuis `/admin/conges`. Ce nouveau module ajoute une **saisie réelle des heures travaillées** par jour, avec workflow de validation triple : collaborateur → admin (Clément/Céline) → comptable.
+
+**Migrations SQL** (`supabase/migrations/20260520f_cra_module.sql` + `20260520g_cra_admin_validation.sql`) — appliquées en prod :
+- `member_work_schedules` : semaine type d'un collaborateur (1 ligne par `day_of_week`, 7 lignes max). Contrainte SQL : aucun horaire ne dépasse 17h00. Index unique partiel sur (member, day) WHERE valid_until IS NULL.
+- `cra_entries` : surcharges journalières (only when ≠ template). `hours_total` est une **computed column** (`GENERATED ALWAYS AS ... STORED`) → la source de vérité du total est PostgreSQL, pas le front.
+- `cra_monthly_status` : workflow par (member, year, month). Statuts : `draft` → `submitted` → `validated_by_member` → `validated_by_admin` → `sent`. État alternatif `change_requested`.
+- `cra_change_requests` : audit log des demandes de modif (col → Mary, Clément/Céline notifiés).
+- Extension `establishments` : `accountant_email`, `accountant_name`.
+- RLS aligné sur le pattern `leave_requests` (un user voit ses lignes ou s'il a `manage_leaves`).
+
+**Seed initial** : semaines types des 5 salariés SDA déjà en base (Mary, Franck, Marina, Yann, Carole) avec leurs jours de repos confirmés (Mary = Mer+Dim, Franck = Jeu+Dim, Marina/Yann = Mar+Dim, Carole = Mer+Ven+Dim). Horaire standard 8-12 / 14-17. Matthieu (auto-entrepreneur, ferme) n'a pas de seed — Mary saisira ses heures variables au cas par cas.
+
+**Types TypeScript** (`src/lib/types/database.ts`) : `MemberWorkSchedule`, `CraEntry`, `CraStatus`, `CraMonthlyStatus`, `CraChangeRequest`, `CraDay`, `CraMonthlyView`, + labels FR.
+
+**Server actions** :
+- `src/lib/actions/work-schedules.ts` — CRUD semaine type. `listMembersWithSchedules`, `upsertWorkScheduleDay`, `applyStandardSchedule`.
+- `src/lib/actions/cra-saisie.ts` — moteur de pré-remplissage + workflow. `getMonthlySaisie` agrège template + congés + fériés + overrides ; `upsertCraEntry` / `deleteCraEntry` ; `submitCraToMember`, `validateCraAsMember`, **`validateCraAsAdmin`** (réservé `role_type = admin`), `requestCraChange`, `resolveChangeRequest`. Notifications via la table `notifications` existante (réutilisation).
+- `src/lib/actions/cra-send.ts` — envoi comptable (PDF + email Brevo).
+
+**Pages** :
+- `/admin/cra/horaires` — éditeur de semaines types (Mary). Modal par collaborateur avec 7 jours, granularité quart d'heure, max 17h00, total semaine live, bouton "Appliquer 8-12 / 14-17".
+- `/admin/cra/saisie` — grille mensuelle pré-remplie. Cliquer un jour ouvre un modal d'override. Toolbar : sélecteur collab, nav mois, badge statut, boutons workflow conditionnels (soumettre / valider admin / envoyer comptable).
+- `/admin/cra/validations` — **réservé aux admins (Clément/Céline)**. Liste des CRA `validated_by_member` en attente de validation finale. Clic → ouvre `/admin/cra/saisie` avec le bon contexte.
+- `/admin/cra/demandes` — file des demandes de modification (ouvertes + résolues). Visible Mary + admins.
+- `/espace-collaborateur/cra` — liste des 12 derniers mois pour le collaborateur connecté.
+- `/espace-collaborateur/cra/[year]/[month]` — vue détail mensuel. Workflow visible (stepper 5 étapes). Boutons "Valider mon CRA" / "Demander une modification" quand `submitted`.
+
+**PDF** : nouveau template `src/lib/pdf/cra-saisie-template.ts` (charte SDA bleu marine + teal + signature-strip orange) + `cra-saisie-pdf.ts` (Puppeteer A4 landscape). Affiche le calendrier mensuel + KPI + bloc signature double (validation collab + validation admin avec dates).
+
+**Notifications** : 4 nouveaux types `text` dans la table `notifications` (le CHECK est sur TEXT libre, pas besoin de migration) :
+- `cra_submitted` → notif au collab (Mary a soumis)
+- `cra_pending_admin_validation` → notif aux admins (collab a validé, action requise)
+- `cra_admin_validated` → notif aux managers (Mary peut envoyer comptable)
+- `cra_change_requested` → notif aux managers + admins
+
+**Workflow complet** :
+1. Mary clique "Saisie CRA" → choisit collab + mois → ajuste si besoin → "Soumettre au collaborateur"
+2. Le collab reçoit une notif, ouvre `/espace-collaborateur/cra` → valide OU demande modif (avec commentaire)
+3. Si validé → Clément/Céline notifiés via `/admin/cra/validations` → valident en tant qu'admin
+4. Mary voit le bouton "Envoyer au comptable" actif → clique → PDF généré + email envoyé à `establishments.accountant_email`
+5. Statut final `sent`, plus de modification possible
+
+**Sidebar** : 5 nouveaux liens ajoutés dans `nav-config.ts` section Équipe (Saisie, Horaires, Validations admin, Demandes, Mes CRA).
+
+**Configuration restante côté Clément** :
+- Renseigner `accountant_email` et `accountant_name` sur l'établissement SDA (à faire en interface plus tard ou directement en SQL).
+- Compléter le seed des horaires de Matthieu si nécessaire (ou laisser variable, géré au cas par cas dans la saisie).
+
+Aucune dépendance npm nouvelle. Build local + TS check ✅.
