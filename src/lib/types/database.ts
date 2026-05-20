@@ -13,6 +13,9 @@ export interface LineItem {
   total: number
 }
 
+export type BlacklistSource = 'judicial_procedure' | 'manual' | 'incident'
+export type BlacklistMatchStrength = 'exact_email' | 'exact_phone' | 'name_birthdate' | 'name_only'
+
 export interface Client {
   id: string
   kind: ClientKind
@@ -30,10 +33,52 @@ export interface Client {
   is_member: boolean
   member_since: string | null
   notes: string | null
+  // Liste noire SDA (cf. migration 20260520d_judicial_blacklist)
+  is_blacklisted: boolean
+  blacklist_reason: string | null
+  blacklist_source: BlacklistSource | null
+  blacklisted_at: string | null
+  blacklisted_by: string | null
+  blacklist_removed_at: string | null
+  blacklist_removed_by: string | null
+  blacklist_removal_reason: string | null
+  birth_date: string | null
+  birth_place: string | null
+  national_id: string | null
   establishment_id: string
   created_at: string
   updated_at: string
 }
+
+export interface BlacklistMatch {
+  client_id: string
+  match_strength: BlacklistMatchStrength
+  client_name: string
+  client_first_name: string | null
+  blacklist_reason: string | null
+  blacklist_source: BlacklistSource | null
+  blacklisted_at: string | null
+}
+
+export const BLACKLIST_SOURCE_LABELS: Record<BlacklistSource, string> = {
+  judicial_procedure: 'Procédure judiciaire',
+  manual: 'Inscription manuelle',
+  incident: 'Incident',
+}
+
+export const BLACKLIST_MATCH_LABELS: Record<BlacklistMatchStrength, string> = {
+  exact_email: 'Email identique',
+  exact_phone: 'Téléphone identique',
+  name_birthdate: 'Nom + prénom + date de naissance',
+  name_only: 'Nom + prénom (signal faible)',
+}
+
+/** Niveaux qui doivent bloquer automatiquement une adoption / refuser une inquiry publique. */
+export const BLOCKING_MATCH_STRENGTHS: BlacklistMatchStrength[] = [
+  'exact_email',
+  'exact_phone',
+  'name_birthdate',
+]
 
 export function getClientDisplayName(client: Pick<Client, 'kind' | 'name' | 'first_name'>): string {
   if (client.kind === 'organization') return client.name
@@ -353,6 +398,7 @@ export interface Animal {
   judicial_jurisdiction: string | null
   judicial_seizure_date: string | null
   judicial_owner_name: string | null
+  judicial_owner_client_id: string | null
   judicial_billing_recipient: string | null
   judicial_notes: string | null
   judicial_pickup_location: string | null

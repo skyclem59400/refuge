@@ -24,6 +24,7 @@ import {
   MapPin,
   KeyRound,
   Sparkles,
+  Ban,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -102,6 +103,7 @@ const shelterSections: NavSection[] = [
     items: [
       { href: '/statistiques', label: 'Statistiques', Icon: BarChart3, permission: 'canViewStatistics', roles: ['admin', 'salarie'] },
       { href: '/etablissement', label: 'Établissement', Icon: Building2, permission: 'canManageEstablishment' },
+      { href: '/etablissement/liste-noire', label: 'Liste noire', Icon: Ban, permission: 'canManageEstablishment' },
     ],
   },
 ]

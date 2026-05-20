@@ -15,7 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { AnimalStatus, MovementType, IcadStatus, ContactCategory } from '@/lib/types/database'
+import type { AnimalStatus, MovementType, IcadStatus, ContactCategory, BlacklistMatch } from '@/lib/types/database'
+import { BlacklistOverrideModal } from '@/components/blacklist/blacklist-override-modal'
 
 // Map each movement type to the kind of contact we should pick from the directory.
 // `null` means no client picker (intra-shelter transfers, deaths, fourriere entry, etc.).
@@ -155,6 +156,10 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
 
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+
+  // Blacklist guard
+  const [blacklistMatches, setBlacklistMatches] = useState<BlacklistMatch[]>([])
+  const [showBlacklistModal, setShowBlacklistModal] = useState(false)
 
   const isDeathOrEuthanasia = type === 'death' || type === 'euthanasia'
   const isTransferOut = type === 'transfer_out'
@@ -325,6 +330,11 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
           signedAtLocation: signedAtLocation || null,
           skipElectronicSignature: skipSignature,
         })
+        if (res.error === 'BLACKLIST_BLOCK' && 'blacklistMatches' in res && res.blacklistMatches) {
+          setBlacklistMatches(res.blacklistMatches as BlacklistMatch[])
+          setShowBlacklistModal(true)
+          return
+        }
         if (res.error) {
           toast.error(res.error)
           return
@@ -661,6 +671,43 @@ export function MovementForm({ animalId, currentStatus, onClose }: Readonly<Move
           {isPending ? 'Enregistrement...' : 'Enregistrer le mouvement'}
         </button>
       </div>
+      {showBlacklistModal && relatedClientId && (
+        <BlacklistOverrideModal
+          matches={blacklistMatches}
+          onClose={() => setShowBlacklistModal(false)}
+          onConfirmOverride={(reason) => {
+            setShowBlacklistModal(false)
+            startTransition(async () => {
+              const res = await recordAdoptionWithContract({
+                animalId,
+                date,
+                notes: notes || null,
+                icadStatus,
+                adopterClientId: relatedClientId,
+                adoptionFee: contractFee.trim() ? Number(contractFee) : 0,
+                sterilizationRequired,
+                sterilizationDeadline: sterilizationRequired && sterilizationDeadline ? sterilizationDeadline : null,
+                sterilizationDeposit: sterilizationRequired && sterilizationDeposit.trim() ? Number(sterilizationDeposit) : null,
+                signedAtLocation: signedAtLocation || null,
+                skipElectronicSignature: skipSignature,
+                blacklistOverride: { reason },
+              })
+              if (res.error) {
+                toast.error(res.error)
+                return
+              }
+              if (res.data?.warning) {
+                toast.warning(res.data.warning, { duration: 30_000 })
+                window.alert(res.data.warning)
+              } else {
+                toast.success('Adoption enregistrée avec override liste noire (audit critique tracé)')
+              }
+              onClose?.()
+              router.refresh()
+            })
+          }}
+        />
+      )}
     </form>
   )
 }
