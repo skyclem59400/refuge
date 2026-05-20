@@ -430,3 +430,117 @@
 - Notifications quand un animal en procédure approche d'une échéance (audience, etc.)
 - Documenter la procédure pour Maryline / Céline / Caroline (mode d'emploi rapide)
 - Résoudre le doublon `CFA-2026-002` + auditer la fonction de séquençage des numéros de contrat
+
+---
+
+## Session 2026-05-20
+
+Sept chantiers en parallèle livrés sur main (Coolify auto-deploy) + une régression critique corrigée. Toutes les migrations Supabase appliquées en production sur `zzevrtrgtgnlxxuwbnge`.
+
+### 1. Couverture des congés (`feature/leave-coverage` — merged)
+
+Nouveau onglet **Couverture** dans `/admin/conges` (gated `manage_leaves`) :
+- Calendrier mensuel heatmap vert/orange/rouge selon effectif salarié dispo
+- Toggle "inclure les demandes en attente"
+- Drill-down par jour avec badges salarié/auto-entrepreneur/bénévole
+- Seuil `min_daily_staff` par établissement (défaut 3)
+
+Modèle DB enrichi (migration `leave_coverage`) :
+- `establishment_members.contract_type` (`salarie`/`auto_entrepreneur`/`benevole`/`autre`)
+- `establishment_members.availability_status` (`active`/`on_extended_leave`) + `extended_leave_from`/`until`/`reason`
+- `establishments.min_daily_staff`
+
+Validation des demandes : `approveLeaveRequest` refuse si l'approbation ferait passer l'effectif salarié sous le seuil. Bouton "Forcer la validation" pour les admins avec motif obligatoire (taggé `[Validation forcee]` dans le commentaire).
+
+**Bugfix delete leave** : `deleteLeaveRequest` retournait un faux succès. Le DELETE cookie-based était silencieusement bloqué par RLS. Passage à `adminClient` (route déjà gardée par `requirePermission('manage_leaves')`) + check `count` pour détecter une suppression silencieuse.
+
+Effectif SDA configuré :
+- 5 salariés actifs : Carole, Franck, Marina, Mary, Yann
+- Eric : créé en pseudo-user, `on_extended_leave` jusqu'au 2026-12-31
+- Matthieu : `auto_entrepreneur` (existait déjà en admin)
+- Clément + Céline : `autre` (dirigeants associatifs, pas comptés dans l'effectif salarié)
+
+### 2. CRA mensuel + arrêts horaires + upload arrêts (`feature/leave-cra` — merged)
+
+Étend `feature/leave-coverage` avec :
+- **Granularité arrêts** : `leave_requests.granularity` (`full_day`/`half_day`/`hourly`) + `start_time`/`end_time`/`duration_hours`. Backfill : demi-jours existants passent en `half_day`.
+- **Admin saisie directe** : nouveau bouton "Saisir un arrêt/congé" dans l'onglet Demandes. `adminCreateLeaveRequest` accepte un `member_id` quelconque, auto-approuve par défaut, tag `[Saisie admin]`.
+- **Upload arrêts maladie** : table `leave_attachments` + bucket privé `leave-attachments` (10 Mo). Kinds : `sick_note`, `extended_leave_proof`, `other`. Panneau intégré dans la modale de validation.
+- **CRA mensuel PDF** : nouvel onglet "CRA mensuel" avec sélecteur collaborateur + mois + année. Route `/api/pdf/cra/[memberId]/[year]/[month]` génère un A4 paysage avec calendrier mensuel (travaillé / WE / férié / congé / demi / horaire), KPI cards, ventilation par type d'absence, blocs signature.
+
+### 3. Retour adoption pendant période d'accueil (`feature/adoption-trial-return` — merged)
+
+Modèle (migration `adoption_trial_return`) :
+- `establishments.default_trial_period_days` (default 15)
+- `adoption_contracts.trial_period_days` (override) / `trial_period_ends_at` / `non_refundable_amount` (default 60) / `returned_at` / `refunded_amount` / `refunded_at` / `refund_payment_method` / `return_reason`
+- Statut étendu : ajout de `trial_returned` et `finalized`
+- Colonnes signature Documenso pour l'avenant d'annulation
+
+Workflow 260€ → 200€ remboursés :
+1. Adoption signée → contrat `active`
+2. Pendant période d'accueil, bouton ↺ orange sur la fiche → modale `AdoptionReturnModal` : date retour, mode remboursement, montant pré-rempli (= adoption_fee - non_refundable), motif. Validation crée le mouvement shelter, marque le contrat `trial_returned`, trace le remboursement.
+3. PDF avenant d'annulation disponible immédiatement (template SDA A4 : contexte, règlement financier, motif, blocs signature)
+4. Bouton "Envoyer pour signature" → Documenso pipeline complet (externalId préfixé `adoption_cancellation_<uuid>`, email branded SDA via Brevo, webhook met à jour `cancellation_signature_status` + stocke le PDF signé)
+
+### 4. Procédure judiciaire — extension (`feature/judicial-documents` — merged)
+
+Animaux en réquisition disposent maintenant d'un onglet dédié **Procédure** (visible uniquement si `judicial_procedure=true`).
+
+Champs ajoutés sur `animals` (migration `judicial_extension`) :
+- `judicial_pickup_location` (puis remplacé par le champ générique pickup, cf section 6)
+- `judicial_hearing_date` / `judicial_decision_date` / `judicial_appeal_deadline`
+- `judicial_lawyer_name` / `judicial_lawyer_contact`
+
+Documents uploadés : table `judicial_attachments` + bucket privé `judicial-documents` (20 Mo). Kinds : `seizure_pv`, `requisition_order`, `court_decision`, `vet_report`, `photo_evidence`, `invoice`, `other`. Composant `JudicialDocumentsSection` avec sélecteur kind + date document + notes + upload + liste avec icônes contextuelles + ouverture signed URL + suppression.
+
+Onglet Procédure affiche : encadré rouge avec récap complet du dossier (toutes les dates, l'avocat, le propriétaire mis en cause, la facturation, les notes) + lien PDF "Dossier procédure" + section documents + (cf section 7) section frais médicaux.
+
+### 5. Bugfix modal Sortie animal (2 commits)
+
+Régression sur le modal "Sortie pour [animal]" depuis le drawer Box :
+1. **Premier fix (z-index)** : le modal était à `z-50`, sous le backdrop du drawer (`z-[99]`). Les clics tombaient sur le backdrop du drawer → drawer fermé. Passage à `z-[200]`.
+2. **Deuxième fix** : malgré le z-index, les clics fermaient encore le drawer (propagation des events React via portails vers la React-tree ancestor). Ajout de `e.stopPropagation()` sur le backdrop + panel interne. ET ajout de `.catch()` sur `getEstablishmentMembers()` qui rejetait silencieusement → liste membres restait "Chargement…" à l'infini.
+
+### 6. Lieu de récupération générique avec autocomplete BAN (`feature/animal-pickup-address` — merged)
+
+Pour TOUS les animaux (pas seulement en procédure). Composant réutilisable `ui/address-autocomplete.tsx` qui appelle l'API gratuite [api-adresse.data.gouv.fr](https://api-adresse.data.gouv.fr) (Base Adresse Nationale) :
+- Recherche live à partir de 3 caractères, debounce 250ms, AbortController
+- L'utilisateur DOIT cliquer un résultat (warning visuel si saisie libre, restauration au blur)
+- Icône check verte quand valide, bouton clear, bouton ouvrir
+
+Champs DB (migration `animal_pickup_address`) :
+- `pickup_address_label` (label complet du BAN, source de vérité)
+- `pickup_postcode` / `pickup_city` / `pickup_lat` / `pickup_lng` / `pickup_ban_id`
+- Backfill : hydrate depuis `capture_location` existant
+- Index partiels sur `pickup_city` et `pickup_postcode`
+
+Le champ `judicial_pickup_location` ajouté la veille est laissé en DB (rétrocompat) mais retiré de l'UI au profit du nouveau champ générique. La section "Lieu de récupération" est désormais toujours visible (création + édition), placée juste après l'identité.
+
+### 7. Factures médicales + recap frais (`feature/medical-invoices` — merged)
+
+Upload des factures cliniques sur les actes de santé, recap PDF pour le tribunal.
+
+Migration `medical_invoices` :
+- `animal_health_records.invoice_storage_path` + `invoice_file_name` + `invoice_mime_type` + `invoice_size_bytes` + `invoice_uploaded_at`
+- Bucket privé `medical-invoices` (20 Mo, pdf+images)
+- Index partiel `(animal_id, judicial_procedure) WHERE true`
+
+UI :
+- **Dans le formulaire santé** (`HealthRecordForm`) : nouveau composant `MedicalInvoiceUploader` visible uniquement quand `judicial_procedure=true` ET en mode édition (la création doit d'abord enregistrer pour avoir un `health_record_id`). Upload / remplace / ouvre / supprime via `getMedicalInvoiceSignedUrl`.
+- **Dans l'onglet Procédure** : nouvelle `MedicalCostRecapSection` listant tous les actes judiciaires avec `cost > 0`, total cumulé, badge facture jointe (vert) / manquante (orange), avertissement si actes sans facture.
+- Bouton "Générer le récap PDF (template refuge)" → route `/api/pdf/medical-cost-recap/[animalId]` → PDF A4 SDA avec header logo, animal + dossier judiciaire, tableau actes, total HT, blocs signature, à remettre au tribunal pour recouvrement.
+
+Server actions `medical-invoices.ts` : `uploadMedicalInvoice` (FormData) / `deleteMedicalInvoice(healthRecordId)` / `getMedicalInvoiceSignedUrl(healthRecordId)`. Toutes gardées par `requirePermission('manage_health')`.
+
+### Bugs / régressions résolus en cours de session
+
+- TS narrowing dans `cra-template.ts` : le membre union `{kind: 'weekend' | 'holiday'}` ne se narrowait pas après `if (d.kind === 'weekend')`. Fix : check explicite sur `absent_hours` + fallback de sécurité.
+- Build Docker Coolify a échoué une fois sur ce point (commit `f9f65b9`) ; corrigé en `6ad0454` (déploiement passé).
+
+### Méta
+
+- 7 branches features + 3 branches fixes mergées sur main au cours de la journée
+- 7 migrations Supabase appliquées en production
+- Co-réalisé avec un autre poste (Akéla / certificat engagement / nouvelles, DatePicker migration) — historique linéaire conservé par rebases successifs
+- Pas de force-push sur main, force-push sur les feature branches uniquement (avant merge)
+
