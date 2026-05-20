@@ -113,6 +113,32 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
   const data = await fetchAnimalData(admin, id, estabId)
   if (!data.animal) notFound()
 
+  // Fetch propriétaire judiciaire si lié
+  let judicialOwner: {
+    client_id: string
+    name: string
+    first_name: string | null
+    blacklist_reason: string | null
+    blacklist_source: string | null
+  } | null = null
+  if (data.animal.judicial_owner_client_id) {
+    const { data: owner } = await admin
+      .from('clients')
+      .select('id, name, first_name, blacklist_reason, blacklist_source')
+      .eq('id', data.animal.judicial_owner_client_id)
+      .eq('establishment_id', estabId)
+      .maybeSingle()
+    if (owner) {
+      judicialOwner = {
+        client_id: owner.id,
+        name: owner.name,
+        first_name: owner.first_name,
+        blacklist_reason: owner.blacklist_reason,
+        blacklist_source: owner.blacklist_source,
+      }
+    }
+  }
+
   const [outingsResult, treatmentsResult, protocolsResult, sponsorshipsResult, engagementCertResult] = await Promise.all([
     getOutings({ animalId: id, limit: 100 }),
     getTreatments({ animalId: id }),
@@ -235,6 +261,7 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
         canManagePosts={canManagePosts}
         isAdmin={isAdmin}
         activityLogs={activityLogs}
+        judicialOwner={judicialOwner}
       />
     </div>
   )

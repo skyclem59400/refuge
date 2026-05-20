@@ -89,6 +89,7 @@ import {
   HandHeart,
   ListChecks,
   Scale,
+  Ban,
 } from 'lucide-react'
 
 type TabId = 'info' | 'photos' | 'health' | 'movements' | 'foster' | 'adoption' | 'sponsorships' | 'abandonment' | 'judicial' | 'documents' | 'outings' | 'posts' | 'icad' | 'activity'
@@ -134,6 +135,13 @@ interface AnimalDetailTabsProps {
   canManagePosts: boolean
   isAdmin?: boolean
   activityLogs?: ActivityLog[]
+  judicialOwner?: {
+    client_id: string
+    name: string
+    first_name: string | null
+    blacklist_reason: string | null
+    blacklist_source: string | null
+  } | null
 }
 
 const baseTabs: { id: TabId; label: string; icon: React.ElementType; countKey?: 'photos' | 'healthRecords' | 'movements' | 'outings' | 'socialPosts' | 'icadDeclarations' | 'activityLogs' | 'fosterContracts' | 'adoptionContracts' | 'abandonmentContracts' | 'sponsorshipsActive'; adminOnly?: boolean; judicialOnly?: boolean }[] = [
@@ -179,6 +187,7 @@ export function AnimalDetailTabs({
   canManagePosts,
   isAdmin = false,
   activityLogs = [],
+  judicialOwner = null,
 }: Readonly<AnimalDetailTabsProps>) {
   const [activeTab, setActiveTab] = useState<TabId>('info')
   const [showHealthForm, setShowHealthForm] = useState(false)
@@ -401,7 +410,25 @@ export function AnimalDetailTabs({
                   <div className="md:col-span-2"><span className="text-muted">Lieu de récupération :</span> <span className="font-semibold text-text">{animal.judicial_pickup_location}</span></div>
                 )}
                 {animal.judicial_owner_name && (
-                  <div><span className="text-muted">Propriétaire :</span> <span className="font-semibold text-text">{animal.judicial_owner_name}</span></div>
+                  <div>
+                    <span className="text-muted">Propriétaire :</span>{' '}
+                    {animal.judicial_owner_client_id ? (
+                      <a
+                        href={`/clients/${animal.judicial_owner_client_id}`}
+                        className="font-semibold text-text hover:text-primary underline-offset-2 hover:underline"
+                      >
+                        {animal.judicial_owner_name}
+                      </a>
+                    ) : (
+                      <span className="font-semibold text-text">{animal.judicial_owner_name}</span>
+                    )}
+                    {animal.judicial_owner_client_id && (
+                      <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-error/15 text-error border border-error/30 align-middle">
+                        <Ban className="w-2.5 h-2.5" />
+                        LISTE NOIRE
+                      </span>
+                    )}
+                  </div>
                 )}
                 {animal.judicial_lawyer_name && (
                   <div><span className="text-muted">Avocat :</span> <span className="font-semibold text-text">{animal.judicial_lawyer_name}</span>{animal.judicial_lawyer_contact && <span className="text-muted"> · {animal.judicial_lawyer_contact}</span>}</div>
@@ -603,7 +630,7 @@ function InfoTab({
               Modifier l&apos;animal
             </summary>
             <div className="px-5 pb-5">
-              <AnimalForm animal={animal} boxes={boxes} />
+              <AnimalForm animal={animal} boxes={boxes} judicialOwner={judicialOwner} />
             </div>
           </details>
         )}

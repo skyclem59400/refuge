@@ -7,6 +7,7 @@ import { Loader2, Sparkles } from 'lucide-react'
 import { createAnimal, updateAnimal } from '@/lib/actions/animals'
 import { CommuneAutocomplete } from '@/components/ui/commune-autocomplete'
 import { AddressAutocomplete } from '@/components/ui/address-autocomplete'
+import { JudicialOwnerPicker } from '@/components/animals/judicial-owner-picker'
 import { DatePicker } from '@/components/ui/date-picker'
 import {
   Select,
@@ -29,12 +30,22 @@ import {
 } from '@/lib/species'
 import type { Animal, Box, BoxWithZone, AnimalSpecies, AnimalSex, AnimalOrigin } from '@/lib/types/database'
 
+interface JudicialOwnerSnapshot {
+  client_id: string
+  name: string
+  first_name: string | null
+  blacklist_reason: string | null
+  blacklist_source: string | null
+}
+
 interface AnimalFormProps {
   animal?: Animal
   boxes?: BoxWithZone[]
+  /** Pré-rempli en mode édition si l'animal a un judicial_owner_client_id renseigné. */
+  judicialOwner?: JudicialOwnerSnapshot | null
 }
 
-export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
+export function AnimalForm({ animal, boxes = [], judicialOwner = null }: Readonly<AnimalFormProps>) {
   const isEditing = !!animal
 
   // Identity fields
@@ -846,16 +857,30 @@ export function AnimalForm({ animal, boxes = [] }: Readonly<AnimalFormProps>) {
                 onChange={(v) => setJudicialSeizureDate(v ?? '')}
               />
             </div>
-            <div>
-              <label htmlFor="judicial-owner" className={labelClass}>Propriétaire mis en cause</label>
-              <input
-                id="judicial-owner"
-                type="text"
-                value={judicialOwnerName}
-                onChange={(e) => setJudicialOwnerName(e.target.value)}
-                placeholder="Nom complet"
-                className={inputClass}
-              />
+            <div className="md:col-span-2">
+              <label className={labelClass}>Propriétaire mis en cause</label>
+              {isEditing && animal ? (
+                <JudicialOwnerPicker
+                  animalId={animal.id}
+                  animalName={animal.name}
+                  current={judicialOwner}
+                  canEdit
+                />
+              ) : (
+                <>
+                  <input
+                    id="judicial-owner"
+                    type="text"
+                    value={judicialOwnerName}
+                    onChange={(e) => setJudicialOwnerName(e.target.value)}
+                    placeholder="Nom complet (sera lié à une fiche après création)"
+                    className={inputClass}
+                  />
+                  <p className="text-xs text-muted mt-1">
+                    Saisie libre pour le moment. Après création de l&apos;animal, vous pourrez lier ce propriétaire à une vraie fiche contact (et l&apos;inscrire sur la liste noire SDA).
+                  </p>
+                </>
+              )}
             </div>
             <div className="md:col-span-2">
               <label htmlFor="judicial-billing" className={labelClass}>Destinataire facturation (clinique → SDA)</label>
