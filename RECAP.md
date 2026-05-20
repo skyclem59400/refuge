@@ -611,3 +611,87 @@ Pour SDA aujourd'hui, le dénominateur est désormais **6** (Carole, Franck, Mar
 
 2 fichiers modifiés (+11 / -7). TS check ✅.
 
+---
+
+## Session 2026-05-20 (après-midi) — Auth onboarding + Liste noire SDA
+
+Deux chantiers en parallèle via worktrees git + agent background.
+
+### 1. Auth onboarding bloquant (`feature/auth-onboarding`)
+
+**Constat** : système d'auth "léger" — admins en email + Google SSO, salariés/bénévoles en pseudo (prénom) + mot de passe avec email technique caché. Pas de mail perso, donc pas de récup mdp, pas de notif, identifiants non universels.
+
+**Décisions cadrées avec Clément** :
+- Tous les bénévoles ont un email → migration 100% vers auth email
+- Adresse personnelle obligatoire pour tous (assurance, RGPD)
+- Blocage immédiat à la prochaine release
+- Mapping conservé entre comptes pré/post — pas de nouveau compte créé, juste enrichissement (auth.users.id immuable)
+- Mode pseudo gardé en transition 2 mois puis supprimé
+- Google SSO réservé à `clement.scailteux@gmail.com`
+
+**Livré** :
+- Migration `20260520e_user_profiles.sql` — table `user_profiles` (nom, prénom, email perso, tél, date naissance, adresse BAN), trigger sur `auth.users` (création auto), backfill pour tous comptes existants (`profile_completed=false`), RLS self-read + estab-read
+- Server action `completeMyProfile` : upsert profil + update `auth.users.email` (cas migration pseudo) + écrit `user_metadata.profile_completed=true` pour cache middleware
+- Middleware : redirige vers `/onboarding` tant que `profile_completed != true` (lecture metadata, pas de query DB)
+- Page `/onboarding` + `onboarding-form.tsx` — form complet avec `AddressAutocomplete` BAN obligatoire, message dédié aux comptes pseudo
+- `auth/callback/route.ts` — whitelist Google SSO `[clement.scailteux@gmail.com]` ; sinon signOut + `/login?error=sso_forbidden`
+- `login/page.tsx` — affichage du message d'erreur SSO
+- `api/auth/signout/route.ts` — logout depuis l'onboarding
+- `compte/page.tsx` + `personal-info-section.tsx` — section "Mes informations personnelles" avec toggle lecture/édition pour retrouver/modifier les infos après onboarding
+
+### 2. Liste noire SDA (`feature/judicial-blacklist`) — agent en background
+
+**Besoin** : registre des propriétaires d'animaux mis en cause en procédure judiciaire (réquisition/saisie) qui bloque leurs futures tentatives d'adoption.
+
+**Architecture validée** : pas de nouvelle table, on étend `clients` (réutilise nom/prénom/adresse/tel/email existants ; si la personne tente plus tard d'adopter, elle apparaît dans la recherche client avec badge ⛔).
+
+**Livré par l'agent (commit `f2cd88e`)** :
+- Migration `20260520d_judicial_blacklist.sql` — `clients` +9 colonnes (`is_blacklisted`, `blacklist_reason/source/at/by`, `blacklist_removed_*`, `birth_date`, `birth_place`, `national_id`), `animals.judicial_owner_client_id`, `adoption_inquiries.possible_blacklist_match`, extension `unaccent`, fonction `check_adopter_blacklist(estab, last_name, first_name, email?, phone?, birth_date?)` retournant `match_strength` (`exact_email`/`exact_phone`/`name_birthdate`/`name_only`)
+- Server actions `blacklist.ts` (6 fonctions : matching, picker search, upsert propriétaire judiciaire, ajout manuel, retrait admin avec audit critique, lecture enrichie)
+- Page `/etablissement/liste-noire` + composants `BlacklistTable`, `BlacklistAddButton`, `BlacklistOverrideModal`
+- `JudicialOwnerPicker` (2 steps : recherche client existant ou création complète avec BAN, naissance, motif) — remplace l'input texte libre dans la fiche animal en édition
+- Blocage inquiry publique : match exact/email/phone/birthdate → `status='refused'` + raison neutre côté demandeur (on ne révèle pas la liste noire au public) ; match nom seul → flag `possible_blacklist_match` pour vérif équipe
+- Blocage contrat back-office : Server Action retourne `BLACKLIST_BLOCK` → `BlacklistOverrideModal` ; admin peut forcer avec justification obligatoire + audit critique
+- Fiche client : bandeau rouge + badge ⛔ + section dédiée "Liste noire SDA" (motif, source, animaux liés, historique)
+- Recherche client : badge ⛔ + toggle "Afficher la liste noire" (OFF par défaut)
+- Lien dans le menu admin "Pilotage"
+
+### 3. Hotfixes build TS (3 cycles)
+
+Builds Coolify successifs cassés par des erreurs TypeScript strict sur des interfaces locales non synchronisées avec `database.ts` :
+
+| Commit | Fix |
+|---|---|
+| `a4086d2` | `sante/page.tsx` — ajout des 5 champs `invoice_*` à l'interface locale `HealthRecordWithAnimal` (manquaient depuis la migration `20260520c`) |
+| `889b0f9` | `medical-cost-recap-section.tsx` — suppression de `interface ExtendedHealthRecord extends AnimalHealthRecord` qui re-déclarait des champs requis en optionnel (TS strict refuse l'élargissement) |
+| `e95ed5d` | `animal-detail-tabs.tsx` — propagation du prop `judicialOwner` de `AnimalDetailTabs` vers la sous-fonction `InfoTab` (l'agent référençait la variable sans l'avoir reçue) |
+
+### Workflow technique
+
+- Worktrees git créés à la volée pour paralléliser : `refuge` (agent blacklist), `refuge-auth` (auth), `refuge-hotfix` (merges + fixes)
+- Conflit attendu sur `database.ts` résolu en auto-merge (zones différentes : agent en haut, ajout `UserProfile` en bas)
+- Migrations appliquées directement sur Supabase prod via MCP (`apply_migration`) — pas d'attente du déploiement applicatif
+- Tous les commits forcés en `--author="skyclem59400 <c.scailteux@sda-nord.com>"` (git config jamais modifié, conformément au protocole)
+
+### À configurer côté Supabase Dashboard (manuel, hors session)
+
+- Auth → Email → activer "Confirm email"
+- Auth → Policies → password min length = 12
+- Vérifier templates email FR
+
+### Effet utilisateur
+
+- **Au prochain login de chacun** : redirection forcée vers `/onboarding` jusqu'à saisie complète
+- **Section `/compte` "Mes informations"** : éditable à tout moment après onboarding
+- **Création animal en procédure judiciaire** : picker propriétaire en édition (pas à la création — limitation assumée par l'agent, lier après création)
+- **Demandes d'adoption publiques** : filtrage automatique silencieux des personnes blacklistées
+- **Création contrat d'adoption back-office** : warning bloquant avec override admin si match
+
+### Méta
+
+- 4 commits feature mergés sur main (`feature/auth-onboarding`, `feature/judicial-blacklist`, section compte, hotfixes)
+- 2 migrations appliquées sur Supabase prod
+- Agent général-purpose lancé en background (~25 min, 8 fichiers créés, 11 modifiés, 2695 insertions)
+- 3 cycles de build Coolify pour atterrir — build non testé en local (pas de node_modules dans les worktrees)
+- `pseudo` à supprimer dans 2 mois (~juillet 2026) une fois tout le monde migré
+
