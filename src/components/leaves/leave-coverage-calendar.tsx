@@ -263,18 +263,15 @@ export function LeaveCoverageCalendar({
             </button>
           </div>
 
-          {/* Présents */}
+          {/* Présents — salariés uniquement (les bénévoles et autres collaborateurs
+              ne sont pas comptés dans la couverture). */}
           <div className="space-y-2">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">
                 Presents
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {[
-                  ...selectedDayData.active_salaried,
-                  ...selectedDayData.active_auto,
-                  ...selectedDayData.active_other,
-                ]
+                {selectedDayData.active_salaried
                   .filter((id) => {
                     const absentIds = new Set(
                       selectedDayData.absent
@@ -285,17 +282,10 @@ export function LeaveCoverageCalendar({
                   })
                   .map((id) => {
                     const m = memberMap.get(id)
-                    const isPresta = m?.contract_type === 'auto_entrepreneur'
                     return (
                       <span
                         key={id}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border
-                          ${
-                            isPresta
-                              ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
-                              : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                          }
-                        `}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                       >
                         {memberLabel(m)}
                         {m?.contract_type && (
@@ -309,16 +299,21 @@ export function LeaveCoverageCalendar({
               </div>
             </div>
 
-            {/* Absents */}
+            {/* Absents — salariés uniquement (cohérent avec la liste des présents). */}
+            {(() => {
+              const salariedAbsents = selectedDayData.absent.filter(
+                (a) => memberMap.get(a.member_id)?.contract_type === 'salarie',
+              )
+              return (
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">
                 Absents
               </p>
-              {selectedDayData.absent.length === 0 ? (
+              {salariedAbsents.length === 0 ? (
                 <p className="text-xs text-muted italic">Aucun</p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
-                  {selectedDayData.absent.map((a, idx) => {
+                  {salariedAbsents.map((a, idx) => {
                     const m = memberMap.get(a.member_id)
                     const lt = a.leave_type_id ? typeMap.get(a.leave_type_id) : null
                     const reasonLabel =
@@ -346,6 +341,8 @@ export function LeaveCoverageCalendar({
                 </div>
               )}
             </div>
+              )
+            })()}
           </div>
         </div>
       )}
