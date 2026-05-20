@@ -586,3 +586,15 @@ Demandée par Clément : retravailler la rubrique Nouvelles pour distinguer 2 ca
 
 Fichiers modifiés : 9 (+537 / -419 lignes). Migrations : 2. TS check + build local OK avant push.
 
+### 9. Modal "Détail du jour" : salariés uniquement (commit `6381463`)
+
+Petit ajustement UX demandé par Clément après revue de l'écran : le modal **Détail du jour** de l'onglet Couverture (`/admin/conges` > Couverture > clic sur un jour) affichait tous les `establishment_members` actifs (~30 personnes pour SDA), ce qui rendait l'écran difficile à lire alors que la couverture n'est calculée que sur les salariés.
+
+**Modif** dans `src/components/leaves/leave-coverage-calendar.tsx` :
+- **Présents** : avant `[...active_salaried, ...active_auto, ...active_other]`, désormais `active_salaried` seul. Suppression du badge bleu PRESTA spécifique à `auto_entrepreneur` (devenu inutile).
+- **Absents** : filter par `memberMap.get(a.member_id)?.contract_type === 'salarie'` avant rendu. Le compteur "Aucun" reflète maintenant les absents salariés seulement.
+
+Le calcul de couverture (seuil 3 par défaut à la SDA) était déjà basé sur les seuls salariés — donc cohérence métier conservée, juste l'affichage qui s'aligne. Les bénévoles et auto-entrepreneurs restent visibles ailleurs (planning sorties, équipe…) où ils sont pertinents.
+
+1 fichier modifié (+14 / -17 lignes). TS check ✅.
+
