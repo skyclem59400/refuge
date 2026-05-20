@@ -30,6 +30,11 @@ interface HealthRecordWithAnimal {
   judicial_procedure: boolean
   billed_to: string | null
   invoice_reference: string | null
+  invoice_storage_path: string | null
+  invoice_file_name: string | null
+  invoice_mime_type: string | null
+  invoice_size_bytes: number | null
+  invoice_uploaded_at: string | null
   created_by: string | null
   created_at: string
   animals: {
