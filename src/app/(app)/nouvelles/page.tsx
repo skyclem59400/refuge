@@ -2,9 +2,9 @@ import { redirect } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import {
-  getAnimalNewsInbox,
-  getAnimalNewsHistory,
-  getEligibleAnimalsForNews,
+  getAnimalNewsByCategory,
+  getAnimalsForCategory,
+  getMosaics,
 } from '@/lib/actions/animal-news'
 import { AnimalNewsClient } from '@/components/animal-news/animal-news-client'
 
@@ -13,15 +13,19 @@ export default async function NouvellesPage() {
   if (!ctx) redirect('/login')
   if (!ctx.permissions.canViewAnimalNews) redirect('/dashboard')
 
-  const [inboxResult, historyResult, eligibleResult] = await Promise.all([
-    getAnimalNewsInbox(),
-    getAnimalNewsHistory(),
-    getEligibleAnimalsForNews(),
+  const [
+    shelteredNewsResult,
+    alumniNewsResult,
+    shelteredAnimalsResult,
+    alumniAnimalsResult,
+    mosaicsResult,
+  ] = await Promise.all([
+    getAnimalNewsByCategory({ category: 'sheltered' }),
+    getAnimalNewsByCategory({ category: 'alumni' }),
+    getAnimalsForCategory('sheltered'),
+    getAnimalsForCategory('alumni'),
+    getMosaics(),
   ])
-
-  const inbox = inboxResult.data || []
-  const history = historyResult.data || { solos: [], mosaics: [] }
-  const eligibleAnimals = eligibleResult.data || []
 
   return (
     <div className="animate-fade-up">
@@ -33,16 +37,18 @@ export default async function NouvellesPage() {
           <div>
             <h1 className="text-2xl font-bold">Nouvelles</h1>
             <p className="text-xs text-muted mt-0.5">
-              Photos et messages reçus des familles d&apos;accueil et adoptants
+              Suivi des protégés au refuge et nouvelles des sortis (adoptés / familles d&apos;accueil)
             </p>
           </div>
         </div>
       </div>
 
       <AnimalNewsClient
-        inbox={inbox}
-        history={history}
-        eligibleAnimals={eligibleAnimals}
+        shelteredNews={shelteredNewsResult.data || []}
+        alumniNews={alumniNewsResult.data || []}
+        shelteredAnimals={shelteredAnimalsResult.data || []}
+        alumniAnimals={alumniAnimalsResult.data || []}
+        mosaics={mosaicsResult.data || []}
         establishmentId={ctx.establishment.id}
       />
     </div>
