@@ -11,7 +11,7 @@
 
 import { getSpeciesLabel } from '@/lib/species'
 
-export type ContractKind = 'foster' | 'adoption' | 'abandonment' | 'engagement'
+export type ContractKind = 'foster' | 'adoption' | 'abandonment' | 'engagement' | 'adoption_cancellation'
 
 export interface ContractEmailParams {
   /** "foster" → famille d'accueil, "adoption" → adoption */
@@ -63,6 +63,9 @@ function buildSubject(p: ContractEmailParams): string {
   if (p.kind === 'engagement') {
     return `Certificat d'engagement — ${p.animalName} | ${p.establishmentName}`
   }
+  if (p.kind === 'adoption_cancellation') {
+    return `Avenant d'annulation d'adoption — ${p.animalName} | ${p.establishmentName}`
+  }
   return `Contrat d'adoption — ${p.animalName} | ${p.establishmentName}`
 }
 
@@ -70,6 +73,7 @@ function buildHeading(p: ContractEmailParams): string {
   if (p.kind === 'foster') return 'Convention famille d’accueil'
   if (p.kind === 'abandonment') return 'Contrat d’abandon par anticipation'
   if (p.kind === 'engagement') return 'Certificat d’engagement et de connaissance'
+  if (p.kind === 'adoption_cancellation') return 'Avenant d’annulation d’adoption'
   return 'Contrat d’adoption'
 }
 
@@ -83,6 +87,9 @@ function buildIntro(p: ContractEmailParams): string {
   if (p.kind === 'engagement') {
     return `Merci pour votre démarche d'adoption de <strong>${escapeHtml(p.animalName)}</strong>. Conformément à la loi du 30 novembre 2021 (article L214-8 du Code rural), un certificat d'engagement et de connaissance est à signer avant tout contrat d'adoption. Un délai légal de <strong>7 jours</strong> de réflexion s'écoulera ensuite avant la finalisation définitive de l'adoption.`
   }
+  if (p.kind === 'adoption_cancellation') {
+    return `Suite au retour de <strong>${escapeHtml(p.animalName)}</strong> pendant la période d'accueil prévue au contrat d'adoption, ${escapeHtml(p.establishmentName)} vous adresse l'avenant d'annulation à signer électroniquement. Ce document formalise la résiliation du contrat d'adoption et le remboursement convenu.`
+  }
   return `Félicitations pour l'adoption de <strong>${escapeHtml(p.animalName)}</strong>. Le contrat d'adoption ci-dessous est à signer électroniquement pour finaliser la cession définitive.`
 }
 
@@ -90,6 +97,7 @@ function buildCtaLabel(p: ContractEmailParams): string {
   if (p.kind === 'foster') return 'Signer la convention'
   if (p.kind === 'abandonment') return 'Signer le contrat'
   if (p.kind === 'engagement') return 'Signer le certificat'
+  if (p.kind === 'adoption_cancellation') return 'Signer l’avenant d’annulation'
   return 'Signer le contrat'
 }
 

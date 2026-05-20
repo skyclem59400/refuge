@@ -102,12 +102,18 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient()
 
   // Documents from Optimus carry an externalId. The prefix distinguishes the type:
-  //   "adoption_<uuid>"     → adoption_contracts
-  //   "abandonment_<uuid>"  → abandonment_contracts
-  //   "engagement_<uuid>"   → engagement_certificates (certificat d'engagement loi 30/11/2021)
-  //   "<uuid>" (no prefix)  → foster_contracts (legacy)
+  //   "adoption_cancellation_<uuid>" → adoption_contracts (mise à jour cancellation_* cols)
+  //   "adoption_<uuid>"              → adoption_contracts
+  //   "abandonment_<uuid>"           → abandonment_contracts
+  //   "engagement_<uuid>"            → engagement_certificates (loi 30/11/2021)
+  //   "<uuid>" (no prefix)           → foster_contracts (legacy)
   const externalId = payload.data?.externalId
-  const isAdoption = typeof externalId === 'string' && externalId.startsWith('adoption_')
+  const isAdoptionCancellation =
+    typeof externalId === 'string' && externalId.startsWith('adoption_cancellation_')
+  const isAdoption =
+    typeof externalId === 'string' &&
+    externalId.startsWith('adoption_') &&
+    !isAdoptionCancellation
   const isAbandonment = typeof externalId === 'string' && externalId.startsWith('abandonment_')
   const isEngagement = typeof externalId === 'string' && externalId.startsWith('engagement_')
 
@@ -115,41 +121,44 @@ export async function POST(request: NextRequest) {
   type SupportedBucket = 'adoption-contracts' | 'foster-contracts' | 'abandonment-contracts' | 'engagement-certificates'
 
   const tableName: SupportedTable =
-    isAdoption ? 'adoption_contracts'
+    isAdoption || isAdoptionCancellation ? 'adoption_contracts'
     : isAbandonment ? 'abandonment_contracts'
     : isEngagement ? 'engagement_certificates'
     : 'foster_contracts'
   const bucketName: SupportedBucket =
-    isAdoption ? 'adoption-contracts'
+    isAdoption || isAdoptionCancellation ? 'adoption-contracts'
     : isAbandonment ? 'abandonment-contracts'
     : isEngagement ? 'engagement-certificates'
     : 'foster-contracts'
 
   // Le certificat d'engagement utilise `status` (draft|sent|signed|...) au lieu de
   // `signature_status` (not_sent|pending|signed|...). On lit donc le champ adapté.
+  // L'avenant d'annulation d'adoption utilise les colonnes cancellation_*.
   type ContractRow = { id: string; animal_id: string; signature_status: string; documenso_document_id: number | null }
 
   // Find the contract by Documenso document id (preferred) or by id from externalId.
-  // We type the select results explicitly because Supabase narrows the runtime type to `never`
-  // when the table name is a union literal and not a hardcoded string.
-  // Pour engagement_certificates, le champ d'état est `status` (pas signature_status).
-  // On l'aliase pour garder un type unique côté TS.
-  const stateColumn = isEngagement ? 'status' : 'signature_status'
-  const selectCols = `id, animal_id, ${stateColumn} as signature_status, documenso_document_id`
+  const stateColumn = isEngagement
+    ? 'status'
+    : isAdoptionCancellation
+      ? 'cancellation_signature_status'
+      : 'signature_status'
+  const docIdColumn = isAdoptionCancellation ? 'cancellation_documenso_document_id' : 'documenso_document_id'
+  const selectCols = `id, animal_id, ${stateColumn} as signature_status, ${docIdColumn} as documenso_document_id`
 
   let contract: ContractRow | null = null
   {
     const { data } = await admin
       .from(tableName)
       .select(selectCols)
-      .eq('documenso_document_id', documensoDocId)
+      .eq(docIdColumn, documensoDocId)
       .maybeSingle<ContractRow>()
     contract = data
   }
 
   if (!contract && externalId) {
     let idLookup = externalId
-    if (isAdoption) idLookup = externalId.replace(/^adoption_/, '')
+    if (isAdoptionCancellation) idLookup = externalId.replace(/^adoption_cancellation_/, '')
+    else if (isAdoption) idLookup = externalId.replace(/^adoption_/, '')
     else if (isAbandonment) idLookup = externalId.replace(/^abandonment_/, '')
     else if (isEngagement) idLookup = externalId.replace(/^engagement_/, '')
     const { data } = await admin
@@ -222,6 +231,50 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ ok: true, contractId: contract.id, type: 'engagement', newStatus })
+  }
+
+  // ============================================
+  // Cas spécial : adoption_cancellation_* (avenant d'annulation d'adoption)
+  // — met à jour les colonnes cancellation_* de adoption_contracts
+  // — pas de mouvement animal à finaliser (la restitution est déjà enregistrée)
+  // ============================================
+  if (isAdoptionCancellation) {
+    const cancelUpdate: Record<string, unknown> = { cancellation_signature_status: newStatus }
+
+    if (firstSigned?.signedAt) {
+      cancelUpdate.cancellation_signed_at = firstSigned.signedAt
+    }
+
+    if (newStatus === 'signed' && finalEvent && contract.signature_status !== 'signed') {
+      try {
+        const buf = await downloadSignedPdf(documensoDocId)
+        const fileName = `signed_cancellation_${contract.id}_${Date.now()}.pdf`
+        const { data: upload, error: uploadErr } = await admin.storage
+          .from('adoption-contracts')
+          .upload(fileName, Buffer.from(buf), {
+            contentType: 'application/pdf',
+            upsert: false,
+          })
+        if (!uploadErr && upload) {
+          const { data: pub } = admin.storage.from('adoption-contracts').getPublicUrl(upload.path)
+          cancelUpdate.cancellation_signed_pdf_url = pub.publicUrl
+        }
+      } catch (e) {
+        console.warn('Webhook (cancellation): could not download signed PDF:', (e as Error).message)
+      }
+    }
+
+    const { error } = await admin
+      .from('adoption_contracts')
+      .update(cancelUpdate)
+      .eq('id', contract.id)
+
+    if (error) {
+      console.error('Webhook cancellation update error:', error.message)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ ok: true, contractId: contract.id, type: 'adoption_cancellation', newStatus })
   }
 
   // ============================================
