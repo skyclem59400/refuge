@@ -17,12 +17,6 @@ const TYPE_LABEL: Record<HealthRecordType, string> = {
   cession: 'Certificat cession',
 }
 
-interface ExtendedHealthRecord extends AnimalHealthRecord {
-  invoice_storage_path?: string | null
-  invoice_file_name?: string | null
-  invoice_uploaded_at?: string | null
-}
-
 interface Props {
   readonly animalId: string
   readonly healthRecords: AnimalHealthRecord[]
@@ -42,7 +36,7 @@ function formatDate(iso: string): string {
 }
 
 export function MedicalCostRecapSection({ animalId, healthRecords }: Props) {
-  const judicial = (healthRecords as ExtendedHealthRecord[])
+  const judicial = healthRecords
     .filter((r) => r.judicial_procedure && (r.cost ?? 0) > 0)
     .sort((a, b) => (a.date < b.date ? -1 : 1))
 
