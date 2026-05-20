@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
@@ -22,6 +22,18 @@ export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
   const { theme, toggleTheme } = useTheme()
+
+  // Affiche les erreurs eventuelles renvoyees par le callback OAuth
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const err = params.get('error')
+    if (err === 'sso_forbidden') {
+      setError('La connexion Google est reservee a l\'administrateur principal. Utilise ton email et ton mot de passe.')
+    } else if (err === 'oauth_exchange') {
+      setError('Erreur lors de la connexion Google. Reessaie.')
+    }
+  }, [])
 
   // --- Admin login handlers ---
   async function handleAdminSubmit(e: React.FormEvent) {
