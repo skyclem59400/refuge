@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createHealthRecord, updateHealthRecord } from '@/lib/actions/health'
 import { VeterinarianSelect } from '@/components/health/veterinarian-select'
+import { MedicalInvoiceUploader } from '@/components/health/medical-invoice-uploader'
 import { DatePicker } from '@/components/ui/date-picker'
 import type { HealthRecordType } from '@/lib/types/database'
 
@@ -43,6 +44,8 @@ interface HealthRecordFormProps {
     judicial_procedure?: boolean
     billed_to?: string | null
     invoice_reference?: string | null
+    invoice_storage_path?: string | null
+    invoice_file_name?: string | null
   }
   onClose?: () => void
 }
@@ -299,30 +302,45 @@ export function HealthRecordForm({ animalId, record, onClose, judicialAnimal = f
             <span>Cet acte fait partie de la procédure (à inclure dans le dossier tribunal)</span>
           </label>
           {judicialProcedure && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="health-billed-to" className={labelClass}>Facturé à</label>
-                <input
-                  id="health-billed-to"
-                  type="text"
-                  value={billedTo}
-                  onChange={(e) => setBilledTo(e.target.value)}
-                  placeholder={judicialBillingDefault || 'SDA — pour remboursement tribunal'}
-                  className={inputClass}
-                />
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="health-billed-to" className={labelClass}>Facturé à</label>
+                  <input
+                    id="health-billed-to"
+                    type="text"
+                    value={billedTo}
+                    onChange={(e) => setBilledTo(e.target.value)}
+                    placeholder={judicialBillingDefault || 'SDA — pour remboursement tribunal'}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="health-invoice-ref" className={labelClass}>Réf. facture clinique</label>
+                  <input
+                    id="health-invoice-ref"
+                    type="text"
+                    value={invoiceReference}
+                    onChange={(e) => setInvoiceReference(e.target.value)}
+                    placeholder="N° facture si déjà émise"
+                    className={inputClass}
+                  />
+                </div>
               </div>
-              <div>
-                <label htmlFor="health-invoice-ref" className={labelClass}>Réf. facture clinique</label>
-                <input
-                  id="health-invoice-ref"
-                  type="text"
-                  value={invoiceReference}
-                  onChange={(e) => setInvoiceReference(e.target.value)}
-                  placeholder="N° facture si déjà émise"
-                  className={inputClass}
+
+              {/* Upload facture clinique (seulement quand l'acte est déjà sauvegardé) */}
+              {isEditing && record?.id ? (
+                <MedicalInvoiceUploader
+                  healthRecordId={record.id}
+                  existingFileName={record.invoice_file_name ?? null}
+                  hasFile={!!record.invoice_storage_path}
                 />
-              </div>
-            </div>
+              ) : (
+                <p className="text-[11px] text-muted italic">
+                  Enregistrez d&apos;abord l&apos;acte, puis revenez l&apos;éditer pour joindre le PDF de la facture.
+                </p>
+              )}
+            </>
           )}
         </div>
       )}

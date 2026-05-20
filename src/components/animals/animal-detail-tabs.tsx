@@ -9,6 +9,7 @@ import { AnimalForm } from '@/components/animals/animal-form'
 import { AnimalIdentificationCard } from '@/components/animals/animal-identification-card'
 import { AnimalAttachmentsSection } from '@/components/animals/animal-attachments-section'
 import { JudicialDocumentsSection } from '@/components/animals/judicial-documents-section'
+import { MedicalCostRecapSection } from '@/components/animals/medical-cost-recap-section'
 import { HealthRecordForm } from '@/components/health/health-record-form'
 import { MovementForm } from '@/components/animals/movement-form'
 import { FosterContractsTab } from '@/components/foster-contracts/foster-contracts-tab'
@@ -434,8 +435,23 @@ export function AnimalDetailTabs({
                   <FileText className="w-3.5 h-3.5" />
                   Dossier procédure (PDF)
                 </a>
+                <a
+                  href={`/api/pdf/medical-cost-recap/${animal.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-emerald-500/40 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors font-semibold"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Récap frais médicaux (PDF)
+                </a>
               </div>
             </div>
+
+            {/* Recap frais medicaux */}
+            <MedicalCostRecapSection
+              animalId={animal.id}
+              healthRecords={healthRecords}
+            />
 
             {/* Documents uploadés */}
             <JudicialDocumentsSection animalId={animal.id} canManage={canManageAnimals} />
