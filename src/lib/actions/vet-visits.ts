@@ -384,6 +384,11 @@ export async function validateVetVisitLine(lineId: string) {
       parentId: lineData.animal_id,
     })
 
+    // 7. Si toutes les lignes du passage sont validées, envoyer auto le récap véto
+    // (fire-and-forget : on ne bloque pas la réponse, le log est interne)
+    const { maybeAutoSendRecap } = await import('@/lib/actions/vet-visit-recap')
+    void maybeAutoSendRecap(lineData.visit.id)
+
     return { success: true, created: created.length }
   } catch (e) {
     return { error: (e as Error).message }

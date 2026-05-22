@@ -33,6 +33,9 @@ export async function updateEstablishment(data: {
   siret?: string
   logo_url?: string
   google_calendar_id?: string
+  accountant_email?: string | null
+  accountant_name?: string | null
+  vet_recap_email?: string | null
 }) {
   try {
     const { establishmentId } = await requirePermission('manage_establishment')

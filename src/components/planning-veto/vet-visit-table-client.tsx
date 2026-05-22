@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, Check, Trash2, X, Loader2 } from 'lucide-react'
+import { Plus, Check, Trash2, X, Loader2, Mail, FileDown, CheckCircle2 } from 'lucide-react'
 import {
   addVetVisitLine,
   updateVetVisitLine,
@@ -12,6 +12,7 @@ import {
   validateVetVisitLine,
   unvalidateVetVisitLine,
 } from '@/lib/actions/vet-visits'
+import { sendVetVisitRecap, getVetVisitRecapDownloadUrl } from '@/lib/actions/vet-visit-recap'
 import { getSpeciesEmoji } from '@/lib/species'
 import type {
   VetVisitWithLines,
@@ -161,6 +162,38 @@ export function VetVisitTableClient({ visit, availableAnimals }: Readonly<Props>
     })
   }
 
+  const allLinesValidated = lines.length > 0 && lines.every((l) => l.validated_at !== null)
+  const someLinesValidated = lines.some((l) => l.validated_at !== null)
+  const recapSent = !!visit.recap_sent_at
+
+  async function handleSendRecap(force: boolean) {
+    if (!someLinesValidated) {
+      toast.error('Aucune ligne validée à inclure dans le récap.')
+      return
+    }
+    if (recapSent && !force) {
+      if (!confirm('Le récap a déjà été envoyé. Renvoyer une nouvelle copie ?')) return
+      force = true
+    } else if (!recapSent) {
+      if (!confirm(`Envoyer le récap PDF par email à la clinique vétérinaire ?`)) return
+    }
+    const r = await sendVetVisitRecap(visit.id, { force })
+    if (r.error) toast.error(r.error)
+    else {
+      toast.success(`Récap envoyé à ${r.data?.sentTo}`)
+      router.refresh()
+    }
+  }
+
+  async function handleDownloadArchived() {
+    const r = await getVetVisitRecapDownloadUrl(visit.id)
+    if (r.error || !r.url) {
+      toast.error(r.error || 'Téléchargement impossible')
+      return
+    }
+    window.open(r.url, '_blank')
+  }
+
   return (
     <div className="space-y-4">
       {/* Méta visite */}
@@ -169,6 +202,56 @@ export function VetVisitTableClient({ visit, availableAnimals }: Readonly<Props>
         {visit.vet_label && <span>👨‍⚕️ {visit.vet_label}</span>}
         {visit.notes && <span>📝 {visit.notes}</span>}
       </div>
+
+      {/* Bandeau récap véto */}
+      {recapSent ? (
+        <div className="bg-emerald-500/5 border border-emerald-500/30 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm text-emerald-300">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>
+              Récap envoyé à <strong>{visit.recap_sent_to}</strong>
+              {visit.recap_sent_at && ` le ${new Date(visit.recap_sent_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {visit.recap_storage_path && (
+              <button
+                type="button"
+                onClick={handleDownloadArchived}
+                className="text-xs px-3 py-1.5 rounded-lg border border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-300 flex items-center gap-1"
+              >
+                <FileDown className="w-3 h-3" />
+                Télécharger le PDF archivé
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => handleSendRecap(true)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-surface-dark"
+            >
+              Renvoyer
+            </button>
+          </div>
+        </div>
+      ) : someLinesValidated && (
+        <div className={`rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 ${allLinesValidated ? 'bg-primary/5 border border-primary/30' : 'bg-surface border border-border'}`}>
+          <div className="text-sm">
+            {allLinesValidated ? (
+              <span className="text-primary font-semibold">✅ Toutes les lignes sont validées — le récap va être envoyé automatiquement.</span>
+            ) : (
+              <span className="text-muted">{lines.filter((l) => l.validated_at).length} / {lines.length} ligne(s) validée(s). Le récap sera envoyé auto à la dernière validation.</span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => handleSendRecap(false)}
+            className="text-xs px-3 py-1.5 rounded-lg bg-primary text-white font-semibold hover:bg-primary/90 flex items-center gap-1"
+          >
+            <Mail className="w-3 h-3" />
+            Envoyer le récap maintenant
+          </button>
+        </div>
+      )}
 
       {/* Tableau */}
       <div className="bg-surface rounded-xl border border-border overflow-x-auto">
@@ -181,7 +264,7 @@ export function VetVisitTableClient({ visit, availableAnimals }: Readonly<Props>
               <th className="px-2 py-2 text-left font-bold uppercase tracking-wider">Race</th>
               <th className="px-2 py-2 text-left font-bold uppercase tracking-wider">Couleur</th>
               {ACT_COLUMNS.map((col) => (
-                <th key={col.key} className={`px-1.5 py-2 text-center font-bold uppercase tracking-wider ${col.color}`} style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', minWidth: 28 }}>
+                <th key={col.key} className={`px-1 py-2 text-center font-bold uppercase tracking-wider ${col.color}`} style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', minWidth: 22, width: 22, fontSize: '9px' }}>
                   {col.label}
                 </th>
               ))}
@@ -236,24 +319,36 @@ export function VetVisitTableClient({ visit, availableAnimals }: Readonly<Props>
                       className="w-full px-1.5 py-1 border border-border rounded bg-surface text-xs disabled:opacity-50"
                     />
                   </td>
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="text"
-                      placeholder="Notes véto"
+                  <td className="px-2 py-1.5" style={{ minWidth: 220 }}>
+                    <textarea
+                      placeholder="Notes véto (cliquez pour étendre)"
                       defaultValue={line.observations || ''}
                       disabled={isValidated}
+                      rows={2}
                       onBlur={(e) => handleFieldChange(line.id, 'observations', e.target.value)}
-                      className="w-full px-1.5 py-1 border border-border rounded bg-surface text-xs disabled:opacity-50"
+                      onInput={(e) => {
+                        const t = e.currentTarget
+                        t.style.height = 'auto'
+                        t.style.height = t.scrollHeight + 'px'
+                      }}
+                      className="w-full px-1.5 py-1 border border-border rounded bg-surface text-xs disabled:opacity-50 resize-y leading-snug"
+                      style={{ minHeight: 44 }}
                     />
                   </td>
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="text"
-                      placeholder="CRAINTIF, ARRIVE CASTRE..."
+                  <td className="px-2 py-1.5" style={{ minWidth: 140 }}>
+                    <textarea
+                      placeholder="CRAINTIF, ARRIVE CASTRÉ..."
                       defaultValue={line.complement || ''}
                       disabled={isValidated}
+                      rows={2}
                       onBlur={(e) => handleFieldChange(line.id, 'complement', e.target.value)}
-                      className="w-full px-1.5 py-1 border border-border rounded bg-surface text-xs disabled:opacity-50"
+                      onInput={(e) => {
+                        const t = e.currentTarget
+                        t.style.height = 'auto'
+                        t.style.height = t.scrollHeight + 'px'
+                      }}
+                      className="w-full px-1.5 py-1 border border-border rounded bg-surface text-xs disabled:opacity-50 resize-y leading-snug"
+                      style={{ minHeight: 44 }}
                     />
                   </td>
                   <td className="px-2 py-1.5 text-center sticky right-0 bg-surface z-10">

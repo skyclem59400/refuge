@@ -23,6 +23,9 @@ export function EstablishmentForm({ establishment }: EstablishmentFormProps) {
   const [bic, setBic] = useState(establishment.bic)
   const [siret, setSiret] = useState(establishment.siret || '')
   const [googleCalendarId, setGoogleCalendarId] = useState(establishment.google_calendar_id || '')
+  const [accountantEmail, setAccountantEmail] = useState(establishment.accountant_email || '')
+  const [accountantName, setAccountantName] = useState(establishment.accountant_name || '')
+  const [vetRecapEmail, setVetRecapEmail] = useState(establishment.vet_recap_email || '')
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -46,6 +49,9 @@ export function EstablishmentForm({ establishment }: EstablishmentFormProps) {
         bic: bic.trim(),
         siret: siret.trim(),
         google_calendar_id: googleCalendarId.trim(),
+        accountant_email: accountantEmail.trim() || null,
+        accountant_name: accountantName.trim() || null,
+        vet_recap_email: vetRecapEmail.trim() || null,
       })
 
       if (result.error) {
@@ -223,6 +229,66 @@ export function EstablishmentForm({ establishment }: EstablishmentFormProps) {
         />
         <p className="text-xs text-muted mt-1">
           Identifiant de l&apos;agenda Google a synchroniser avec le planning.
+        </p>
+      </div>
+
+      {/* Destinataires emails automatiques */}
+      <div className="pt-4 mt-2 border-t border-border">
+        <h3 className="text-sm font-bold text-text mb-1">Destinataires emails automatiques</h3>
+        <p className="text-xs text-muted mb-4">
+          Adresses utilisées pour l&apos;envoi automatique des récaps depuis Optimus.
+          Modifiables si le comptable ou le vétérinaire change.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+          Comptable — Email
+        </label>
+        <input
+          type="email"
+          value={accountantEmail}
+          onChange={(e) => setAccountantEmail(e.target.value)}
+          placeholder="comptable@cabinet.fr"
+          className="w-full px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
+            focus:border-primary focus:ring-1 focus:ring-primary transition-colors
+            placeholder:text-muted/50"
+        />
+        <p className="text-xs text-muted mt-1">
+          Destinataire des CRA mensuels validés et autres documents comptables.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+          Comptable — Nom / Cabinet
+        </label>
+        <input
+          type="text"
+          value={accountantName}
+          onChange={(e) => setAccountantName(e.target.value)}
+          placeholder="Fiteco (M./Mme Arciuolo)"
+          className="w-full px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
+            focus:border-primary focus:ring-1 focus:ring-primary transition-colors
+            placeholder:text-muted/50"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+          Clinique vétérinaire — Email récap
+        </label>
+        <input
+          type="email"
+          value={vetRecapEmail}
+          onChange={(e) => setVetRecapEmail(e.target.value)}
+          placeholder="compta@clinique-veto.fr"
+          className="w-full px-4 py-2.5 bg-surface-dark border border-border rounded-lg text-sm
+            focus:border-primary focus:ring-1 focus:ring-primary transition-colors
+            placeholder:text-muted/50"
+        />
+        <p className="text-xs text-muted mt-1">
+          Destinataire automatique du récap PDF à la fin de chaque passage vétérinaire (toutes lignes validées).
         </p>
       </div>
 

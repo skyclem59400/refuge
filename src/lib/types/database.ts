@@ -134,6 +134,11 @@ export interface Establishment {
   documenso_folder_id: string | null
   adoption_appointment_settings: AdoptionAppointmentSettings
   min_daily_staff: number
+  /** Email comptable (config CRA) — destinataire des CRA validés */
+  accountant_email: string | null
+  accountant_name: string | null
+  /** Email clinique véto — destinataire des récaps auto de passage véto */
+  vet_recap_email: string | null
   created_at: string
   updated_at: string
 }
@@ -1398,6 +1403,12 @@ export interface VetVisit {
   created_by: string | null
   created_at: string
   updated_at: string
+  /** Récap auto envoyé à la clinique vétérinaire */
+  recap_sent_at: string | null
+  recap_sent_by: string | null
+  recap_sent_to: string | null
+  recap_storage_path: string | null
+  recap_email_message_id: string | null
 }
 
 export interface VetVisitLine {
