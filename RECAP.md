@@ -750,3 +750,84 @@ Module entièrement nouveau. Le précédent "CRA" (`src/lib/actions/cra.ts` + `s
 - Compléter le seed des horaires de Matthieu si nécessaire (ou laisser variable, géré au cas par cas dans la saisie).
 
 Aucune dépendance npm nouvelle. Build local + TS check ✅.
+
+---
+
+## Session 2026-05-22 — Récap véto auto + horaires jours fériés CRA
+
+### 12. Récap PDF auto à la clinique vétérinaire (commits `6db9698` + config DB)
+
+**Origine** : demande de Mary suite à un passage véto avec Caroline → besoin que, à la fin de chaque passage, un récap PDF des actes effectués soit envoyé automatiquement au comptable de la clinique vétérinaire. Et besoin d'agrandir les zones de commentaires dans le tableau car Caroline n'avait pas la place de noter ses observations.
+
+**Migration `20260522a_vet_visit_recap.sql`** appliquée en prod :
+- 5 colonnes sur `vet_visits` : `recap_sent_at`, `recap_sent_by`, `recap_sent_to`, `recap_storage_path`, `recap_email_message_id`
+- Colonne `vet_recap_email` sur `establishments` (configurable côté UI, défaut SDA = `compta@deltour.vet`)
+- Bucket Storage `vet-visit-recaps` (privé, archive de chaque PDF envoyé)
+
+**Logique auto-send** (`src/lib/actions/vet-visit-recap.ts`) :
+- Hook dans `validateVetVisitLine` : à chaque validation d'une ligne, on vérifie si TOUTES les lignes du passage sont validées. Si oui ET récap pas encore envoyé → envoi automatique.
+- Fire-and-forget : pas de blocage de l'UX de validation. Si l'envoi échoue (token Brevo, etc.), log console mais la validation reste OK.
+- Idempotent : ne renvoie pas si `recap_sent_at IS NOT NULL`, sauf force=true.
+- Bouton manuel "Envoyer le récap maintenant" disponible dès qu'au moins une ligne est validée.
+
+**Template PDF** (`src/lib/pdf/vet-visit-recap-template.ts`) : A4 portrait, charte SDA officielle (navy `#1e3a5f`, teal `#5ba8a0`, orange terracotta `#c96b3c`, signature-strip gradient en bas). Affiche : header établissement + date du passage + véto + nombre d'animaux + tableau détail par animal (actes en pills émeraude + observations + complément + coût) + synthèse (compte des actes par type + coût total bloc navy) + footer.
+
+**UX tableau planning véto** (`src/components/planning-veto/vet-visit-table-client.tsx`) :
+- Bandeau récap en haut : vert si déjà envoyé (date + destinataire + bouton "Télécharger le PDF archivé" + "Renvoyer"), surface neutre sinon avec progress "X/Y validées" + bouton manuel.
+- Colonnes Observations et Complément passent de `<input type="text">` mono-ligne à `<textarea rows={2}>` avec auto-grow JS (`onInput` adjust scrollHeight). minWidth: 220px pour Observations, 140px pour Complément.
+- Colonnes d'actes (11) réduites de `minWidth: 28` à `minWidth: 22` + `fontSize: 9px` pour libérer de la place horizontale.
+
+**Configuration paramétrable** dans `/etablissement` (`src/components/establishment/establishment-form.tsx`) :
+- Nouvelle section "Destinataires emails automatiques" avec 3 champs :
+  - **Comptable — Email** (`accountant_email`)
+  - **Comptable — Nom / Cabinet** (`accountant_name`)
+  - **Clinique vétérinaire — Email récap** (`vet_recap_email`)
+- Server action `updateEstablishment` étendue avec ces 3 champs.
+
+**Valeurs config prod SDA** (DB) :
+- `accountant_email = g.arciuolo@fiteco.com`
+- `accountant_name = Fiteco (M./Mme Arciuolo)`
+- `vet_recap_email = compta@deltour.vet`
+
+**Hierarchie de fonctionnement** :
+1. Mary ouvre `/sante/planning/[id]`
+2. Caroline note ses observations dans le tableau (zones agrandies)
+3. Mary valide chaque ligne avec "✓ Valider"
+4. À la dernière validation → génération PDF + envoi auto à `compta@deltour.vet` + archive Storage
+5. Bandeau vert "Récap envoyé" apparaît avec lien de téléchargement du PDF archivé
+
+8 fichiers modifiés + 4 créés. Build local + TS check ✅. Push direct prod, Coolify déployé.
+
+### 13. CRA — Horaires jours fériés par collaborateur (commit `d64043c`)
+
+**Origine** : Clément a précisé que certains salariés viennent nourrir les animaux les jours fériés. Le CRA doit pouvoir refléter ces heures travaillées un jour férié, par défaut vide (= 0h, comportement initial) sauf si configuré manuellement par collaborateur.
+
+**Migration `20260522b_cra_member_holiday.sql`** appliquée en prod :
+- 4 colonnes TIME sur `establishment_members` : `holiday_start_am`, `holiday_end_am`, `holiday_start_pm`, `holiday_end_pm`
+- Contraintes CHECK : max 17h00, fin > début, AM avant PM (alignement avec `member_work_schedules`)
+
+**Logique** dans `getMonthlySaisie` :
+- À chaque jour férié :
+  1. Si override `cra_entries` existe → l'utiliser (priorité absolue)
+  2. Sinon, si membre a un `holiday_*` renseigné → l'appliquer (compte les heures comme travaillées)
+  3. Sinon → jour de repos (0h, comportement par défaut inchangé)
+
+**Server action** `upsertHolidaySchedule(memberId, payload)` dans `work-schedules.ts` : update les 4 colonnes en une transaction. Si tous null → le membre ne travaille plus les fériés.
+
+**UI éditeur** `work-schedules-editor.tsx` :
+- Modal : nouvelle carte "🎉 Férié" en bas des 7 jours de la semaine. Checkbox "Travaille les jours fériés (nourrissage animaux)" + 4 inputs time (granularité quart d'heure, max 17h). Total heures du jour férié affiché en orange.
+- Tableau liste : nouvelle colonne **Férié** entre `Dim` et `h/sem`, qui affiche l'horaire si configuré ou `—` sinon.
+
+**Hiérarchie complète de résolution dans le CRA mensuel** (du plus prioritaire au moins) :
+1. Override `cra_entries` (jour spécifique surcharge Mary)
+2. Arrêt longue durée du membre
+3. Congé approuvé ou en attente
+4. Jour férié :
+   - a. `holiday_*` du membre si renseigné → heures travaillées
+   - b. Sinon → repos
+5. Semaine type (`member_work_schedules`)
+6. Fallback : repos
+
+5 fichiers modifiés + 1 créé. Build local + TS check ✅. Pushé sur main, Coolify déployé.
+
+**Comment configurer pour SDA** : Mary va dans `/admin/cra/horaires` → clic "Modifier" sur le collaborateur concerné → en bas de la modal cocher "Travaille les jours fériés" → renseigner les 4 horaires (typiquement plus courts que la journée standard, genre 8h-12h sans aprem) → Enregistrer.
