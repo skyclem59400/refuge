@@ -24,7 +24,10 @@ const BATCH_LIMIT = 50
 
 interface CronResult {
   ok: boolean
-  processed: { adoption: number; foster: number; donation: number }
+  /** Nombre de mails réellement envoyés (hors collisions/skips/erreurs) */
+  sent: { adoption: number; foster: number; donation: number }
+  /** Events scannés mais déjà traités (collision UNIQUE = idempotence garantie) */
+  already_done: { adoption: number; foster: number; donation: number }
   errors: string[]
 }
 
@@ -50,7 +53,8 @@ async function handleRequest(req: NextRequest): Promise<NextResponse<CronResult 
 
   const result: CronResult = {
     ok: true,
-    processed: { adoption: 0, foster: 0, donation: 0 },
+    sent: { adoption: 0, foster: 0, donation: 0 },
+    already_done: { adoption: 0, foster: 0, donation: 0 },
     errors: [],
   }
 
@@ -71,8 +75,9 @@ async function handleRequest(req: NextRequest): Promise<NextResponse<CronResult 
 
     for (const row of rows || []) {
       try {
-        await processOne(admin, 'adoption', row.id, row.animal_id, row.related_client_id as string, nowIso)
-        result.processed.adoption += 1
+        const outcome = await processOne(admin, 'adoption', row.id, row.animal_id, row.related_client_id as string, nowIso)
+        if (outcome === 'sent') result.sent.adoption += 1
+        else result.already_done.adoption += 1
       } catch (e) {
         result.errors.push(`adoption ${row.id}: ${(e as Error).message}`)
       }
@@ -93,8 +98,9 @@ async function handleRequest(req: NextRequest): Promise<NextResponse<CronResult 
 
     for (const row of rows || []) {
       try {
-        await processOne(admin, 'foster', row.id, row.animal_id, row.related_client_id as string, nowIso)
-        result.processed.foster += 1
+        const outcome = await processOne(admin, 'foster', row.id, row.animal_id, row.related_client_id as string, nowIso)
+        if (outcome === 'sent') result.sent.foster += 1
+        else result.already_done.foster += 1
       } catch (e) {
         result.errors.push(`foster ${row.id}: ${(e as Error).message}`)
       }
@@ -114,8 +120,9 @@ async function handleRequest(req: NextRequest): Promise<NextResponse<CronResult 
 
     for (const row of rows || []) {
       try {
-        await processOneDonation(admin, row, nowIso)
-        result.processed.donation += 1
+        const outcome = await processOneDonation(admin, row, nowIso)
+        if (outcome === 'sent') result.sent.donation += 1
+        else result.already_done.donation += 1
       } catch (e) {
         result.errors.push(`donation ${row.id}: ${(e as Error).message}`)
       }
@@ -139,7 +146,7 @@ async function processOne(
   animalId: string,
   clientId: string,
   nowIso: string
-) {
+): Promise<'sent' | 'skipped'> {
   // Doublon ?
   const { data: existing } = await admin
     .from('satisfaction_surveys')
@@ -147,7 +154,7 @@ async function processOne(
     .eq('kind', kind)
     .eq('related_id', movementId)
     .maybeSingle()
-  if (existing) return
+  if (existing) return 'skipped'
 
   // Récupération client + animal + établissement
   const { data: client } = await admin
@@ -190,7 +197,7 @@ async function processOne(
       scheduled_for: nowIso,
     })
   if (insErr) {
-    if (insErr.code === '23505') return // race condition uniq → ignore
+    if (insErr.code === '23505') return 'skipped' // race condition uniq → ignore
     throw new Error(insErr.message)
   }
 
@@ -208,6 +215,7 @@ async function processOne(
       .from('satisfaction_surveys')
       .update({ sent_at: nowIso, send_error: null })
       .eq('token', token)
+    return 'sent'
   } catch (mailErr) {
     await admin
       .from('satisfaction_surveys')
@@ -222,14 +230,14 @@ async function processOneDonation(
   admin: ReturnType<typeof createAdminClient>,
   row: { id: string; establishment_id: string; donor_name: string; donor_email: string | null; created_at: string },
   nowIso: string
-) {
+): Promise<'sent' | 'skipped'> {
   const { data: existing } = await admin
     .from('satisfaction_surveys')
     .select('id')
     .eq('kind', 'donation')
     .eq('related_id', row.id)
     .maybeSingle()
-  if (existing) return
+  if (existing) return 'skipped'
   if (!row.donor_email) throw new Error('don sans email')
 
   const { data: estab } = await admin
@@ -252,7 +260,7 @@ async function processOneDonation(
       scheduled_for: nowIso,
     })
   if (insErr) {
-    if (insErr.code === '23505') return
+    if (insErr.code === '23505') return 'skipped'
     throw new Error(insErr.message)
   }
 
@@ -268,6 +276,7 @@ async function processOneDonation(
       .from('satisfaction_surveys')
       .update({ sent_at: nowIso, send_error: null })
       .eq('token', token)
+    return 'sent'
   } catch (mailErr) {
     await admin
       .from('satisfaction_surveys')
