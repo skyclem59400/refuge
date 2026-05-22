@@ -70,12 +70,23 @@ export async function sendSatisfactionSurveyEmail(params: SatisfactionEmailParam
 <body style="margin:0;padding:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f8fafc;color:#1e293b;">
   <div style="max-width:600px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(15,23,42,.08);">
     <div style="background:#1e3a5f;padding:24px;">
-      <h1 style="margin:0;color:white;font-size:22px;font-weight:700;letter-spacing:.5px;">
-        ${params.establishmentName}
-      </h1>
-      <p style="margin:6px 0 0 0;color:#a5b4cb;font-size:12px;text-transform:uppercase;letter-spacing:1.5px;">
-        ${SUBJECT_BY_KIND[params.kind]}
-      </p>
+      <table cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+        <tr>
+          <td style="vertical-align:middle;padding-right:14px;width:56px;">
+            <img src="${baseUrl}/logo-sda.png" alt="SDA"
+                 width="56" height="56"
+                 style="display:block;width:56px;height:56px;border-radius:12px;object-fit:cover;background:white;" />
+          </td>
+          <td style="vertical-align:middle;">
+            <h1 style="margin:0;color:white;font-size:22px;font-weight:700;letter-spacing:.5px;line-height:1.2;">
+              ${params.establishmentName}
+            </h1>
+            <p style="margin:6px 0 0 0;color:#a5b4cb;font-size:12px;text-transform:uppercase;letter-spacing:1.5px;">
+              ${SUBJECT_BY_KIND[params.kind]}
+            </p>
+          </td>
+        </tr>
+      </table>
     </div>
 
     <div style="padding:30px 28px;font-size:15px;line-height:1.65;">
