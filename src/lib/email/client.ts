@@ -7,6 +7,9 @@ import nodemailer, { type Transporter } from 'nodemailer'
  * - BREVO_SMTP_USER     — login technique SMTP (ex: a97868001@smtp-brevo.com)
  * - BREVO_SMTP_KEY      — clé SMTP générée dans Brevo
  * - BREVO_FROM_ADDRESS  — adresse d'expédition par défaut (doit être domaine vérifié Brevo)
+ * - BREVO_REPLY_TO      — adresse Reply-To globale par défaut (les réponses
+ *                          arrivent là, distincte du from quand on utilise un
+ *                          no-reply ou un contact générique). Optionnel.
  *
  * Cas d'usage actuels :
  *   - mail INITIAL d'invitation à signer un contrat d'adoption / FA (pour
@@ -14,6 +17,7 @@ import nodemailer, { type Transporter } from 'nodemailer'
  *     des relances et notifications via les mêmes credentials)
  *   - compte-rendu d'intervention astreinte (PDF en pièce jointe + copie
  *     à fourriere@sda-nord.com)
+ *   - enquêtes de satisfaction NPS (adoption / don / foster)
  *
  * Pour ajouter un nouveau type d'email, mettre à jour cette liste et le
  * `fromName` par défaut si le branding doit changer.
@@ -68,8 +72,10 @@ export interface SendEmailParams {
 }
 
 export async function sendEmail(params: SendEmailParams): Promise<{ messageId: string }> {
-  const fromAddress = params.from || process.env.BREVO_FROM_ADDRESS || 'signature@sda-nord.com'
+  const fromAddress = params.from || process.env.BREVO_FROM_ADDRESS || 'contact@sda-nord.com'
   const fromName = params.fromName || 'Refuge SDA'
+  // Reply-To en cascade : param explicite > env var globale > rien
+  const replyTo = params.replyTo || process.env.BREVO_REPLY_TO || undefined
 
   const result = await getTransporter().sendMail({
     from: `"${fromName}" <${fromAddress}>`,
@@ -78,7 +84,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{ messageId: s
     subject: params.subject,
     html: params.html,
     text: params.text || stripHtml(params.html),
-    replyTo: params.replyTo,
+    replyTo,
     attachments: params.attachments?.map((a) => ({
       filename: a.filename,
       content: a.content,
