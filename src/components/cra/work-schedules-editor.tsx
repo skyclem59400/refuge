@@ -5,7 +5,7 @@ import { Clock, X, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DayOfWeek, MemberWorkSchedule } from '@/lib/types/database'
 import { DAY_OF_WEEK_LABELS_SHORT } from '@/lib/types/database'
-import { upsertWorkScheduleDay, applyStandardSchedule } from '@/lib/actions/work-schedules'
+import { upsertWorkScheduleDay, applyStandardSchedule, upsertHolidaySchedule } from '@/lib/actions/work-schedules'
 import type { MemberWithSchedule } from '@/lib/actions/work-schedules'
 
 interface Props {
@@ -54,6 +54,7 @@ export function WorkSchedulesEditor({ members }: Props) {
               {DAYS_ORDER.map((d) => (
                 <th key={d} className="px-3 py-3 font-semibold">{DAY_OF_WEEK_LABELS_SHORT[d]}</th>
               ))}
+              <th className="px-3 py-3 font-semibold text-orange-300">Férié</th>
               <th className="px-4 py-3 font-semibold text-right">h/sem</th>
               <th className="px-4 py-3"></th>
             </tr>
@@ -73,6 +74,16 @@ export function WorkSchedulesEditor({ members }: Props) {
                     </td>
                   )
                 })}
+                <td className="px-3 py-3 text-center text-xs">
+                  {(() => {
+                    const m = row.member
+                    const works = !!(m.holiday_start_am || m.holiday_end_am || m.holiday_start_pm || m.holiday_end_pm)
+                    if (!works) return <span className="text-muted italic">—</span>
+                    const am = m.holiday_start_am && m.holiday_end_am ? `${m.holiday_start_am.slice(0, 5)}-${m.holiday_end_am.slice(0, 5)}` : ''
+                    const pm = m.holiday_start_pm && m.holiday_end_pm ? `${m.holiday_start_pm.slice(0, 5)}-${m.holiday_end_pm.slice(0, 5)}` : ''
+                    return <span className="text-orange-300 font-medium">{[am, pm].filter(Boolean).join(' / ')}</span>
+                  })()}
+                </td>
                 <td className="px-4 py-3 text-right font-semibold text-primary">{row.weekly_hours}h</td>
                 <td className="px-4 py-3 text-right">
                   <button
@@ -102,7 +113,7 @@ export function WorkSchedulesEditor({ members }: Props) {
           member={editing}
           isPending={isPending}
           onClose={() => setEditing(null)}
-          onSave={(updates) => {
+          onSave={(updates, holiday) => {
             startTransition(async () => {
               for (const u of updates) {
                 const r = await upsertWorkScheduleDay(editing.member.id, u.day_of_week, u.payload)
@@ -110,6 +121,17 @@ export function WorkSchedulesEditor({ members }: Props) {
                   toast.error(`Erreur jour ${u.day_of_week} : ${r.error}`)
                   return
                 }
+              }
+              // Enregistrer aussi l'horaire jour férié
+              const hr = await upsertHolidaySchedule(editing.member.id, {
+                start_am: holiday.works ? holiday.start_am : null,
+                end_am: holiday.works ? holiday.end_am : null,
+                start_pm: holiday.works ? holiday.start_pm : null,
+                end_pm: holiday.works ? holiday.end_pm : null,
+              })
+              if (hr.error) {
+                toast.error(`Erreur jours fériés : ${hr.error}`)
+                return
               }
               toast.success('Horaires enregistrés')
               setEditing(null)
@@ -154,11 +176,33 @@ function defaultDayPayload(schedule: MemberWorkSchedule[], dow: DayOfWeek): DayP
   }
 }
 
+interface HolidayPayload {
+  works: boolean
+  start_am: string | null
+  end_am: string | null
+  start_pm: string | null
+  end_pm: string | null
+}
+
+function defaultHolidayPayload(member: MemberWithSchedule['member']): HolidayPayload {
+  const works = !!(
+    member.holiday_start_am || member.holiday_end_am ||
+    member.holiday_start_pm || member.holiday_end_pm
+  )
+  return {
+    works,
+    start_am: member.holiday_start_am?.slice(0, 5) || (works ? '08:00' : null),
+    end_am: member.holiday_end_am?.slice(0, 5) || (works ? '12:00' : null),
+    start_pm: member.holiday_start_pm?.slice(0, 5) || (works ? '14:00' : null),
+    end_pm: member.holiday_end_pm?.slice(0, 5) || (works ? '17:00' : null),
+  }
+}
+
 function ScheduleEditModal(props: {
   member: MemberWithSchedule
   isPending: boolean
   onClose: () => void
-  onSave: (updates: { day_of_week: DayOfWeek; payload: DayPayload }[]) => void
+  onSave: (updates: { day_of_week: DayOfWeek; payload: DayPayload }[], holiday: HolidayPayload) => void
   onApplyStandard: (restDays: DayOfWeek[]) => void
 }) {
   const { member, isPending, onClose, onSave, onApplyStandard } = props
@@ -167,6 +211,7 @@ function ScheduleEditModal(props: {
     for (const d of [0, 1, 2, 3, 4, 5, 6] as DayOfWeek[]) init[d] = defaultDayPayload(member.schedule, d)
     return init
   })
+  const [holiday, setHoliday] = useState<HolidayPayload>(() => defaultHolidayPayload(member.member))
 
   function updateDay(d: DayOfWeek, partial: Partial<DayPayload>) {
     setState((prev) => ({ ...prev, [d]: { ...prev[d], ...partial } }))
@@ -191,6 +236,17 @@ function ScheduleEditModal(props: {
     onApplyStandard(restDays)
   }
 
+  function holidayHours(): number {
+    if (!holiday.works) return 0
+    const h = (s: string | null, e: string | null) => {
+      if (!s || !e) return 0
+      const [sh, sm] = s.split(':').map(Number)
+      const [eh, em] = e.split(':').map(Number)
+      return (eh * 60 + em - (sh * 60 + sm)) / 60
+    }
+    return h(holiday.start_am, holiday.end_am) + h(holiday.start_pm, holiday.end_pm)
+  }
+
   function save() {
     // Validation max 17h
     for (const d of DAYS_ORDER) {
@@ -202,8 +258,16 @@ function ScheduleEditModal(props: {
         }
       }
     }
+    if (holiday.works) {
+      for (const t of [holiday.end_am, holiday.end_pm]) {
+        if (t && t > '17:00') {
+          toast.error('Horaire jour férié : aucun horaire ne peut dépasser 17h00.')
+          return
+        }
+      }
+    }
     const updates = DAYS_ORDER.map((d) => ({ day_of_week: d, payload: state[d] }))
-    onSave(updates)
+    onSave(updates, holiday)
   }
 
   return (
@@ -253,6 +317,34 @@ function ScheduleEditModal(props: {
               </div>
             )
           })}
+
+          {/* Bloc jour férié */}
+          <div className={`p-4 rounded-xl border ${holiday.works ? 'border-orange-500/40 bg-orange-500/5' : 'border-border bg-surface-dark/40'}`}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <span className="font-semibold text-text w-24">🎉 Férié</span>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={holiday.works}
+                    onChange={(e) => setHoliday((h) => ({ ...h, works: e.target.checked }))}
+                  />
+                  <span className="text-sm text-muted">Travaille les jours fériés (nourrissage animaux)</span>
+                </label>
+              </div>
+              {holiday.works && <span className="text-sm font-semibold text-orange-300">{Math.round(holidayHours() * 100) / 100}h</span>}
+            </div>
+            {holiday.works ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <TimeInput label="Début matin" value={holiday.start_am} onChange={(v) => setHoliday((h) => ({ ...h, start_am: v }))} />
+                <TimeInput label="Fin matin" value={holiday.end_am} onChange={(v) => setHoliday((h) => ({ ...h, end_am: v }))} />
+                <TimeInput label="Début aprem" value={holiday.start_pm} onChange={(v) => setHoliday((h) => ({ ...h, start_pm: v }))} />
+                <TimeInput label="Fin aprem" value={holiday.end_pm} onChange={(v) => setHoliday((h) => ({ ...h, end_pm: v }))} />
+              </div>
+            ) : (
+              <p className="text-xs text-muted italic">Par défaut : aucun horaire les jours fériés (= jour de repos).</p>
+            )}
+          </div>
         </div>
 
         <div className="sticky bottom-0 bg-surface border-t border-border px-6 py-4 flex flex-wrap items-center justify-between gap-3">

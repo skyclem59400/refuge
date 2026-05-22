@@ -200,6 +200,11 @@ export interface EstablishmentMember {
   extended_leave_from: string | null
   extended_leave_until: string | null
   extended_leave_reason: string | null
+  // CRA — horaires jours fériés (NULL = ne travaille pas les fériés, défaut)
+  holiday_start_am: string | null
+  holiday_end_am: string | null
+  holiday_start_pm: string | null
+  holiday_end_pm: string | null
   created_at: string
   updated_at: string
   // Enriched from auth.users via RPC

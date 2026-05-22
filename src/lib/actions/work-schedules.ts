@@ -215,6 +215,47 @@ export async function upsertWorkScheduleDay(
 }
 
 /**
+ * Définit (ou supprime) l'horaire jours fériés d'un membre.
+ * Si tous les champs sont null/'', le membre ne travaille pas les fériés (défaut).
+ * Sinon, ces horaires s'appliquent à TOUS les jours fériés sauf override jour-par-jour.
+ */
+export async function upsertHolidaySchedule(
+  memberId: string,
+  payload: {
+    start_am: string | null
+    end_am: string | null
+    start_pm: string | null
+    end_pm: string | null
+  }
+): Promise<{ data?: true; error?: string }> {
+  try {
+    await requirePermission('manage_leaves')
+    const admin = createAdminClient()
+
+    // Validation max 17h
+    for (const t of [payload.end_am, payload.end_pm]) {
+      if (t && t > '17:00') {
+        return { error: 'Aucun horaire ne peut dépasser 17h00 (règle SDA).' }
+      }
+    }
+
+    const { error } = await admin
+      .from('establishment_members')
+      .update({
+        holiday_start_am: payload.start_am || null,
+        holiday_end_am: payload.end_am || null,
+        holiday_start_pm: payload.start_pm || null,
+        holiday_end_pm: payload.end_pm || null,
+      })
+      .eq('id', memberId)
+    if (error) return { error: error.message }
+    return { data: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+/**
  * Applique l'horaire standard refuge (8-12 / 14-17) sur tous les jours sauf ceux
  * marqués repos. Utilitaire pour initialiser ou réinitialiser un collaborateur.
  */

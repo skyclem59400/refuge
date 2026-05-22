@@ -168,6 +168,52 @@ export async function getMonthlySaisie(
 
       // 3a. Férié
       if (holidayName) {
+        // 3a.bis : Override jour précis prioritaire (cra_entries)
+        const overrideOnHoliday = entryByDate.get(date)
+        if (overrideOnHoliday) {
+          const h = overrideOnHoliday.hours_total ?? 0
+          days.push({
+            date,
+            weekday,
+            source: 'override',
+            is_rest_day: overrideOnHoliday.is_rest_day,
+            start_am: overrideOnHoliday.start_am,
+            end_am: overrideOnHoliday.end_am,
+            start_pm: overrideOnHoliday.start_pm,
+            end_pm: overrideOnHoliday.end_pm,
+            hours_total: Number(h),
+            notes: overrideOnHoliday.notes,
+            holiday_name: holidayName,
+          })
+          if (overrideOnHoliday.is_rest_day) totalRest += 1
+          else totalWorked += Number(h)
+          continue
+        }
+
+        // 3a.ter : Si le membre a un horaire jour férié défini, l'appliquer
+        const hasHolidaySchedule =
+          member.holiday_start_am || member.holiday_end_am ||
+          member.holiday_start_pm || member.holiday_end_pm
+        if (hasHolidaySchedule) {
+          const h = hoursBetween(member.holiday_start_am, member.holiday_end_am)
+            + hoursBetween(member.holiday_start_pm, member.holiday_end_pm)
+          days.push({
+            date,
+            weekday,
+            source: 'holiday',
+            is_rest_day: false,
+            start_am: member.holiday_start_am,
+            end_am: member.holiday_end_am,
+            start_pm: member.holiday_start_pm,
+            end_pm: member.holiday_end_pm,
+            hours_total: h,
+            holiday_name: holidayName,
+          })
+          totalWorked += h
+          continue
+        }
+
+        // Sinon : férié = repos (comportement par défaut)
         days.push({ ...emptyDay(date, weekday, 'holiday'), holiday_name: holidayName })
         continue
       }
