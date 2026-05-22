@@ -208,7 +208,7 @@ export function LeaveRequestForm({ leaveTypes, balances }: LeaveRequestFormProps
           </p>
           {serverDays !== null && (
             <p className="text-[11px] text-primary/80 mt-1">
-              Les jours fériés et vos jours de repos hebdomadaires sont automatiquement exclus.
+              Décompte en jours ouvrables (CCN fleuristes) : dimanches et jours fériés exclus.
             </p>
           )}
         </div>

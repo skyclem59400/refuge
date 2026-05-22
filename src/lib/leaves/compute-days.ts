@@ -1,15 +1,22 @@
 /**
  * Calcul du nombre de jours de congé décomptés du solde.
  *
- * Règle métier (droit du travail français, art. L3141-5) :
- *   - Un jour férié chômé tombant pendant un congé n'est PAS décompté du solde.
- *   - Un jour de repos hebdomadaire (selon la semaine type du salarié) n'est pas
- *     décompté non plus — sinon on consommerait des CP pour un dimanche par exemple.
+ * Helper pur et générique — l'appelant choisit la convention en passant la
+ * liste des jours non-ouvrables (`restWeekdays`). Cas SDA : convention
+ * fleuristes-animalerie (IDCC 1978) → mode "jours ouvrables" = `restWeekdays = [0]`
+ * (seul le dimanche est non-ouvrable, le mercredi est décompté même s'il
+ * s'agit du jour de repos hebdo personnel du salarié).
  *
- * Conséquence : pour une semaine de congé du lundi 4 au samedi 9 mai 2026 (6 jours
- * calendaires), pour un salarié travaillant lun→ven sans jour de repos sup., on
- * décompte 4 jours (lun 4, mar 5, mer 6, jeu 7) car le ven 8 mai est férié (Victoire
- * 1945) et le sam 9 est jour de repos hebdo.
+ * Règle métier (Code du travail, art. L3141-5 et jurisprudence) :
+ *   - Un jour férié chômé tombant pendant un congé n'est PAS décompté du solde.
+ *   - Les jours indiqués dans `restWeekdays` (dim seul en ouvrable, sam+dim
+ *     en ouvré) ne sont pas non plus décomptés.
+ *
+ * Conséquence en mode ouvrable (SDA), semaine du lun 4 au sam 9 mai 2026 :
+ *   - Jours ouvrables : lun 4, mar 5, mer 6, jeu 7, sam 9 = 5 jours
+ *   - Ven 8 (férié Victoire 1945) : non décompté
+ *   - Dim 10 : non concerné (hors plage)
+ *   Total : 5 jours décomptés (peu importe que mer soit le repos du salarié).
  *
  * Les demi-journées (`halfDayStart` / `halfDayEnd`) déduisent 0.5 chacune, à
  * condition que le jour concerné soit effectivement comptabilisé (pas férié et
@@ -22,9 +29,11 @@ export interface ComputeLeaveDaysParams {
   /** Date fin, format 'YYYY-MM-DD' inclus */
   endDate: string
   /**
-   * Jours de la semaine considérés en repos hebdo pour ce membre.
+   * Jours de la semaine NON-ouvrables / non-décomptés du solde.
    * Format : 0=dimanche, 1=lundi, ..., 6=samedi (cohérent avec `Date.getDay()`).
-   * Fallback raisonnable si non fourni : `[0, 6]` (week-end standard).
+   *   - Mode "jours ouvrables" (CCN fleuristes, défaut SDA) : `[0]` (dim seul)
+   *   - Mode "jours ouvrés" (5j/sem) : `[0, 6]` (sam + dim)
+   *   - Cas temps partiel atypique : passer les jours non travaillés du salarié
    */
   restWeekdays: number[]
   /**

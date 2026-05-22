@@ -7,7 +7,7 @@ import { logActivity } from '@/lib/actions/activity-log'
 import { createNotification, notifyAdminsWithPermission } from '@/lib/actions/notifications'
 import { getCoverageImpactForRequest } from '@/lib/actions/leave-coverage'
 import { computeLeaveDays } from '@/lib/leaves/compute-days'
-import type { LeaveGranularity, LeaveRequestStatus, MemberWorkSchedule } from '@/lib/types/database'
+import type { LeaveGranularity, LeaveRequestStatus } from '@/lib/types/database'
 
 // ===========================================================================
 // HELPERS
@@ -32,10 +32,17 @@ function revalidateLeavePaths() {
 }
 
 /**
- * Charge la semaine type (jours de repos) + jours fériés et calcule
- * le nombre de jours de CP réellement décomptés du solde.
+ * Calcule le nombre de jours de CP décomptés du solde — mode "jours ouvrables"
+ * de la CCN fleuristes-animalerie (IDCC 1978, art. 5 : 2,5 j ouvrables/mois,
+ * soit 30 j/an).
  *
- * Fallback si aucune semaine type définie : week-end standard (sam + dim).
+ * Règle : un jour ouvrable = du lundi au samedi inclus, hors dimanches et
+ * jours fériés. La semaine type individuelle du salarié n'intervient PAS :
+ * le mercredi est décompté même s'il s'agit du jour de repos hebdo du salarié
+ * (cf. règle conventionnelle). Seul un accord plus favorable pourrait y déroger.
+ *
+ * Note : si la SDA passait un jour à une convention "jours ouvrés" (25 j/an),
+ * il suffirait de passer `restWeekdays = [0, 6]` (sam + dim) au helper.
  */
 async function computeLeaveDaysFromDB(params: {
   memberId: string
@@ -46,30 +53,18 @@ async function computeLeaveDaysFromDB(params: {
 }): Promise<number> {
   const admin = createAdminClient()
 
-  const [schedRes, holidaysRes] = await Promise.all([
-    admin
-      .from('member_work_schedules')
-      .select('day_of_week, is_rest_day')
-      .eq('member_id', params.memberId)
-      .is('valid_until', null),
-    admin
-      .from('public_holidays')
-      .select('date')
-      .gte('date', params.startDate)
-      .lte('date', params.endDate),
-  ])
+  const { data: holidaysData } = await admin
+    .from('public_holidays')
+    .select('date')
+    .gte('date', params.startDate)
+    .lte('date', params.endDate)
 
-  const schedule = (schedRes.data || []) as Pick<MemberWorkSchedule, 'day_of_week' | 'is_rest_day'>[]
-  const restWeekdays = schedule.length > 0
-    ? schedule.filter((s) => s.is_rest_day).map((s) => s.day_of_week)
-    : [0, 6] // fallback : samedi + dimanche
-
-  const holidays = ((holidaysRes.data || []) as Array<{ date: string }>).map((h) => h.date)
+  const holidays = ((holidaysData || []) as Array<{ date: string }>).map((h) => h.date)
 
   return computeLeaveDays({
     startDate: params.startDate,
     endDate: params.endDate,
-    restWeekdays,
+    restWeekdays: [0], // CCN fleuristes-animalerie : seul le dimanche est non-ouvrable
     holidays,
     halfDayStart: params.halfDayStart,
     halfDayEnd: params.halfDayEnd,

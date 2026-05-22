@@ -241,36 +241,24 @@ export async function getMonthlySaisie(
         continue
       }
 
-      // 3c. Congé (full_day uniquement pour le moment ; les hourly seront ajoutés à l'override)
+      // 3c. Congé (full_day uniquement ; les hourly sont gérés via override)
+      // Convention fleuristes-animalerie : décompte en jours ouvrables.
+      // Tout jour ouvrable (lun-sam, hors férié) d'une période de congé est
+      // marqué "CP" — y compris le jour de repos hebdo du membre — pour
+      // refléter le décompte réel du solde. Pour ne pas gonfler artificiellement
+      // les heures de congé, on compte 0h si c'est normalement un jour de repos.
       const dayLeaves = leaves.filter(
         (l) => l.start_date <= date && l.end_date >= date && l.granularity !== 'hourly'
       )
       if (dayLeaves.length > 0) {
-        // Si ce jour est un jour de repos hebdo (selon la semaine type), il NE doit
-        // PAS être marqué "Congé payé" : un repos n'est jamais consommé en CP.
-        // Cohérent avec computeLeaveDays qui exclut ces jours du décompte du solde.
         const tplForDow = scheduleByDow.get(weekday)
-        if (tplForDow?.is_rest_day) {
-          days.push({
-            date,
-            weekday,
-            source: 'template',
-            is_rest_day: true,
-            start_am: null,
-            end_am: null,
-            start_pm: null,
-            end_pm: null,
-            hours_total: 0,
-          })
-          totalRest += 1
-          continue
-        }
-
-        // Heures du congé = heures réelles du template ce jour-là (fallback 7h)
-        const hoursForDay = tplForDow
-          ? hoursBetween(tplForDow.start_am, tplForDow.end_am)
-            + hoursBetween(tplForDow.start_pm, tplForDow.end_pm)
-          : 7
+        const isRestDay = tplForDow?.is_rest_day ?? false
+        const hoursForDay = isRestDay
+          ? 0
+          : tplForDow
+            ? hoursBetween(tplForDow.start_am, tplForDow.end_am)
+              + hoursBetween(tplForDow.start_pm, tplForDow.end_pm)
+            : 7
 
         const top = dayLeaves[0]
         const t = typeMap.get(top.leave_type_id)

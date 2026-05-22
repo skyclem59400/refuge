@@ -323,7 +323,7 @@ export function AdminLeaveCreator({ members, leaveTypes }: Props) {
               : `${computedDays} jour${computedDays > 1 ? 's' : ''} décompté${computedDays > 1 ? 's' : ''}`}
           {granularity !== 'hourly' && serverDays !== null && (
             <div className="text-[10px] text-muted/70 italic mt-0.5">
-              fériés + repos hebdo exclus
+              jours ouvrables (dim + fériés exclus)
             </div>
           )}
         </div>

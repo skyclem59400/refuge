@@ -167,7 +167,7 @@ export function LeaveRequestReview({
                       }
                     }}
                     className="px-2 py-0.5 rounded text-[10px] font-semibold border border-primary/30 text-primary hover:bg-primary/10 transition-colors"
-                    title="Recalcule les jours en excluant fériés + repos hebdo"
+                    title="Recalcule en jours ouvrables (CCN fleuristes : lun-sam, dim et fériés exclus)"
                   >
                     Recalculer
                   </button>
