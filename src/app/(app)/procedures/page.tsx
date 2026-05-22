@@ -7,11 +7,20 @@ import { getSexIcon, calculateAge } from '@/lib/sda-utils'
 import { AnimalStatusBadge, SpeciesBadge } from '@/components/animals/animal-status-badge'
 import { formatDate } from '@/lib/utils'
 import { getSpeciesEmoji } from '@/lib/species'
-import type { Animal, AnimalPhoto } from '@/lib/types/database'
+import type { Animal, AnimalOrigin, AnimalPhoto } from '@/lib/types/database'
 
 type AnimalWithPhotos = Animal & { animal_photos: AnimalPhoto[] }
 
-export default async function RequisitionsPage() {
+const ORIGIN_LABELS: Record<AnimalOrigin, string> = {
+  found: 'Trouvé / errant',
+  abandoned: 'Abandonné',
+  surrender: 'Abandon volontaire',
+  requisition: 'Réquisition',
+  transferred_in: 'Transfert',
+  divagation: 'Divagation',
+}
+
+export default async function ProceduresPage() {
   const ctx = await getEstablishmentContext()
   if (!ctx) throw new Error('Establishment context required')
   const estabId = ctx.establishment.id
@@ -21,10 +30,11 @@ export default async function RequisitionsPage() {
     .from('animals')
     .select('*, animal_photos(*)')
     .eq('establishment_id', estabId)
-    .eq('origin_type', 'requisition')
+    .eq('judicial_procedure', true)
     .order('created_at', { ascending: false })
 
   const animals: AnimalWithPhotos[] = (rawAnimals as AnimalWithPhotos[]) || []
+  const nbRequisitions = animals.filter((a) => a.origin_type === 'requisition').length
 
   function getEntryDate(a: Animal): string {
     return a.pound_entry_date || a.shelter_entry_date || a.created_at
@@ -35,9 +45,17 @@ export default async function RequisitionsPage() {
       <div className="flex items-center gap-3 mb-6">
         <Scale className="w-6 h-6 text-primary" />
         <div>
-          <h1 className="text-xl font-bold">Requisition</h1>
+          <h1 className="text-xl font-bold">Procédure judiciaire</h1>
           <p className="text-sm text-muted">
-            {animals.length} {animals.length <= 1 ? 'animal' : 'animaux'} issus de requisitions judiciaires
+            {animals.length} {animals.length <= 1 ? 'animal' : 'animaux'} en procédure judiciaire en cours
+            {nbRequisitions > 0 && (
+              <>
+                {' '}
+                <span className="text-muted/70">
+                  (dont {nbRequisitions} {nbRequisitions <= 1 ? 'arrivé' : 'arrivés'} par réquisition)
+                </span>
+              </>
+            )}
           </p>
         </div>
       </div>
@@ -45,7 +63,7 @@ export default async function RequisitionsPage() {
       {animals.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-8 text-center">
           <Scale className="w-10 h-10 text-muted mx-auto mb-3" />
-          <p className="text-muted text-sm">Aucun animal sous requisition</p>
+          <p className="text-muted text-sm">Aucun animal en procédure judiciaire</p>
         </div>
       ) : (
         <div className="bg-surface rounded-xl border border-border overflow-hidden">
@@ -55,14 +73,16 @@ export default async function RequisitionsPage() {
                 <tr className="border-b border-border text-left">
                   <th className="px-4 py-3 font-semibold text-muted">Animal</th>
                   <th className="px-4 py-3 font-semibold text-muted">Statut</th>
+                  <th className="px-4 py-3 font-semibold text-muted">Origine</th>
                   <th className="px-4 py-3 font-semibold text-muted">Identification</th>
                   <th className="px-4 py-3 font-semibold text-muted">Lieu de capture</th>
-                  <th className="px-4 py-3 font-semibold text-muted">Date d&apos;entree</th>
+                  <th className="px-4 py-3 font-semibold text-muted">Date d&apos;entrée</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {animals.map((a) => {
                   const photoUrl = a.animal_photos?.find((p) => p.is_primary)?.url || a.animal_photos?.[0]?.url || a.photo_url || null
+                  const isRequisition = a.origin_type === 'requisition'
 
                   return (
                     <tr key={a.id} className="hover:bg-surface-hover transition-colors">
@@ -108,10 +128,22 @@ export default async function RequisitionsPage() {
                       </td>
 
                       <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            isRequisition
+                              ? 'bg-primary/15 text-primary'
+                              : 'bg-border/50 text-muted'
+                          }`}
+                        >
+                          {ORIGIN_LABELS[a.origin_type] || a.origin_type}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3">
                         {a.chip_number ? (
                           <span className="font-mono text-xs">{a.chip_number}</span>
                         ) : (
-                          <span className="text-warning text-xs font-medium">Non identifie</span>
+                          <span className="text-warning text-xs font-medium">Non identifié</span>
                         )}
                       </td>
 

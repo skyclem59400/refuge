@@ -60,7 +60,7 @@ const shelterSections: NavSection[] = [
     items: [
       { href: '/animals', label: 'Animaux', Icon: PawPrint, permission: 'canViewAnimals' },
       { href: '/pound', label: 'Fourrière', Icon: Warehouse, permission: 'canViewPound' },
-      { href: '/requisitions', label: 'Réquisition', Icon: Scale, permission: 'canViewAnimals' },
+      { href: '/procedures', label: 'Procédure judiciaire', Icon: Scale, permission: 'canViewAnimals' },
       { href: '/boxes', label: 'Box', Icon: Package, permission: 'canManageBoxes' },
       { href: '/sorties', label: 'Sorties', Icon: Footprints, permission: 'canManageOutings' },
       { href: '/adoptions', label: 'Adoptions', Icon: Heart, permission: 'canManageAdoptions' },
