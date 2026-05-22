@@ -1402,6 +1402,47 @@ export interface MemberDocument {
   created_at: string
 }
 
+/** Type d'évènement déclencheur d'enquête de satisfaction */
+export type SatisfactionSurveyKind = 'adoption' | 'donation' | 'foster'
+
+export const SATISFACTION_KIND_LABELS: Record<SatisfactionSurveyKind, string> = {
+  adoption: 'Adoption',
+  donation: 'Don',
+  foster: 'Famille d\'accueil',
+}
+
+/** Enquête NPS envoyée après un évènement (adoption / don / foster) */
+export interface SatisfactionSurvey {
+  id: string
+  establishment_id: string
+  kind: SatisfactionSurveyKind
+  related_id: string
+  recipient_name: string | null
+  recipient_email: string
+  token: string
+  scheduled_for: string
+  sent_at: string | null
+  send_error: string | null
+  completed_at: string | null
+  nps_score: number | null
+  verbatim: string | null
+  resolved_at: string | null
+  resolved_by: string | null
+  resolution_notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Classification NPS standard : promoteur 9-10, passif 7-8, détracteur 0-6 */
+export type NpsBucket = 'promoter' | 'passive' | 'detractor'
+
+export function npsBucketOf(score: number | null): NpsBucket | null {
+  if (score === null || score === undefined) return null
+  if (score >= 9) return 'promoter'
+  if (score >= 7) return 'passive'
+  return 'detractor'
+}
+
 // ============================================
 // Planning vétérinaire (visites quotidiennes — style Google Sheet)
 // ============================================

@@ -33,7 +33,9 @@ export async function updateSession(request: NextRequest) {
     path.startsWith('/auth/callback') ||
     path.startsWith('/api/auth/pseudo') ||
     path.startsWith('/api/public/') ||
-    path.startsWith('/api/webhooks/')
+    path.startsWith('/api/webhooks/') ||
+    path.startsWith('/api/cron/') ||
+    path.startsWith('/satisfaction/')
 
   // Chemins accessibles a un user connecte mais SANS profil complet
   const isOnboardingPath =
