@@ -35,6 +35,7 @@ export async function updateSession(request: NextRequest) {
     path.startsWith('/api/public/') ||
     path.startsWith('/api/webhooks/') ||
     path.startsWith('/api/cron/') ||
+    path.startsWith('/api/test/') ||
     path.startsWith('/satisfaction/')
 
   // Chemins accessibles a un user connecte mais SANS profil complet
