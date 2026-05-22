@@ -81,11 +81,37 @@ export function CraMemberView({ view }: { view: CraMonthlyView }) {
       <WorkflowSteps status={view.status} />
 
       {/* Totaux */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <StatCard label="Heures travaillées" value={`${view.total_worked_hours}h`} accent="primary" />
         <StatCard label="Heures de congé" value={`${view.total_leave_hours}h`} accent="orange" />
         <StatCard label="Jours de repos" value={String(view.total_rest_days)} accent="muted" />
+        <StatCard label="Astreintes" value={`${view.astreinte_weeks.length} sem.`} accent="purple" />
       </div>
+
+      {/* Détail astreintes */}
+      {view.astreinte_weeks.length > 0 && (
+        <div className="mb-6 p-4 rounded-xl border border-purple-500/20 bg-purple-500/5">
+          <p className="text-xs uppercase tracking-wider text-purple-200 font-semibold mb-2">
+            Vos semaines d&apos;astreinte ce mois
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {view.astreinte_weeks.map((w) => {
+              const d = new Date(w + 'T00:00:00Z')
+              return (
+                <span
+                  key={w}
+                  className="px-3 py-1 rounded-full bg-purple-500/15 text-purple-100 text-xs font-semibold border border-purple-500/30"
+                >
+                  Sem. du {String(d.getUTCDate()).padStart(2, '0')}/{String(d.getUTCMonth() + 1).padStart(2, '0')}
+                </span>
+              )
+            })}
+          </div>
+          <p className="text-[11px] text-muted mt-2 italic">
+            Forfait hebdomadaire (lundi → lundi) — le montant est calculé par le comptable.
+          </p>
+        </div>
+      )}
 
       {/* Grille */}
       <MonthGridReadonly view={view} />
@@ -209,10 +235,11 @@ export function CraMemberView({ view }: { view: CraMonthlyView }) {
   )
 }
 
-function StatCard({ label, value, accent }: { label: string; value: string; accent: 'primary' | 'orange' | 'muted' }) {
+function StatCard({ label, value, accent }: { label: string; value: string; accent: 'primary' | 'orange' | 'muted' | 'purple' }) {
   const cls =
     accent === 'primary' ? 'border-primary/30 bg-primary/5' :
     accent === 'orange'  ? 'border-orange-500/30 bg-orange-500/5' :
+    accent === 'purple'  ? 'border-purple-500/30 bg-purple-500/5' :
     'border-border bg-surface-dark/40'
   return (
     <div className={`p-4 rounded-xl border ${cls}`}>

@@ -9,18 +9,19 @@ import { useTheme } from '@/components/theme-provider'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { EstablishmentSwitcher } from '@/components/establishment/establishment-switcher'
 import { getNavSections } from './nav-config'
-import type { Establishment, EstablishmentType, Permissions, RoleType } from '@/lib/types/database'
+import type { ContractType, Establishment, EstablishmentType, Permissions, RoleType } from '@/lib/types/database'
 
 interface HeaderProps {
   userEmail: string
   userAvatarUrl?: string | null
   permissions: Permissions
   roleType: RoleType
+  contractType: ContractType | null
   currentEstablishment: Establishment
   establishments: Establishment[]
 }
 
-export function Header({ userEmail, userAvatarUrl, permissions, roleType, currentEstablishment, establishments }: Readonly<HeaderProps>) {
+export function Header({ userEmail, userAvatarUrl, permissions, roleType, contractType, currentEstablishment, establishments }: Readonly<HeaderProps>) {
   const [showMenu, setShowMenu] = useState(false)
   const [showMobileNav, setShowMobileNav] = useState(false)
   const router = useRouter()
@@ -29,7 +30,7 @@ export function Header({ userEmail, userAvatarUrl, permissions, roleType, curren
   const { theme, toggleTheme } = useTheme()
 
   const establishmentType: EstablishmentType = currentEstablishment.type || 'farm'
-  const sections = getNavSections(establishmentType, permissions, roleType)
+  const sections = getNavSections(establishmentType, permissions, roleType, contractType)
 
   function isActive(href: string) {
     if (href === '/dashboard') return pathname === '/dashboard'

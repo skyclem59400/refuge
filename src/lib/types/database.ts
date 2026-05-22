@@ -1772,6 +1772,25 @@ export interface CraChangeRequest {
   resolution_notes: string | null
 }
 
+/** Astreinte : un membre est de garde sur une semaine entière (lundi → lundi).
+ * Forfait calculé par le comptable. Une seule personne par semaine et établissement. */
+export interface CraAstreinte {
+  id: string
+  member_id: string
+  establishment_id: string
+  week_start_monday: string  // 'YYYY-MM-DD' (toujours un lundi)
+  notes: string | null
+  created_at: string
+  created_by: string | null
+  updated_at: string
+}
+
+/** Astreinte enrichie avec le nom du membre (pour les vues admin/PDF) */
+export interface CraAstreinteWithMember extends CraAstreinte {
+  member_name: string | null
+  member_pseudo: string | null
+}
+
 export const CRA_STATUS_LABELS: Record<CraStatus, string> = {
   draft: 'Brouillon',
   submitted: 'Soumis au collaborateur',
@@ -1842,6 +1861,7 @@ export interface CraMonthlyView {
   total_worked_hours: number
   total_leave_hours: number
   total_rest_days: number
+  astreinte_weeks: string[]  // Liste des lundis de semaines d'astreinte du mois
   status: CraStatus
   status_record_id: string | null
   submitted_at: string | null

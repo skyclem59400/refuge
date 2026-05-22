@@ -5,22 +5,23 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from '@/components/theme-provider'
 import { EstablishmentSwitcher } from '@/components/establishment/establishment-switcher'
 import { getNavSections } from './nav-config'
-import type { Establishment, EstablishmentType, Permissions, RoleType } from '@/lib/types/database'
+import type { ContractType, Establishment, EstablishmentType, Permissions, RoleType } from '@/lib/types/database'
 
 interface SidebarProps {
   establishments: Establishment[]
   currentEstablishment: Establishment
   permissions: Permissions
   roleType: RoleType
+  contractType: ContractType | null
   userEmail?: string
 }
 
-export function Sidebar({ establishments, currentEstablishment, permissions, roleType, userEmail }: Readonly<SidebarProps>) {
+export function Sidebar({ establishments, currentEstablishment, permissions, roleType, contractType, userEmail }: Readonly<SidebarProps>) {
   const pathname = usePathname()
   const { sidebarCollapsed, toggleSidebar } = useTheme()
 
   const establishmentType: EstablishmentType = currentEstablishment.type || 'farm'
-  const sections = getNavSections(establishmentType, permissions, roleType)
+  const sections = getNavSections(establishmentType, permissions, roleType, contractType)
 
   function isActive(href: string) {
     if (href === '/dashboard') return pathname === '/dashboard'

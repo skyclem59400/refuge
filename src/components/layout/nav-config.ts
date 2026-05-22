@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import type { EstablishmentType, Permissions, RoleType } from '@/lib/types/database'
+import type { ContractType, EstablishmentType, Permissions, RoleType } from '@/lib/types/database'
 import {
   LayoutDashboard,
   FileText,
@@ -36,8 +36,11 @@ export interface NavItem {
   label: string
   Icon: ComponentType<{ className?: string }>
   permission?: keyof Permissions
-  /** Si défini, limite l'item à ces types de rôle */
+  /** Si défini, limite l'item à ces types de rôle (admin/salarie/benevole) */
   roles?: RoleType[]
+  /** Si défini, limite l'item à ces types de contrat. Utile pour les auto-entrepreneurs
+   * concernés par le CRA mais qui ne sont pas role_type='salarie'. */
+  contractTypes?: ContractType[]
 }
 
 export interface NavSection {
@@ -90,8 +93,8 @@ const shelterSections: NavSection[] = [
     label: 'Équipe',
     items: [
       { href: '/planning', label: 'Planning', Icon: CalendarDays, permission: 'canManageEstablishment' },
-      { href: '/espace-collaborateur', label: 'Mon espace', Icon: Briefcase, permission: 'canViewOwnLeaves', roles: ['admin', 'salarie'] },
-      { href: '/espace-collaborateur/cra', label: 'Mes CRA', Icon: ClipboardList, permission: 'canViewOwnLeaves', roles: ['admin', 'salarie'] },
+      { href: '/espace-collaborateur', label: 'Mon espace', Icon: Briefcase, permission: 'canViewOwnLeaves', contractTypes: ['salarie', 'auto_entrepreneur'] },
+      { href: '/espace-collaborateur/cra', label: 'Mes CRA', Icon: ClipboardList, permission: 'canViewOwnLeaves', contractTypes: ['salarie', 'auto_entrepreneur'] },
       { href: '/admin/conges', label: 'Congés', Icon: CalendarCheck, permission: 'canManageLeaves' },
       { href: '/admin/cra/saisie', label: 'Saisie CRA', Icon: ClipboardList, permission: 'canManageLeaves' },
       { href: '/admin/cra/horaires', label: 'Horaires de référence', Icon: Clock, permission: 'canManageLeaves' },
@@ -137,10 +140,16 @@ const farmSections: NavSection[] = [
   },
 ]
 
-function filterItems(items: NavItem[], permissions: Permissions, roleType: RoleType): NavItem[] {
+function filterItems(
+  items: NavItem[],
+  permissions: Permissions,
+  roleType: RoleType,
+  contractType: ContractType | null,
+): NavItem[] {
   return items.filter((item) => {
     if (item.permission && !permissions[item.permission]) return false
     if (item.roles && !item.roles.includes(roleType)) return false
+    if (item.contractTypes && (!contractType || !item.contractTypes.includes(contractType))) return false
     return true
   })
 }
@@ -153,9 +162,10 @@ export function getNavSections(
   type: EstablishmentType,
   permissions: Permissions,
   roleType: RoleType,
+  contractType: ContractType | null = null,
 ): NavSection[] {
   const raw = type === 'farm' ? farmSections : shelterSections
   return raw
-    .map((s) => ({ ...s, items: filterItems(s.items, permissions, roleType) }))
+    .map((s) => ({ ...s, items: filterItems(s.items, permissions, roleType, contractType) }))
     .filter((s) => s.items.length > 0)
 }

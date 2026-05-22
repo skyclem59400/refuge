@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Send, CheckCircle2, AlertCircle, Mail, ShieldCheck } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Send, CheckCircle2, AlertCircle, Mail, ShieldCheck, Shield } from 'lucide-react'
 import { toast } from 'sonner'
 import type { CraDay, CraMonthlyView, CraStatus } from '@/lib/types/database'
 import { CRA_STATUS_LABELS } from '@/lib/types/database'
 import { submitCraToMember, resolveChangeRequest, validateCraAsAdmin } from '@/lib/actions/cra-saisie'
 import { CraDayEditModal } from '@/components/cra/cra-day-edit-modal'
 import { sendCraToAccountant } from '@/lib/actions/cra-send'
+import { toggleAstreinteWeek } from '@/lib/actions/cra-astreintes'
 
 const MONTH_FR = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -186,12 +187,22 @@ export function CraSaisieClient({ members, initialMemberId, year, month, view, i
 
       {/* Totaux */}
       {view && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
           <StatCard label="Heures travaillées" value={`${view.total_worked_hours}h`} accent="primary" />
           <StatCard label="Heures de congé" value={`${view.total_leave_hours}h`} accent="orange" />
           <StatCard label="Jours de repos" value={String(view.total_rest_days)} accent="muted" />
+          <StatCard label="Astreintes" value={`${view.astreinte_weeks.length} sem.`} accent="purple" />
           <StatCard label="Statut" value={CRA_STATUS_LABELS[view.status]} accent="default" />
         </div>
+      )}
+
+      {/* Bandeau Astreintes */}
+      {view && (
+        <AstreintesBar
+          view={view}
+          locked={view.status === 'sent' || view.status === 'validated_by_admin'}
+          onChanged={() => router.refresh()}
+        />
       )}
 
       {/* Grille mensuelle */}
@@ -212,16 +223,94 @@ export function CraSaisieClient({ members, initialMemberId, year, month, view, i
   )
 }
 
-function StatCard({ label, value, accent }: { label: string; value: string; accent: 'primary' | 'orange' | 'muted' | 'default' }) {
+function StatCard({ label, value, accent }: { label: string; value: string; accent: 'primary' | 'orange' | 'muted' | 'purple' | 'default' }) {
   const cls =
     accent === 'primary' ? 'border-primary/30 bg-primary/5' :
     accent === 'orange'  ? 'border-orange-500/30 bg-orange-500/5' :
     accent === 'muted'   ? 'border-border bg-surface-dark/40' :
+    accent === 'purple'  ? 'border-purple-500/30 bg-purple-500/5' :
     'border-border bg-surface'
   return (
     <div className={`p-4 rounded-xl border ${cls}`}>
       <p className="text-xs text-muted mb-1">{label}</p>
       <p className="text-xl font-bold text-text">{value}</p>
+    </div>
+  )
+}
+
+/** Bandeau de gestion des semaines d'astreinte du mois affiché.
+ * Une chip par lundi du mois. Cliquer active/désactive l'astreinte pour le membre courant. */
+function AstreintesBar({
+  view,
+  locked,
+  onChanged,
+}: {
+  view: CraMonthlyView
+  locked: boolean
+  onChanged: () => void
+}) {
+  const [pending, startTransition] = useTransition()
+  const [pendingWeek, setPendingWeek] = useState<string | null>(null)
+
+  // Lister les lundis du mois affiché
+  const mondays: string[] = []
+  for (const day of view.days) {
+    if (day.weekday === 1) mondays.push(day.date)
+  }
+  if (mondays.length === 0) return null
+
+  const activeSet = new Set(view.astreinte_weeks)
+
+  function handleToggle(weekStart: string) {
+    if (locked) return
+    setPendingWeek(weekStart)
+    startTransition(async () => {
+      const r = await toggleAstreinteWeek(view.member_id, weekStart)
+      setPendingWeek(null)
+      if (r.error) {
+        toast.error(r.error)
+        return
+      }
+      if (r.data?.created) toast.success('Semaine d\'astreinte ajoutée')
+      else if (r.data?.deleted) toast.success('Semaine d\'astreinte retirée')
+      onChanged()
+    })
+  }
+
+  return (
+    <div className="mb-6 p-4 rounded-xl border border-purple-500/20 bg-purple-500/5">
+      <div className="flex items-center gap-2 mb-3">
+        <Shield className="w-4 h-4 text-purple-300" />
+        <p className="text-sm font-semibold text-text">Astreintes du mois</p>
+        <p className="text-xs text-muted">— forfait hebdo (lundi → lundi) géré par le comptable</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {mondays.map((m) => {
+          const active = activeSet.has(m)
+          const isPendingThis = pending && pendingWeek === m
+          const d = new Date(m + 'T00:00:00Z')
+          const label = `Sem. du ${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+          return (
+            <button
+              key={m}
+              onClick={() => handleToggle(m)}
+              disabled={locked || pending}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors disabled:opacity-50 ${
+                active
+                  ? 'bg-purple-500/20 text-purple-200 border-purple-500/40 hover:bg-purple-500/30'
+                  : 'bg-surface text-muted border-border hover:bg-surface-dark/40'
+              }`}
+            >
+              {isPendingThis ? '…' : `${active ? '✓ ' : '+ '}${label}`}
+            </button>
+          )
+        })}
+      </div>
+      {locked && (
+        <p className="text-[11px] text-muted mt-2 italic">
+          CRA validé/envoyé — les astreintes ne peuvent plus être modifiées.
+        </p>
+      )}
     </div>
   )
 }

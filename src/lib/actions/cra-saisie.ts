@@ -94,7 +94,7 @@ export async function getMonthlySaisie(
     const endISO = ymd(monthEnd)
 
     // 2. Sources de données en parallèle
-    const [scheduleRes, entriesRes, leavesRes, typesRes, holidaysRes, statusRes] = await Promise.all([
+    const [scheduleRes, entriesRes, leavesRes, typesRes, holidaysRes, statusRes, astreintesRes] = await Promise.all([
       admin
         .from('member_work_schedules')
         .select('*')
@@ -129,6 +129,13 @@ export async function getMonthlySaisie(
         .eq('year', year)
         .eq('month', month)
         .maybeSingle(),
+      admin
+        .from('cra_astreintes')
+        .select('week_start_monday')
+        .eq('member_id', memberId)
+        .gte('week_start_monday', startISO)
+        .lte('week_start_monday', endISO)
+        .order('week_start_monday'),
     ])
 
     if (scheduleRes.error) return { error: scheduleRes.error.message }
@@ -154,6 +161,8 @@ export async function getMonthlySaisie(
     for (const e of entries) entryByDate.set(e.date, e)
 
     const status = statusRes.data as CraMonthlyStatus | null
+    const astreinteWeeks = ((astreintesRes.data || []) as Array<{ week_start_monday: string }>)
+      .map((a) => a.week_start_monday)
 
     // 3. Construction jour par jour
     const days: CraDay[] = []
@@ -306,6 +315,7 @@ export async function getMonthlySaisie(
         total_worked_hours: Math.round(totalWorked * 100) / 100,
         total_leave_hours: Math.round(totalLeave * 100) / 100,
         total_rest_days: totalRest,
+        astreinte_weeks: astreinteWeeks,
         status: status?.status || 'draft',
         status_record_id: status?.id || null,
         submitted_at: status?.submitted_at || null,
@@ -483,10 +493,10 @@ export async function submitCraToMember(
       .eq('id', r.id)
     if (error) return { error: error.message }
 
-    // Notification au collaborateur
+    // Notification au collaborateur (in-app + email)
     const { data: memberData } = await admin
       .from('establishment_members')
-      .select('user_id')
+      .select('user_id, pseudo')
       .eq('id', memberId)
       .single()
     if (memberData?.user_id) {
@@ -499,6 +509,32 @@ export async function submitCraToMember(
         link: `/espace-collaborateur/cra/${year}/${month}`,
         metadata: { year, month, member_id: memberId },
       })
+
+      // Email transactionnel fire-and-forget (ne pas bloquer la soumission si échec)
+      void (async () => {
+        try {
+          const { data: usersInfo } = await admin.rpc('get_users_info', {
+            user_ids: [memberData.user_id],
+          })
+          const recipient = Array.isArray(usersInfo) ? usersInfo[0] : null
+          if (!recipient?.email) return
+          const { data: estab } = await admin
+            .from('establishments')
+            .select('name')
+            .eq('id', establishmentId)
+            .single()
+          const { sendCraSubmittedEmail } = await import('@/lib/email/cra-submitted')
+          await sendCraSubmittedEmail({
+            to: recipient.email,
+            toName: recipient.full_name || memberData.pseudo || 'Collaborateur',
+            year,
+            month,
+            establishmentName: estab?.name || 'Refuge SDA',
+          })
+        } catch (err) {
+          console.error('[submitCraToMember] email send failed', err)
+        }
+      })()
     }
 
     return { data: true }

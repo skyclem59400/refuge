@@ -117,10 +117,14 @@ export function buildCraSaisieHtml(view: CraMonthlyView, establishmentName: stri
     .cell.worked { background: #ecfdf5; }
     .cell.override { background: #dbeafe; border-color: #93c5fd; }
 
-    .summary { margin-top: 18px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .summary { margin-top: 18px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .kpi { padding: 10px 12px; background: #f8fafc; border-left: 3px solid #5ba8a0; border-radius: 6px; }
+    .kpi.astreinte { border-left-color: #c96b3c; background: #fff7ed; }
     .kpi-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 700; }
     .kpi-value { font-size: 18px; font-weight: 800; color: #1e3a5f; margin-top: 2px; }
+    .kpi.astreinte .kpi-value { color: #c96b3c; }
+    .astreinte-detail { margin-top: 10px; padding: 10px 12px; background: #fff7ed; border-left: 3px solid #c96b3c; border-radius: 6px; font-size: 10px; color: #92400e; }
+    .astreinte-detail strong { color: #c96b3c; }
 
     .signature { margin-top: 18px; padding: 12px; background: #f8fafc; border-radius: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 10px; }
     .signature .block strong { color: #1e3a5f; }
@@ -178,7 +182,20 @@ export function buildCraSaisieHtml(view: CraMonthlyView, establishmentName: stri
       <div class="kpi-label">Jours de repos</div>
       <div class="kpi-value">${view.total_rest_days}</div>
     </div>
+    <div class="kpi astreinte">
+      <div class="kpi-label">Semaines d'astreinte</div>
+      <div class="kpi-value">${view.astreinte_weeks.length}</div>
+    </div>
   </div>
+
+  ${view.astreinte_weeks.length > 0 ? `
+  <div class="astreinte-detail">
+    <strong>Détail des astreintes (forfait hebdomadaire lundi → lundi) :</strong><br/>
+    ${view.astreinte_weeks.map((w) => {
+      const d = new Date(w + 'T00:00:00Z')
+      return `Semaine du <strong>${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}</strong>`
+    }).join(' &nbsp;•&nbsp; ')}
+  </div>` : ''}
 
   <div class="signature">
     <div class="block">

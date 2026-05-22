@@ -36,6 +36,7 @@ export default async function AppLayout({
         currentEstablishment={ctx.establishment}
         permissions={ctx.permissions}
         roleType={ctx.membership.role_type}
+        contractType={ctx.membership.contract_type}
         userEmail={user.email}
       />
       <MainContent>
@@ -44,6 +45,7 @@ export default async function AppLayout({
           userAvatarUrl={user.user_metadata?.avatar_url}
           permissions={ctx.permissions}
           roleType={ctx.membership.role_type}
+          contractType={ctx.membership.contract_type}
           currentEstablishment={ctx.establishment}
           establishments={establishments}
         />
