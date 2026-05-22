@@ -260,13 +260,17 @@ function MonthGridReadonly({ view }: { view: CraMonthlyView }) {
 
   return (
     <div className="rounded-xl border border-border bg-surface overflow-hidden">
-      <div className="grid grid-cols-7 bg-surface-dark/40 text-xs uppercase text-muted">
-        {['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map((d) => (
-          <div key={d} className="px-2 py-2 text-center font-semibold">{d}</div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7">
-        {cells.map((c, i) => <DayCellRO key={i} day={c} />)}
+      <div className="overflow-x-auto">
+        <div className="min-w-[640px]">
+          <div className="grid grid-cols-7 bg-surface-dark/40 text-xs uppercase text-muted">
+            {['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map((d) => (
+              <div key={d} className="px-2 py-2 text-center font-semibold">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {cells.map((c, i) => <DayCellRO key={i} day={c} />)}
+          </div>
+        </div>
       </div>
     </div>
   )
