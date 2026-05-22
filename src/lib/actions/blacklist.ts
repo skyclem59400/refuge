@@ -352,7 +352,11 @@ export async function addManualBlacklist(input: {
     if (!input.reason || input.reason.trim().length < 10) {
       return { error: 'Le motif d\'inscription est obligatoire (minimum 10 caractères).' }
     }
-    const { establishmentId, userId } = await requirePermission('manage_establishment')
+    // L'inscription en liste noire fait partie de la gestion clients
+    // (Mary, manager des contacts, doit pouvoir agir au quotidien).
+    // Le RETRAIT reste réservé à manage_establishment + groupe Administrateur
+    // (cf. removeFromBlacklist ci-dessous) — c'est l'acte sensible.
+    const { establishmentId, userId } = await requirePermission('manage_clients')
     const admin = createAdminClient()
 
     const source: BlacklistSource = input.source ?? 'manual'

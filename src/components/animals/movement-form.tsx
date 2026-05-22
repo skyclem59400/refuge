@@ -67,6 +67,10 @@ const movementsByStatus: Record<string, { value: MovementType; label: string }[]
   pound: [
     { value: 'shelter_transfer', label: 'Transfert en refuge' },
     { value: 'foster_placement', label: 'Placement en famille d’accueil' },
+    // Adoption directe depuis fourrière : indispensable pour les animaux en
+    // réquisition une fois la décision judiciaire actée (pas besoin de
+    // transit administratif par 'shelter' pour les remettre à un adoptant).
+    { value: 'adoption', label: 'Adoption' },
     { value: 'return_to_owner', label: 'Restitution au proprietaire' },
     { value: 'transfer_out', label: 'Transfert vers autre refuge' },
     { value: 'death', label: 'Deces' },
