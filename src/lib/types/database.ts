@@ -1377,6 +1377,31 @@ export interface Payslip {
   created_at: string
 }
 
+/** Type de document RH stocké par membre */
+export type MemberDocumentKind = 'contract' | 'amendment' | 'certificate' | 'other'
+
+export const MEMBER_DOCUMENT_KIND_LABELS: Record<MemberDocumentKind, string> = {
+  contract: 'Contrat de travail',
+  amendment: 'Avenant',
+  certificate: 'Attestation / certificat',
+  other: 'Autre document',
+}
+
+/** Document RH d'un collaborateur : contrat, avenant, attestation, etc. */
+export interface MemberDocument {
+  id: string
+  establishment_id: string
+  member_id: string
+  kind: MemberDocumentKind
+  label: string
+  signed_date: string | null
+  file_path: string
+  file_url: string
+  file_size: number | null
+  uploaded_by: string
+  created_at: string
+}
+
 // ============================================
 // Planning vétérinaire (visites quotidiennes — style Google Sheet)
 // ============================================
@@ -1505,6 +1530,7 @@ export type NotificationType =
   | 'leave_request_approved'
   | 'leave_request_refused'
   | 'payslip_uploaded'
+  | 'member_document_uploaded'
   | 'treatment_new'
   | 'health_reminder'
   | 'general'

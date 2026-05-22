@@ -29,6 +29,7 @@ import {
   ClipboardList,
   ShieldCheck,
   AlertCircle,
+  FileSignature,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -95,11 +96,13 @@ const shelterSections: NavSection[] = [
       { href: '/planning', label: 'Planning', Icon: CalendarDays, permission: 'canManageEstablishment' },
       { href: '/espace-collaborateur', label: 'Mon espace', Icon: Briefcase, permission: 'canViewOwnLeaves', contractTypes: ['salarie', 'auto_entrepreneur'] },
       { href: '/espace-collaborateur/cra', label: 'Mes CRA', Icon: ClipboardList, permission: 'canViewOwnLeaves', contractTypes: ['salarie', 'auto_entrepreneur'] },
+      { href: '/espace-collaborateur/contrats', label: 'Mes contrats', Icon: FileSignature, permission: 'canViewOwnLeaves', contractTypes: ['salarie', 'auto_entrepreneur'] },
       { href: '/admin/conges', label: 'Congés', Icon: CalendarCheck, permission: 'canManageLeaves' },
       { href: '/admin/cra/saisie', label: 'Saisie CRA', Icon: ClipboardList, permission: 'canManageLeaves' },
       { href: '/admin/cra/horaires', label: 'Horaires de référence', Icon: Clock, permission: 'canManageLeaves' },
       { href: '/admin/cra/validations', label: 'Validations admin CRA', Icon: ShieldCheck, permission: 'canManageEstablishment' },
       { href: '/admin/cra/demandes', label: 'Demandes modif CRA', Icon: AlertCircle, permission: 'canManageLeaves' },
+      { href: '/admin/contrats', label: 'Contrats / docs RH', Icon: FileSignature, permission: 'canManagePayslips' },
     ],
   },
   {
