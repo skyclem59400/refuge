@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Clock, Plus } from 'lucide-react'
-import { adminCreateLeaveRequest } from '@/lib/actions/leaves'
+import { adminCreateLeaveRequest, previewLeaveDaysCount } from '@/lib/actions/leaves'
 import type { EstablishmentMember, LeaveType, LeaveGranularity } from '@/lib/types/database'
 
 interface Props {
@@ -62,13 +62,42 @@ export function AdminLeaveCreator({ members, leaveTypes }: Props) {
     setAutoApprove(true)
   }
 
-  const computedDays =
+  // Estimation locale (fallback instantané)
+  const estimatedDays =
     granularity === 'hourly'
       ? 0
       : Math.max(
           0.5,
           diffDays(startDate, endDate) - (halfStart ? 0.5 : 0) - (halfEnd ? 0.5 : 0)
         )
+
+  // Valeur autoritaire (déduit fériés + jours de repos hebdo du membre)
+  const [serverDays, setServerDays] = useState<number | null>(null)
+  const [previewing, setPreviewing] = useState(false)
+
+  useEffect(() => {
+    if (!memberId || !startDate || !endDate || startDate > endDate || granularity === 'hourly') {
+      setServerDays(null)
+      return
+    }
+    let cancelled = false
+    setPreviewing(true)
+    previewLeaveDaysCount({
+      memberId,
+      startDate,
+      endDate,
+      halfDayStart: halfStart,
+      halfDayEnd: halfEnd,
+    }).then((res) => {
+      if (cancelled) return
+      setPreviewing(false)
+      if (typeof res.data === 'number') setServerDays(res.data)
+      else setServerDays(null)
+    })
+    return () => { cancelled = true }
+  }, [memberId, startDate, endDate, halfStart, halfEnd, granularity])
+
+  const computedDays = serverDays ?? estimatedDays
   const computedHours = granularity === 'hourly' ? hoursBetween(startTime, endTime) : 0
 
   function handleSubmit() {
@@ -286,10 +315,17 @@ export function AdminLeaveCreator({ members, leaveTypes }: Props) {
           <input type="checkbox" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} className="accent-primary" />
           Valider automatiquement (saisie admin)
         </label>
-        <div className="text-xs text-muted">
+        <div className="text-xs text-muted text-right">
           {granularity === 'hourly'
             ? `${computedHours.toFixed(2)} h`
-            : `${computedDays} jour${computedDays > 1 ? 's' : ''}`}
+            : previewing
+              ? 'Calcul…'
+              : `${computedDays} jour${computedDays > 1 ? 's' : ''} décompté${computedDays > 1 ? 's' : ''}`}
+          {granularity !== 'hourly' && serverDays !== null && (
+            <div className="text-[10px] text-muted/70 italic mt-0.5">
+              fériés + repos hebdo exclus
+            </div>
+          )}
         </div>
       </div>
 

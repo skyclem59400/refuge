@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { AlertTriangle, ShieldAlert } from 'lucide-react'
-import { approveLeaveRequest, refuseLeaveRequest } from '@/lib/actions/leaves'
+import { approveLeaveRequest, refuseLeaveRequest, recomputeLeaveRequestDays } from '@/lib/actions/leaves'
 import { getCoverageImpactForRequest } from '@/lib/actions/leave-coverage'
 import type { CoverageImpactResult } from '@/lib/actions/leave-coverage'
 import { LeaveStatusBadge } from './leave-status-badge'
@@ -138,13 +138,41 @@ export function LeaveRequestReview({
               </span>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted">Duree</span>
-              <span className="text-sm font-semibold text-text">
-                {request.days_count} jour{request.days_count > 1 ? 's' : ''}
-                {request.half_day_start && ' (demi-j. debut)'}
-                {request.half_day_end && ' (demi-j. fin)'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-text">
+                  {request.days_count} jour{request.days_count > 1 ? 's' : ''}
+                  {request.half_day_start && ' (demi-j. debut)'}
+                  {request.half_day_end && ' (demi-j. fin)'}
+                </span>
+                {request.granularity !== 'hourly' && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const res = await recomputeLeaveRequestDays(request.id)
+                      if (res.error) {
+                        toast.error(res.error)
+                        return
+                      }
+                      const d = res.data!
+                      if (d.previous_days === d.new_days) {
+                        toast.success(`Déjà à jour (${d.new_days} j)`)
+                      } else {
+                        toast.success(
+                          `Recalculé : ${d.previous_days} → ${d.new_days} j` +
+                          (d.balance_adjusted ? ' (solde ajusté)' : '')
+                        )
+                        onReviewed()
+                      }
+                    }}
+                    className="px-2 py-0.5 rounded text-[10px] font-semibold border border-primary/30 text-primary hover:bg-primary/10 transition-colors"
+                    title="Recalcule les jours en excluant fériés + repos hebdo"
+                  >
+                    Recalculer
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center justify-between">

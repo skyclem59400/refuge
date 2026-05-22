@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useTransition, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { createLeaveRequest } from '@/lib/actions/leaves'
+import { createLeaveRequest, previewLeaveDaysCount } from '@/lib/actions/leaves'
 import { DatePicker } from '@/components/ui/date-picker'
 import type { LeaveType, LeaveBalance } from '@/lib/types/database'
 
@@ -12,7 +12,9 @@ interface LeaveRequestFormProps {
   balances: LeaveBalance[]
 }
 
-function countBusinessDays(startDate: string, endDate: string): number {
+/** Estimation locale rapide (week-ends exclus) — affichée avant le recalcul serveur
+ * qui prend en compte les jours fériés et la semaine type du membre. */
+function estimateBusinessDays(startDate: string, endDate: string): number {
   const start = new Date(startDate)
   const end = new Date(endDate)
   if (end < start) return 0
@@ -21,9 +23,7 @@ function countBusinessDays(startDate: string, endDate: string): number {
   const current = new Date(start)
   while (current <= end) {
     const day = current.getDay()
-    if (day !== 0 && day !== 6) {
-      count++
-    }
+    if (day !== 0 && day !== 6) count++
     current.setDate(current.getDate() + 1)
   }
   return count
@@ -42,13 +42,42 @@ export function LeaveRequestForm({ leaveTypes, balances }: LeaveRequestFormProps
   const [halfDayEnd, setHalfDayEnd] = useState(false)
   const [reason, setReason] = useState('')
 
-  const daysCount = useMemo(() => {
+  // Estimation locale (fallback instantané) — recalculée côté serveur ensuite
+  const estimatedDays = useMemo(() => {
     if (!startDate || !endDate) return 0
-    let days = countBusinessDays(startDate, endDate)
+    let days = estimateBusinessDays(startDate, endDate)
     if (halfDayStart) days -= 0.5
     if (halfDayEnd) days -= 0.5
     return Math.max(days, 0)
   }, [startDate, endDate, halfDayStart, halfDayEnd])
+
+  // Valeur autoritaire renvoyée par le serveur (déduit fériés + repos hebdo)
+  const [serverDays, setServerDays] = useState<number | null>(null)
+  const [previewing, setPreviewing] = useState(false)
+
+  useEffect(() => {
+    if (!startDate || !endDate || startDate > endDate) {
+      setServerDays(null)
+      return
+    }
+    let cancelled = false
+    setPreviewing(true)
+    previewLeaveDaysCount({
+      startDate,
+      endDate,
+      halfDayStart,
+      halfDayEnd,
+    }).then((res) => {
+      if (cancelled) return
+      setPreviewing(false)
+      if (typeof res.data === 'number') setServerDays(res.data)
+      else setServerDays(null)
+    })
+    return () => { cancelled = true }
+  }, [startDate, endDate, halfDayStart, halfDayEnd])
+
+  // Décompte affiché = valeur serveur si dispo, sinon estimation locale
+  const daysCount = serverDays ?? estimatedDays
 
   const selectedBalance = balances.find((b) => b.leave_type_id === leaveTypeId)
   const remaining = selectedBalance
@@ -172,11 +201,16 @@ export function LeaveRequestForm({ leaveTypes, balances }: LeaveRequestFormProps
       </div>
 
       {/* Recapitulatif jours */}
-      {daysCount > 0 && (
+      {(daysCount > 0 || previewing) && (
         <div className="bg-primary/10 rounded-lg px-4 py-3">
           <p className="text-sm font-semibold text-primary">
-            {daysCount} jour{daysCount > 1 ? 's' : ''} ouvre{daysCount > 1 ? 's' : ''}
+            {previewing ? 'Calcul en cours…' : `${daysCount} jour${daysCount > 1 ? 's' : ''} décompté${daysCount > 1 ? 's' : ''} du solde`}
           </p>
+          {serverDays !== null && (
+            <p className="text-[11px] text-primary/80 mt-1">
+              Les jours fériés et vos jours de repos hebdomadaires sont automatiquement exclus.
+            </p>
+          )}
         </div>
       )}
 

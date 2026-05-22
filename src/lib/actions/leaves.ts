@@ -6,7 +6,8 @@ import { requireEstablishment, requirePermission } from '@/lib/establishment/per
 import { logActivity } from '@/lib/actions/activity-log'
 import { createNotification, notifyAdminsWithPermission } from '@/lib/actions/notifications'
 import { getCoverageImpactForRequest } from '@/lib/actions/leave-coverage'
-import type { LeaveGranularity, LeaveRequestStatus } from '@/lib/types/database'
+import { computeLeaveDays } from '@/lib/leaves/compute-days'
+import type { LeaveGranularity, LeaveRequestStatus, MemberWorkSchedule } from '@/lib/types/database'
 
 // ===========================================================================
 // HELPERS
@@ -28,6 +29,81 @@ async function hasManageLeavesPermission(): Promise<boolean> {
 function revalidateLeavePaths() {
   revalidatePath('/espace-collaborateur/conges')
   revalidatePath('/admin/conges')
+}
+
+/**
+ * Charge la semaine type (jours de repos) + jours fériés et calcule
+ * le nombre de jours de CP réellement décomptés du solde.
+ *
+ * Fallback si aucune semaine type définie : week-end standard (sam + dim).
+ */
+async function computeLeaveDaysFromDB(params: {
+  memberId: string
+  startDate: string
+  endDate: string
+  halfDayStart?: boolean
+  halfDayEnd?: boolean
+}): Promise<number> {
+  const admin = createAdminClient()
+
+  const [schedRes, holidaysRes] = await Promise.all([
+    admin
+      .from('member_work_schedules')
+      .select('day_of_week, is_rest_day')
+      .eq('member_id', params.memberId)
+      .is('valid_until', null),
+    admin
+      .from('public_holidays')
+      .select('date')
+      .gte('date', params.startDate)
+      .lte('date', params.endDate),
+  ])
+
+  const schedule = (schedRes.data || []) as Pick<MemberWorkSchedule, 'day_of_week' | 'is_rest_day'>[]
+  const restWeekdays = schedule.length > 0
+    ? schedule.filter((s) => s.is_rest_day).map((s) => s.day_of_week)
+    : [0, 6] // fallback : samedi + dimanche
+
+  const holidays = ((holidaysRes.data || []) as Array<{ date: string }>).map((h) => h.date)
+
+  return computeLeaveDays({
+    startDate: params.startDate,
+    endDate: params.endDate,
+    restWeekdays,
+    holidays,
+    halfDayStart: params.halfDayStart,
+    halfDayEnd: params.halfDayEnd,
+  })
+}
+
+/**
+ * Server action exposée à l'UI : retourne le nombre de jours qui SERA décompté
+ * pour une demande de congé. Permet aux formulaires d'afficher un aperçu juste
+ * (déduction des fériés + jours de repos) avant la soumission.
+ *
+ * Si `memberId` est omis, on utilise le membership courant.
+ */
+export async function previewLeaveDaysCount(params: {
+  memberId?: string
+  startDate: string
+  endDate: string
+  halfDayStart?: boolean
+  halfDayEnd?: boolean
+}): Promise<{ data?: number; error?: string }> {
+  try {
+    const { membership } = await requireEstablishment()
+    const memberId = params.memberId || membership.id
+    const days = await computeLeaveDaysFromDB({
+      memberId,
+      startDate: params.startDate,
+      endDate: params.endDate,
+      halfDayStart: params.halfDayStart,
+      halfDayEnd: params.halfDayEnd,
+    })
+    return { data: days }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
 }
 
 // ===========================================================================
@@ -222,6 +298,20 @@ export async function createLeaveRequest(data: {
       }
     }
 
+    // Calcul AUTORITAIRE côté serveur (déduit fériés + jours de repos hebdo).
+    // On ignore la valeur transmise par le client pour éviter toute manipulation
+    // et garantir la cohérence avec le solde de congés. Cas hourly = 0 (le solde
+    // n'est pas en jours mais en heures, géré via duration_hours).
+    const authoritativeDaysCount = granularity === 'hourly'
+      ? 0
+      : await computeLeaveDaysFromDB({
+          memberId: membership.id,
+          startDate: data.start_date,
+          endDate: data.end_date,
+          halfDayStart: data.half_day_start,
+          halfDayEnd: data.half_day_end,
+        })
+
     const { data: request, error } = await supabase
       .from('leave_requests')
       .insert({
@@ -232,7 +322,7 @@ export async function createLeaveRequest(data: {
         end_date: data.end_date,
         half_day_start: data.half_day_start ?? false,
         half_day_end: data.half_day_end ?? false,
-        days_count: data.days_count,
+        days_count: authoritativeDaysCount,
         granularity,
         start_time: granularity === 'hourly' ? data.start_time : null,
         end_time: granularity === 'hourly' ? data.end_time : null,
@@ -258,7 +348,7 @@ export async function createLeaveRequest(data: {
       permission: 'manage_leaves',
       type: 'leave_request_submitted',
       title: 'Nouvelle demande de conge',
-      body: `Une demande de conge du ${data.start_date} au ${data.end_date} a ete soumise.`,
+      body: `Une demande de conge du ${data.start_date} au ${data.end_date} a ete soumise (${authoritativeDaysCount} j décomptés).`,
       link: '/admin/conges',
     })
 
@@ -311,6 +401,17 @@ export async function adminCreateLeaveRequest(data: {
     const autoApprove = data.auto_approve ?? true
     const status: LeaveRequestStatus = autoApprove ? 'approved' : 'pending'
 
+    // Calcul AUTORITAIRE côté serveur (cf. createLeaveRequest)
+    const authoritativeDaysCount = granularity === 'hourly'
+      ? 0
+      : await computeLeaveDaysFromDB({
+          memberId: data.member_id,
+          startDate: data.start_date,
+          endDate: data.end_date,
+          halfDayStart: data.half_day_start,
+          halfDayEnd: data.half_day_end,
+        })
+
     const { data: row, error } = await adminClient
       .from('leave_requests')
       .insert({
@@ -321,7 +422,7 @@ export async function adminCreateLeaveRequest(data: {
         end_date: data.end_date,
         half_day_start: data.half_day_start ?? false,
         half_day_end: data.half_day_end ?? false,
-        days_count: data.days_count,
+        days_count: authoritativeDaysCount,
         granularity,
         start_time: granularity === 'hourly' ? data.start_time : null,
         end_time: granularity === 'hourly' ? data.end_time : null,
@@ -356,7 +457,7 @@ export async function adminCreateLeaveRequest(data: {
         if (balance) {
           await adminClient
             .from('leave_balances')
-            .update({ used: balance.used + data.days_count })
+            .update({ used: balance.used + authoritativeDaysCount })
             .eq('id', balance.id)
         }
       }
@@ -371,6 +472,97 @@ export async function adminCreateLeaveRequest(data: {
     })
 
     return { data: row }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+/**
+ * Recalcule `days_count` d'une demande existante en appliquant la règle métier
+ * mise à jour (déduction des fériés et jours de repos hebdo).
+ *
+ * Si la demande est `approved` et que le type déduit le solde, ajuste également
+ * `leave_balances.used` du delta nécessaire. Idempotent : peut être appelée
+ * plusieurs fois, le delta sera 0 si déjà à jour.
+ */
+export async function recomputeLeaveRequestDays(
+  requestId: string
+): Promise<{
+  data?: { previous_days: number; new_days: number; balance_adjusted: boolean }
+  error?: string
+}> {
+  try {
+    await requirePermission('manage_leaves')
+    const admin = createAdminClient()
+
+    const { data: req, error: reqErr } = await admin
+      .from('leave_requests')
+      .select('id, member_id, leave_type_id, start_date, end_date, half_day_start, half_day_end, granularity, days_count, status')
+      .eq('id', requestId)
+      .single()
+    if (reqErr || !req) return { error: 'Demande de congé introuvable' }
+    if (req.granularity === 'hourly') {
+      return { error: 'Recalcul non applicable à un arrêt horaire (durée en heures, pas en jours).' }
+    }
+
+    const newDays = await computeLeaveDaysFromDB({
+      memberId: req.member_id,
+      startDate: req.start_date,
+      endDate: req.end_date,
+      halfDayStart: req.half_day_start,
+      halfDayEnd: req.half_day_end,
+    })
+
+    const previousDays = Number(req.days_count) || 0
+    const delta = newDays - previousDays
+
+    if (delta === 0) {
+      return { data: { previous_days: previousDays, new_days: newDays, balance_adjusted: false } }
+    }
+
+    // Maj de la demande
+    const { error: updErr } = await admin
+      .from('leave_requests')
+      .update({ days_count: newDays })
+      .eq('id', requestId)
+    if (updErr) return { error: updErr.message }
+
+    // Ajustement du solde si demande approuvée et type déductible
+    let balanceAdjusted = false
+    if (req.status === 'approved') {
+      const { data: lt } = await admin
+        .from('leave_types')
+        .select('deducts_balance')
+        .eq('id', req.leave_type_id)
+        .single()
+      if (lt?.deducts_balance) {
+        const year = new Date(req.start_date).getFullYear()
+        const { data: balance } = await admin
+          .from('leave_balances')
+          .select('id, used')
+          .eq('member_id', req.member_id)
+          .eq('leave_type_id', req.leave_type_id)
+          .eq('year', year)
+          .single()
+        if (balance) {
+          await admin
+            .from('leave_balances')
+            .update({ used: Math.max(0, Number(balance.used) + delta) })
+            .eq('id', balance.id)
+          balanceAdjusted = true
+        }
+      }
+    }
+
+    revalidateLeavePaths()
+    logActivity({
+      action: 'update',
+      entityType: 'leave_request',
+      entityId: requestId,
+      details: { recompute: true, previous_days: previousDays, new_days: newDays, delta, balance_adjusted: balanceAdjusted },
+    })
+
+    return { data: { previous_days: previousDays, new_days: newDays, balance_adjusted: balanceAdjusted } }
   } catch (e) {
     return { error: (e as Error).message }
   }
