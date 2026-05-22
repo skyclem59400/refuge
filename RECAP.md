@@ -831,3 +831,176 @@ Aucune dépendance npm nouvelle. Build local + TS check ✅.
 5 fichiers modifiés + 1 créé. Build local + TS check ✅. Pushé sur main, Coolify déployé.
 
 **Comment configurer pour SDA** : Mary va dans `/admin/cra/horaires` → clic "Modifier" sur le collaborateur concerné → en bas de la modal cocher "Travaille les jours fériés" → renseigner les 4 horaires (typiquement plus courts que la journée standard, genre 8h-12h sans aprem) → Enregistrer.
+
+---
+
+## Session 2026-05-22 (suite) — Astreintes + Fix CCN + Module Satisfaction + Contrats RH + Sidebar accordéon + Fratrie + bugs
+
+Très grosse session : 16 livraisons en chaîne sur la journée. Le détail par bloc.
+
+### 14. CRA Astreintes hebdomadaires (commit `118f1e6`)
+
+**Besoin** : Marie remonte que les semaines d'astreinte (forfait 100€ hebdo, lundi → lundi) doivent être marquées sur le CRA pour le comptable. Une seule personne par semaine.
+
+**Migration** : `20260522c_cra_astreintes.sql` — table `cra_astreintes(id, member_id, establishment_id, week_start_monday, ...)` + contrainte `CHECK (EXTRACT(ISODOW FROM week_start_monday) = 1)` + UNIQUE `(establishment_id, week_start_monday)` qui garantit en base "1 personne par semaine".
+
+**Server actions** dans `src/lib/actions/cra-astreintes.ts` :
+- `toggleAstreinteWeek(memberId, weekStartDate)` : crée ou supprime. Si la semaine est déjà attribuée à un autre membre → erreur explicite avec son nom.
+- `listAstreintesForMonth(year, month)` : pour la vue admin globale.
+- `listMemberAstreintesForMonth` : pour le PDF/espace collab.
+
+**UI** : `AstreintesBar` au-dessus de la grille `cra-saisie-client.tsx` — chip par lundi du mois, click toggle. `CraMonthlyView.astreinte_weeks` (liste des `week_start_monday`) exposé via `getMonthlySaisie`. Stat card violette "Astreintes" dans le bandeau totaux. Côté collaborateur : bandeau read-only des semaines.
+
+**PDF CRA** mis à jour : tuile orange terracotta "Semaines d'astreinte" + détail des dates dans le bloc summary. Le comptable voit le nombre, calcule le forfait lui-même.
+
+### 15. Fix visibilité sidebar pour auto-entrepreneurs (même commit `118f1e6`)
+
+**Bug** Yann remonté par Mary : "il dit qu'il doit vérifier mes modifications mais n'a pas de visuel". Diagnostic : le sidebar filtrait `roles: ['admin', 'salarie']` sur `role_type`, mais Yann est `contract_type='auto_entrepreneur'` (donc soumis au CRA mais pas `role_type='salarie'`). Résultat : aucun lien "Mes CRA" / "Mon espace" dans sa sidebar.
+
+**Fix** : ajout d'un champ `contractTypes?: ContractType[]` sur `NavItem`. Les entrées `/espace-collaborateur` et `/espace-collaborateur/cra` filtrent désormais sur `contract_type ∈ ('salarie', 'auto_entrepreneur')` plutôt que `role_type`. Propagation de `contract_type` à `Sidebar` et `Header` via `getNavSections(type, perms, roleType, contractType)`.
+
+### 16. Email automatique à la soumission du CRA (même commit `118f1e6`)
+
+Nouveau module `src/lib/email/cra-submitted.ts` — charte SDA (header navy, CTA teal, bandeau orange terracotta) — appelé en fire-and-forget depuis `submitCraToMember()` après la notification in-app. Lien direct vers `/espace-collaborateur/cra/[year]/[month]`. Le collaborateur sait immédiatement quand Mary attend sa validation.
+
+### 17. Fix décompte CP (jours fériés + dimanches exclus) — CCN fleuristes-animalerie (commits `480c403`, `73079f6`, `6e79282`)
+
+**Bug initial signalé par Maryline** : "Du 4 au 9 mai j'ai eu une semaine de congés soit 5 jours mais Optimus en compte 6, sachant que le 8 mai est férié." Le calcul de `days_count` dans `createLeaveRequest` / `adminCreateLeaveRequest` faisait juste `diffDays(end - start) + 1` côté client → 6 jours calendaires.
+
+**Itérations** :
+- **480c403** — Première version "favorable salarié" : décompte basé sur la semaine type personnelle (mercredi de Mary = repos donc pas décompté). Faux logiquement quand on a confirmé que la CCN s'applique.
+- **6e79282** — Recalibrage CCN Fleuristes-animalerie (IDCC 1978, art. 5) : 30 j ouvrables/an, période 1er juin → 31 mai. Mode "jours ouvrables" strict : `restWeekdays = [0]` (dim seul) pour tout le monde, le mercredi de Mary EST décompté. Maryline qui attendait 5 jours pour 4-9 mai → 5 jours décomptés (lun, mar, mer, jeu, sam ; ven 8 férié exclu).
+
+**Architecture du fix** :
+- Nouveau module pur `src/lib/leaves/compute-days.ts` — fonction `computeLeaveDays({startDate, endDate, restWeekdays, holidays, halfDayStart, halfDayEnd})` sans dépendance DB, testable.
+- `computeLeaveDaysFromDB(memberId, dates)` charge les jours fériés + délègue au pur, avec `restWeekdays = [0]` codé en dur (CCN fleuristes).
+- **Server-side authority** : `createLeaveRequest` et `adminCreateLeaveRequest` ignorent désormais la valeur `days_count` envoyée par le client et la recalculent en SQL. Pas de manipulation possible.
+- Nouvelle server action `previewLeaveDaysCount` exposée à l'UI pour le live preview (le client appelle au changement de dates pour afficher le bon nombre avant submission).
+- Nouvelle server action `recomputeLeaveRequestDays(requestId)` accessible depuis `/admin/conges` : recalcule un congé existant ET ajuste `leave_balances.used` du delta. Idempotente.
+- Bouton "Recalculer" sur la page review des demandes pour corriger les anciens congés mal calculés.
+
+**Fix complémentaire commit `73079f6`** : symétrie côté affichage CRA. Pendant un congé, le mercredi de Mary (repos hebdo) apparaissait en "Congé payé" alors qu'il est repos. Modifié `cra-saisie.ts` pour utiliser les heures du template (`0h` si jour de repos) et garder l'affichage cohérent.
+
+7 fichiers touchés, build clean, lint clean. Pas de hotfix nécessaire post-déploiement.
+
+### 18. Module Contrats & docs RH par collaborateur (commit `e747145`)
+
+**Besoin** : Clément envoie 6 contrats CDI/CDD + bulletins de paie pour Mary, Maryline, Franck, Carole, Eric, Yann, Marina. Optimus n'a aucun endroit pour stocker ces docs administratifs.
+
+**Migration** `20260522d_member_documents.sql` :
+- Table `member_documents(id, member_id, kind, label, signed_date, file_path, file_url, file_size, uploaded_by, created_at)` avec `kind IN ('contract', 'amendment', 'certificate', 'other')` pour rester générique (avenants, attestations Pôle Emploi, certificats…).
+- Storage bucket privé `employment-docs` avec policy RLS qui n'autorise la lecture qu'au membre concerné OU aux RH (`manage_payslips`).
+- Pattern calqué sur `payslips` (FK uploaded_by = auth.users(id), signed URL 1h).
+
+**Server actions** dans `src/lib/actions/member-documents.ts` :
+- `uploadMemberDocument(formData)` — admin uniquement, multipart PDF.
+- `getMemberDocuments({memberId, kind?})` — un membre voit ses propres docs, un admin voit tout.
+- `deleteMemberDocument(id)` — admin uniquement.
+- `getMemberDocumentSignedUrl(id)` — URL signée 1h, accès vérifié par token serveur.
+
+**UI** :
+- `/admin/contrats` (perm `manage_payslips`) : form d'upload (Drop zone PDF + select membre + kind + label + date signature optionnelle) + liste regroupée par collaborateur avec téléchargement + suppression.
+- `/espace-collaborateur/contrats` : lecture seule de ses propres docs, regroupés par type.
+- Sidebar : "Mes contrats" (collaborateur) + "Contrats / docs RH" (admin) ajoutés à la section Équipe.
+
+Notification in-app au membre quand un nouveau doc est uploadé. **Clément doit uploader manuellement** les PDFs des contrats (je n'ai pas accès aux binaires dans le chat).
+
+### 19. Sidebar accordéon (commit `7a830b5`)
+
+**Besoin** : "il faut toujours scroller pour pouvoir sélectionner une catégorie". 8 sections déployées sur ~1200px de hauteur sur desktop, ~1800px sur mobile.
+
+**Solution** : chaque section avec un `label` devient repliable via un chevron cliquable à droite du titre. État persisté dans `localStorage` (clé `sidebar-open-sections`). Au premier chargement, seule la section contenant la page courante est ouverte. Auto-ouverture de la section active si l'utilisateur navigue via URL directe.
+
+**Pattern technique** : animation via `grid-template-rows: 1fr` (ouvert) ↔ `0fr` (fermé) avec `overflow-hidden` sur l'enfant. Animation fluide GPU-friendly sans calcul de hauteur. Mode sidebar collapsed (icônes seules) : pas d'accordéon, comportement original préservé. Indicateur d'activité : titre de section en teal quand une page de cette section est active.
+
+### 20. Responsive — grille calendrier CRA scrollable (commit `0bd21e9`)
+
+Audit complet du responsive. Tous les composants critiques OK sauf la grille calendaire 7 colonnes (`cra-saisie-client.tsx` + `cra-member-view.tsx`) : cellules de ~46px sur mobile, contenu illisible. Fix : wrapper `overflow-x-auto + min-w-[640px]`. Scroll horizontal naturel sur petit écran, cellules conservent 90+ px. Modal d'édition jour : `max-h-[90vh] + overflow-y-auto` pour éviter débordement sur petite hauteur.
+
+### 21. Module Satisfaction NPS automatique (commits `176c2ff`, `cead44f`, `09b3454`, `817a890`)
+
+**Besoin** : "récupérer ce qui ne marche pas, ce qui ne va pas" après une adoption, un don, un foster.
+
+**Architecture** :
+- **Migration** `20260522e_satisfaction_surveys.sql` — table `satisfaction_surveys(id, kind, related_id, recipient_email, token, scheduled_for, sent_at, completed_at, nps_score, verbatim, resolved_*)` avec contrainte UNIQUE `(kind, related_id)` qui garantit l'idempotence des envois.
+- **Endpoint cron** `/api/cron/satisfaction` protégé par `Authorization: Bearer $CRON_SECRET` :
+  - Scan `animal_movements` type `adoption` créés ≥ 7 jours → envoie le mail "Comment se passe l'adoption ?"
+  - Scan `animal_movements` type `foster_placement` créés ≥ 7 jours → "Votre expérience en famille d'accueil"
+  - Scan `donations` créés ≥ 1 jour → "Merci pour votre don, votre ressenti ?"
+  - Limite 50 events par exécution (rate limit Brevo + timeout serverless).
+  - Retourne JSON `{ok, sent: {adoption, foster, donation}, already_done: {...}, errors: []}`.
+- **pg_cron + pg_net** activés dans Supabase (extensions `pg_cron 1.6.4`, `pg_net 0.19.5`). Job `satisfaction-daily-send` programmé `0 9 * * *` (10h Paris hiver / 11h été).
+- **Page publique** `/satisfaction/[token]` (hors middleware auth) : form NPS 0→10 avec gradient orange (0-6) → jaune (7-8) → vert (9-10), textarea verbatim 2000 caractères max. Soumission stocke `nps_score + verbatim + completed_at`. Lien permet seulement 1 réponse.
+- **Dashboard** `/admin/satisfaction` (perm `manage_establishment`) : KPI cards (score NPS, % promoteurs/passifs/détracteurs, note moyenne, taux de réponse), filtres type + statut, liste des verbatims avec border orange sur les détracteurs non traités, marquage "traité" avec note interne.
+- **Email Brevo** charte SDA (header navy + logo `logo-sda.png` avec border-radius 12px, CTA teal, bandeau orange terracotta "Promesse: pas de spam"), variantes contextualisées par kind (adoption / donation / foster).
+
+**Garde-fou pré-production critique** : 1410 dons + 3 adoptions + 3 fosters anciens éligibles dans la base. Sans intervention, le premier cron run aurait spammé 1416 destinataires. Pré-création de 1416 "phantom rows" en SQL avec `sent_at = NOW()` et `send_error = 'Backfilled...'` pour neutraliser le scan initial. Les events futurs créeront leurs propres surveys au délai normal.
+
+**Config infra** :
+- Env var Coolify `CRON_SECRET` = `3cacae3767...` (256 bits hex, `is_literal: false` — bug rencontré avec `is_literal: true` qui ajoutait des quotes parasites). Cf. mémoire `feedback_coolify_env_vars`.
+- Pattern cron via pg_cron + pg_net + secret Bearer plutôt que cron-job.org tiers. Cf. mémoire `pattern_cron_pg_supabase`.
+
+### 22. Email transactionnel : from contact@sda-nord.com + reply-to global (commit `09b3454`)
+
+`signature@sda-nord.com` était dédiée Documenso. Bascule sur `contact@sda-nord.com` (humaine, ouvre la porte au dialogue) avec `BREVO_REPLY_TO=clement.scailteux@gmail.com` global. Le client `sendEmail` lit l'env var en cascade : `params.replyTo || process.env.BREVO_REPLY_TO || undefined`. S'applique à TOUS les mails transactionnels (NPS, CRA submitted, futures fonctionnalités).
+
+Domaine `sda-nord.com` entier déjà SPF/DKIM-validé dans Brevo donc pas d'étape sender supplémentaire requise.
+
+### 23. Fix FK judicial_attachments.uploaded_by (commit `bffbe5c`)
+
+Bug : la FK pointait par erreur vers `establishment_members(id)` alors que le code insère `ctx.userId` (= `auth.users(id)`). Pattern utilisé dans toutes les autres tables (payslips, cra_entries, member_documents, satisfaction_surveys). Migration `20260522g_fix_judicial_attachments_uploaded_by_fk.sql` aligne la FK sur `auth.users(id) ON DELETE SET NULL`. Pas de migration de données : la table était vide (le bug empêchait toute insertion).
+
+### 24. Permission liste noire : manage_clients au lieu de manage_establishment (commit `b18c219`)
+
+**Bug Mary** : "je ne peux pas valider la création d'une fiche propriétaire liste noire". Diagnostic : `addManualBlacklist` exigeait `manage_establishment` que Mary n'a pas (juste `manage_clients + manage_animals`). Bascule sur `manage_clients` : c'est cohérent avec la gestion quotidienne des contacts. Le retrait reste `manage_establishment + groupe Administrateur` (acte sensible préservé).
+
+### 25. Adoption depuis fourrière (même commit `b18c219`)
+
+**Bug Mary** : "on ne peut pas mettre à l'adoption un animal en réquisition". Diagnostic : `movementsByStatus.pound` dans `movement-form.tsx` n'incluait pas le mouvement `adoption`. Workflow forcé : `pound → shelter_transfer → shelter → adoption`. Pour les animaux en réquisition une fois la décision judiciaire actée, c'est une étape administrative inutile. Ajout de `{ value: 'adoption', label: 'Adoption' }` dans le menu pour statut `pound`.
+
+### 26. Création de fratrie (commit `85a06a4`)
+
+**Besoin Maryline** : "possible de créer des dossiers d'entrées par fratrie ?". Pour une portée de chiots/chatons ou plusieurs animaux d'une même saisie, éviter la saisie répétitive des mêmes infos.
+
+**MVP sans table `litters`** (choix incrémental) : chaque animal créé est indépendant, juste un raccourci de saisie.
+
+- Server action `createAnimalSiblings({common, animals[]})` dans `src/lib/actions/animal-siblings.ts`. Boucle d'INSERT atomiques par animal, retourne `{created: [...], failed: [...]}` (un échec par animal n'empêche pas les autres). Limite 20 animaux par batch. Numéro de médaille auto via RPC `get_next_medal_number` pour chacun.
+- Composant `SiblingForm` : section "Infos communes" (espèce, race, date naissance approx., origine, statut d'arrivée, box commun, lieu/circonstances) + section "Animaux" répétable (cards avec nom, sexe, couleur, n° puce, n° tatouage, poids). Boutons +/- pour ajouter/retirer.
+- Page `/animals/nouveau/fratrie`. Bouton "Plusieurs animaux d'un coup" en haut à droite de `/animals/nouveau`.
+- Si origine = `requisition`, `judicial_procedure` automatiquement à true sur tous.
+
+### Bilan session 2026-05-22
+
+**13 commits livrés en chaîne :**
+| # | Commit | Sujet |
+|---|---|---|
+| 1 | `118f1e6` | Astreintes + sidebar visibility + email submission |
+| 2 | `480c403` | Décompte CP fériés + repos (v1, ouvré réel) |
+| 3 | `73079f6` | Symétrie affichage CRA pendant congés |
+| 4 | `6e79282` | Recalibrage CCN fleuristes mode ouvrable |
+| 5 | `e747145` | Module Contrats / docs RH |
+| 6 | `7a830b5` | Sidebar accordéon |
+| 7 | `0bd21e9` | Responsive grille CRA |
+| 8 | `176c2ff` | Module Satisfaction NPS + cron |
+| 9 | `cead44f` | Fix compteur cron (sent vs already_done) |
+| 10 | `09b3454` | from contact@ + reply-to global |
+| 11 | `817a890` | Logo SDA dans email satisfaction |
+| 12 | `bffbe5c` | Fix FK judicial_attachments |
+| 13 | `b18c219` | Permission blacklist + adoption depuis fourrière |
+| 14 | `85a06a4` | Création de fratrie |
+
+**Infra Supabase / Coolify hors git :**
+- Extensions `pg_cron` + `pg_net` activées
+- Job `satisfaction-daily-send` programmé quotidien 09:00 UTC
+- 1416 phantom rows pré-créées dans `satisfaction_surveys`
+- Env vars Coolify : `CRON_SECRET`, `BREVO_FROM_ADDRESS` → `contact@sda-nord.com`, `BREVO_REPLY_TO` → `clement.scailteux@gmail.com`
+
+**Patterns mémorisés pour les futures features :**
+- `pattern_cron_pg_supabase.md` — pg_cron + pg_net plutôt que tiers
+- `feedback_coolify_env_vars.md` — `is_literal: false` par défaut + redeploy obligatoire
+- `pattern_backfill_phantom_rows.md` — neutraliser les events historiques avant cron
+
+**Validation production :**
+- 3 mails satisfaction envoyés à clement.scailteux@gmail.com (un par variante), Brevo accepte, charte SDA OK, logo OK
+- Endpoint `/api/test/satisfaction-email` créé pour preview rapide (à retirer plus tard)
+- INSERT test sur `judicial_attachments` avec user_id réel : passe (FK fix validée)
