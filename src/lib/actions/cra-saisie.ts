@@ -246,6 +246,32 @@ export async function getMonthlySaisie(
         (l) => l.start_date <= date && l.end_date >= date && l.granularity !== 'hourly'
       )
       if (dayLeaves.length > 0) {
+        // Si ce jour est un jour de repos hebdo (selon la semaine type), il NE doit
+        // PAS être marqué "Congé payé" : un repos n'est jamais consommé en CP.
+        // Cohérent avec computeLeaveDays qui exclut ces jours du décompte du solde.
+        const tplForDow = scheduleByDow.get(weekday)
+        if (tplForDow?.is_rest_day) {
+          days.push({
+            date,
+            weekday,
+            source: 'template',
+            is_rest_day: true,
+            start_am: null,
+            end_am: null,
+            start_pm: null,
+            end_pm: null,
+            hours_total: 0,
+          })
+          totalRest += 1
+          continue
+        }
+
+        // Heures du congé = heures réelles du template ce jour-là (fallback 7h)
+        const hoursForDay = tplForDow
+          ? hoursBetween(tplForDow.start_am, tplForDow.end_am)
+            + hoursBetween(tplForDow.start_pm, tplForDow.end_pm)
+          : 7
+
         const top = dayLeaves[0]
         const t = typeMap.get(top.leave_type_id)
         days.push({
@@ -254,7 +280,7 @@ export async function getMonthlySaisie(
           leave_type_id: top.leave_type_id,
           leave_status: top.status as 'approved' | 'pending',
         })
-        totalLeave += 7
+        totalLeave += hoursForDay
         continue
       }
 
