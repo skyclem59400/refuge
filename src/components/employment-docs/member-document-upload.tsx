@@ -9,6 +9,8 @@ import type { EstablishmentMember, MemberDocumentKind } from '@/lib/types/databa
 
 interface Props {
   readonly members: EstablishmentMember[]
+  /** Si fourni : verrouille l'upload sur ce membre, masque le dropdown. */
+  readonly lockedMemberId?: string
 }
 
 const KIND_OPTIONS: { value: MemberDocumentKind; label: string }[] = (
@@ -21,11 +23,11 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
 }
 
-export function MemberDocumentUpload({ members }: Props) {
+export function MemberDocumentUpload({ members, lockedMemberId }: Props) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [memberId, setMemberId] = useState('')
+  const [memberId, setMemberId] = useState(lockedMemberId || '')
   const [kind, setKind] = useState<MemberDocumentKind>('contract')
   const [label, setLabel] = useState('')
   const [signedDate, setSignedDate] = useState('')
@@ -42,7 +44,7 @@ export function MemberDocumentUpload({ members }: Props) {
   }
 
   const resetForm = () => {
-    setMemberId('')
+    setMemberId(lockedMemberId || '')
     setKind('contract')
     setLabel('')
     setSignedDate('')
@@ -78,23 +80,25 @@ export function MemberDocumentUpload({ members }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Membre */}
-      <div>
-        <label htmlFor="md-member" className="block text-sm font-medium text-text mb-1">Collaborateur</label>
-        <select
-          id="md-member"
-          value={memberId}
-          onChange={(e) => setMemberId(e.target.value)}
-          className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-        >
-          <option value="">Sélectionner un collaborateur</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.full_name || m.pseudo || m.email || m.id}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Membre (caché si on est déjà sur la fiche d'un membre) */}
+      {!lockedMemberId && (
+        <div>
+          <label htmlFor="md-member" className="block text-sm font-medium text-text mb-1">Collaborateur</label>
+          <select
+            id="md-member"
+            value={memberId}
+            onChange={(e) => setMemberId(e.target.value)}
+            className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+          >
+            <option value="">Sélectionner un collaborateur</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.full_name || m.pseudo || m.email || m.id}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Type + Libellé */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

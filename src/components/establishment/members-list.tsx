@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useTransition } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { assignMemberToGroup, removeMemberFromGroup, removeMember, resetPseudoPassword } from '@/lib/actions/establishments'
@@ -203,7 +204,12 @@ export function MembersList({ members, groups, currentUserId, isOwner }: Members
               />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium truncate">
-                  {member.full_name || member.pseudo || member.email || member.user_id.slice(0, 8)}
+                  <Link
+                    href={`/etablissement/membres/${member.id}`}
+                    className="hover:text-primary hover:underline transition-colors"
+                  >
+                    {member.full_name || member.pseudo || member.email || member.user_id.slice(0, 8)}
+                  </Link>
                   {isCurrentUser && <span className="text-muted text-xs ml-1">(vous)</span>}
                   {member.is_pseudo_user && member.role_type === 'salarie' && (
                     <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-blue-500/15 text-blue-400">
