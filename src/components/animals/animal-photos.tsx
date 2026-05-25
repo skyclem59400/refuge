@@ -228,6 +228,32 @@ export function AnimalPhotos({ animalId, establishmentId, photos, canManage, fal
         )}
       </div>
 
+      {/* Actions sur la photo affichée — visibles sur tous les écrans, indispensables sur mobile */}
+      {canManage && displayPhoto && (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleSetPrimary(displayPhoto.id)}
+            disabled={isPending || displayPhoto.is_primary}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text transition-colors hover:border-primary/50 hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+            title={displayPhoto.is_primary ? 'Déjà la photo principale' : 'Définir comme photo principale'}
+          >
+            <Star className={`h-4 w-4 ${displayPhoto.is_primary ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+            {displayPhoto.is_primary ? 'Photo principale' : 'Définir comme principale'}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDelete(displayPhoto.id)}
+            disabled={isPending}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger/20 disabled:cursor-not-allowed disabled:opacity-50"
+            title="Supprimer cette photo"
+          >
+            <Trash2 className="h-4 w-4" />
+            Supprimer
+          </button>
+        </div>
+      )}
+
       {/* Thumbnails grid */}
       <div className="flex flex-wrap gap-2">
         {photos.map((photo) => {
@@ -248,10 +274,13 @@ export function AnimalPhotos({ animalId, establishmentId, photos, canManage, fal
                 className="h-full w-full object-cover"
               />
 
-              {/* Overlay actions (visible on hover when canManage) */}
+              {/* Overlay actions — uniquement sur appareils avec hover réel (desktop).
+                  Sur tactile (iOS/Android), le hover éphémère du tap rendrait les
+                  boutons cliquables et le tap déclencherait Supprimer au lieu de
+                  sélectionner la photo. D'où [@media(hover:hover)] + pointer-events-none
+                  par défaut, et le pendant pointer-events-auto au hover. */}
               {canManage && (
-                <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-                  {/* Set as primary */}
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-1 bg-black/40 opacity-0 transition-opacity [@media(hover:hover)]:group-hover:pointer-events-auto [@media(hover:hover)]:group-hover:opacity-100">
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleSetPrimary(photo.id) }}
@@ -264,7 +293,6 @@ export function AnimalPhotos({ animalId, establishmentId, photos, canManage, fal
                     />
                   </button>
 
-                  {/* Delete */}
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleDelete(photo.id) }}
