@@ -3,6 +3,7 @@
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
 import { switchEstablishment } from '@/lib/actions/switch-establishment'
 import { createEstablishment } from '@/lib/actions/establishments'
 import { ChevronDownIcon } from '@/components/icons'
@@ -43,6 +44,7 @@ export function EstablishmentSwitcher({ establishments, currentEstablishment, co
   const [isOpen, setIsOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [newName, setNewName] = useState('')
+  const [switchingToId, setSwitchingToId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -58,10 +60,20 @@ export function EstablishmentSwitcher({ establishments, currentEstablishment, co
       setIsOpen(false)
       return
     }
+    setSwitchingToId(estabId)
     startTransition(async () => {
-      await switchEstablishment(estabId)
-      setIsOpen(false)
-      router.refresh()
+      const result = await switchEstablishment(estabId)
+      if ('error' in result && result.error) {
+        toast.error(result.error)
+        setSwitchingToId(null)
+        return
+      }
+      // Hard navigation vers /dashboard : router.refresh() était trop lent
+      // et laissait l'UI bloquée le temps que tous les server components
+      // re-render avec le nouveau cookie. La hard nav purge cache navigateur
+      // et state Next App Router en une fois, évite les race conditions
+      // (queries en cours qui retournaient des données de l'ancien établissement).
+      window.location.href = '/dashboard'
     })
   }
 
@@ -81,7 +93,8 @@ export function EstablishmentSwitcher({ establishments, currentEstablishment, co
         setNewName('')
         setIsCreating(false)
         setIsOpen(false)
-        router.refresh()
+        // Idem handleSwitch : hard nav garantit un état propre
+        window.location.href = '/dashboard'
       }
     })
   }
@@ -98,34 +111,46 @@ export function EstablishmentSwitcher({ establishments, currentEstablishment, co
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-3 w-full overflow-hidden cursor-pointer"
+        className="flex items-center gap-3 w-full overflow-hidden cursor-pointer disabled:opacity-70"
         disabled={isPending}
       >
         <EstablishmentLogo establishment={currentEstablishment} />
         <div className="min-w-0 flex-1 text-left">
           <h1 className="font-bold text-sm text-primary-light truncate">{currentEstablishment.name}</h1>
+          {isPending && (
+            <p className="text-[10px] text-muted truncate">Bascule en cours…</p>
+          )}
         </div>
-        <ChevronDownIcon className={`w-4 h-4 text-muted shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        {isPending ? (
+          <Loader2 className="w-4 h-4 text-primary shrink-0 animate-spin" />
+        ) : (
+          <ChevronDownIcon className={`w-4 h-4 text-muted shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        )}
       </button>
 
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" role="presentation" onClick={() => { setIsOpen(false); setIsCreating(false) }} onKeyDown={(e) => { if (e.key === 'Escape') { setIsOpen(false); setIsCreating(false) } }} />
           <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-lg shadow-xl z-50 py-1 animate-fade-up">
-            {establishments.map((estab) => (
-              <button
-                key={estab.id}
-                onClick={() => handleSwitch(estab.id)}
-                className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2
-                  ${estab.id === currentEstablishment.id
-                    ? 'bg-primary/10 text-primary-light font-medium'
-                    : 'text-muted hover:text-text hover:bg-surface-hover'
-                  }`}
-              >
-                <EstablishmentLogo establishment={estab} size={20} />
-                <span className="truncate">{estab.name}</span>
-              </button>
-            ))}
+            {establishments.map((estab) => {
+              const isTarget = switchingToId === estab.id
+              return (
+                <button
+                  key={estab.id}
+                  onClick={() => handleSwitch(estab.id)}
+                  disabled={isPending}
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 disabled:opacity-50
+                    ${estab.id === currentEstablishment.id
+                      ? 'bg-primary/10 text-primary-light font-medium'
+                      : 'text-muted hover:text-text hover:bg-surface-hover'
+                    }`}
+                >
+                  <EstablishmentLogo establishment={estab} size={20} />
+                  <span className="truncate flex-1">{estab.name}</span>
+                  {isTarget && <Loader2 className="w-3.5 h-3.5 text-primary shrink-0 animate-spin" />}
+                </button>
+              )
+            })}
 
             {userEmail === SUPER_ADMIN_EMAIL && (
             <div className="border-t border-border mt-1 pt-1">

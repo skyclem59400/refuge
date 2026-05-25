@@ -1,12 +1,13 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Package, PawPrint, MapPin } from 'lucide-react'
+import { Package, PawPrint, MapPin } from 'lucide-react'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { listBoxZones } from '@/lib/actions/box-zones'
-import { getBoxes } from '@/lib/actions/boxes'
+import { getBoxById } from '@/lib/actions/boxes'
 import { AnimalStatusBadge, SpeciesBadge } from '@/components/animals/animal-status-badge'
 import { BoxActionsBar } from '@/components/boxes/box-actions-bar'
+import { BackToBoxes } from '@/components/boxes/back-to-boxes'
 import { getSexIcon, calculateAge } from '@/lib/sda-utils'
 import { getSpeciesEmoji, SPECIES_LABELS_PLURAL } from '@/lib/species'
 import { getZoneColor } from '@/lib/zone-colors'
@@ -24,17 +25,17 @@ export default async function BoxDetailPage({ params }: PageProps) {
   const ctx = await getEstablishmentContext()
   if (!ctx) throw new Error('Establishment context required')
 
-  // Charger tous les boxes (déjà enrichis avec animaux + zone)
-  const [{ data: rawBoxes, error }, { data: allZones }] = await Promise.all([
-    getBoxes(),
+  // Une seule query pour CE box + ses animaux. listBoxZones est nécessaire
+  // pour le composant EditBoxDrawer (sélecteur de zone).
+  const [boxResult, { data: allZones }] = await Promise.all([
+    getBoxById(id),
     listBoxZones(),
   ])
 
-  if (error) throw new Error(error)
+  if (boxResult.error) throw new Error(boxResult.error)
+  if (!boxResult.data) notFound()
 
-  const boxes = (rawBoxes as EnrichedBox[] | undefined) ?? []
-  const box = boxes.find((b) => b.id === id)
-  if (!box) notFound()
+  const box = boxResult.data as EnrichedBox
 
   const zones = allZones ?? []
   const zone = box.zone_id ? zones.find((z) => z.id === box.zone_id) ?? null : null
@@ -67,14 +68,9 @@ export default async function BoxDetailPage({ params }: PageProps) {
 
   return (
     <div className="animate-fade-up space-y-6">
-      {/* Retour */}
-      <Link
-        href="/boxes"
-        className="inline-flex items-center gap-2 text-sm text-muted hover:text-text transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Retour aux box
-      </Link>
+      {/* Retour (router.back si on vient de /boxes, navigation directe sinon) */}
+      <BackToBoxes />
+
 
       {/* En-tête */}
       <header

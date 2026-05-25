@@ -11,6 +11,76 @@ import { logActivity } from '@/lib/actions/activity-log'
 // Read actions (use createAdminClient)
 // ============================================
 
+/**
+ * Charge un seul box (par id) avec sa zone et ses animaux.
+ * Plus économique que getBoxes().find() qui charge tous les boxes + animaux
+ * de l'établissement — utile pour la page de détail /boxes/[id] où on en
+ * affiche un seul.
+ */
+export async function getBoxById(boxId: string) {
+  try {
+    const { establishmentId } = await requireEstablishment()
+    const supabase = createAdminClient()
+
+    const { data: box, error: boxErr } = await supabase
+      .from('boxes')
+      .select('*, zone:box_zones(id, name, parent_id, parent:box_zones!parent_id(id, name))')
+      .eq('id', boxId)
+      .eq('establishment_id', establishmentId)
+      .single()
+
+    if (boxErr || !box) return { error: boxErr?.message || 'Box introuvable' }
+
+    const { data: animals, error: animalsErr } = await supabase
+      .from('animals')
+      .select('id, name, species, sex, status, photo_url, birth_date, sterilized, adoptable, reserved')
+      .eq('box_id', boxId)
+      .eq('establishment_id', establishmentId)
+
+    if (animalsErr) return { error: animalsErr.message }
+
+    const animalIds = (animals || []).map((a) => a.id)
+    const primaryPhotoByAnimal: Record<string, string> = {}
+    if (animalIds.length > 0) {
+      const { data: photos } = await supabase
+        .from('animal_photos')
+        .select('animal_id, url, is_primary')
+        .in('animal_id', animalIds)
+        .order('is_primary', { ascending: false })
+
+      for (const p of photos || []) {
+        const photo = p as { animal_id: string; url: string; is_primary: boolean }
+        if (!primaryPhotoByAnimal[photo.animal_id] || photo.is_primary) {
+          primaryPhotoByAnimal[photo.animal_id] = photo.url
+        }
+      }
+    }
+
+    const enrichedAnimals = (animals || []).map((a) => ({
+      id: a.id,
+      name: a.name,
+      species: a.species,
+      sex: a.sex,
+      status: a.status,
+      photo_url: primaryPhotoByAnimal[a.id] || a.photo_url,
+      birth_date: a.birth_date,
+      sterilized: a.sterilized,
+      adoptable: a.adoptable,
+      reserved: a.reserved,
+    }))
+
+    return {
+      data: {
+        ...box,
+        animals: enrichedAnimals,
+        animal_count: enrichedAnimals.length,
+      },
+    }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
 export async function getBoxes() {
   try {
     const { establishmentId } = await requireEstablishment()
