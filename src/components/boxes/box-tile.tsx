@@ -2,14 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { GripVertical, Loader2, Plus, Settings } from 'lucide-react'
+import { GripVertical, Loader2 } from 'lucide-react'
 import type { ZoneColor } from '@/lib/zone-colors'
 import type { BoxZone } from '@/lib/actions/box-zones'
 import type { BoxAnimal, EnrichedBox, BoxSummary } from './types'
 import { moveAnimalToBox } from '@/lib/actions/box-assignments'
-import { BoxDetailDrawer } from './box-detail-drawer'
-import { AssignAnimalsPopover } from './assign-animals-popover'
-import { EditBoxDrawer } from './edit-box-drawer'
 import { SPECIES_LABELS_PLURAL } from '@/lib/species'
 import type { AnimalSpecies } from '@/lib/types/database'
 
@@ -20,6 +17,9 @@ interface Props {
   box: EnrichedBox
   color: ZoneColor
   canManage: boolean
+  // Conservés pour compat de l'API parent (BoxesGroupGrid passe ces props) ;
+  // ils ne sont plus utilisés ici depuis que la vignette navigue vers la page
+  // de détail au lieu d'ouvrir un drawer/popover interne.
   allBoxes: BoxSummary[]
   zones: BoxZone[]
   groupKey: string
@@ -46,8 +46,6 @@ export function BoxTile({
   box,
   color,
   canManage,
-  allBoxes,
-  zones,
   groupKey,
   onReorderTarget,
 }: Props) {
@@ -56,13 +54,9 @@ export function BoxTile({
   const [isDragOver, setIsDragOver] = useState(false)
   const [isBoxDragOver, setIsBoxDragOver] = useState(false)
   const [dropError, setDropError] = useState<string | null>(null)
-  const [showDetail, setShowDetail] = useState(false)
-  const [showAssign, setShowAssign] = useState(false)
-  const [showEdit, setShowEdit] = useState(false)
 
   const isEmpty = box.animals.length === 0
   const isFull = box.animal_count >= box.capacity
-  const remainingCapacity = box.capacity - box.animal_count
   const heroAnimal = box.animals[0] as BoxAnimal | undefined
   const overflow = box.animals.length - 1
 
@@ -139,7 +133,7 @@ export function BoxTile({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={() => setShowDetail(true)}
+        onClick={() => router.push(`/boxes/${box.id}`)}
         className={`group relative w-[112px] h-[150px] shrink-0 bg-surface rounded-lg border ${color.borderSoft} overflow-hidden cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-150 ${
           isDragOver ? `ring-4 ${color.ring} scale-[1.05] shadow-2xl` : ''
         } ${isBoxDragOver ? `ring-4 ring-primary/60 scale-[1.05] shadow-2xl` : ''} ${pending ? 'opacity-70' : ''}`}
@@ -251,36 +245,6 @@ export function BoxTile({
         )}
       </div>
 
-      {/* Drawer détail box (clic) */}
-      {showDetail && (
-        <BoxDetailDrawer
-          box={box}
-          color={color}
-          canManage={canManage}
-          allBoxes={allBoxes}
-          onClose={() => setShowDetail(false)}
-          onAssign={() => {
-            setShowDetail(false)
-            setShowAssign(true)
-          }}
-          onEdit={() => {
-            setShowDetail(false)
-            setShowEdit(true)
-          }}
-        />
-      )}
-      {showAssign && (
-        <AssignAnimalsPopover
-          boxId={box.id}
-          boxName={box.name}
-          boxSpeciesType={box.species_type}
-          remainingCapacity={remainingCapacity}
-          onClose={() => setShowAssign(false)}
-        />
-      )}
-      {showEdit && (
-        <EditBoxDrawer box={box} zones={zones} onClose={() => setShowEdit(false)} />
-      )}
     </>
   )
 }
