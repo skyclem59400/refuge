@@ -1,4 +1,5 @@
-import { Package, MapPin, CornerDownRight, Printer } from 'lucide-react'
+import Link from 'next/link'
+import { Package, MapPin, CornerDownRight, Printer, PawPrint } from 'lucide-react'
 import { getBoxes } from '@/lib/actions/boxes'
 import { listBoxZones, type BoxZone } from '@/lib/actions/box-zones'
 import { getEstablishmentContext } from '@/lib/establishment/context'
@@ -24,6 +25,7 @@ interface RootZoneGroup {
   directBoxes: EnrichedBox[]
   subzones: SubZoneGroup[]
   totalBoxes: number
+  totalAnimals: number
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +136,7 @@ function RootZoneSection({
   allBoxes: BoxSummary[]
   zones: BoxZone[]
 }) {
-  const { zone, color, directBoxes, subzones, totalBoxes } = group
+  const { zone, color, directBoxes, subzones, totalBoxes, totalAnimals } = group
   const isNone = zone === null
 
   return (
@@ -180,6 +182,22 @@ function RootZoneSection({
           <span className={`px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold ${color.textOn} shadow-md`}>
             {totalBoxes} box{totalBoxes !== 1 ? 's' : ''}
           </span>
+          <span
+            title="Total des animaux présents dans cette zone (tous boxes confondus)"
+            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold ${color.textOn} shadow-md`}
+          >
+            <PawPrint className="w-3 h-3" />
+            {totalAnimals} animal{totalAnimals !== 1 ? 'x' : ''}
+          </span>
+          {!isNone && totalAnimals > 0 && (
+            <Link
+              href={`/boxes/zones/${zone.id}`}
+              title="Voir tous les animaux de la zone dans une seule vue"
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/30 backdrop-blur-sm text-xs font-bold ${color.textOn} shadow-md hover:bg-white/40 transition-colors`}
+            >
+              Voir tous les animaux
+            </Link>
+          )}
           {!isNone && (
             <a
               href={`/api/pdf/zone/${zone.id}`}
@@ -291,6 +309,7 @@ function groupBoxesByRootZone(boxes: EnrichedBox[], zones: BoxZone[]): RootZoneG
         .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
         .map((c) => ({ zone: c, boxes: [] })),
       totalBoxes: 0,
+      totalAnimals: 0,
     })
   }
 
@@ -304,11 +323,13 @@ function groupBoxesByRootZone(boxes: EnrichedBox[], zones: BoxZone[]): RootZoneG
           directBoxes: [],
           subzones: [],
           totalBoxes: 0,
+          totalAnimals: 0,
         })
       }
       const g = rootMap.get(noneKey)!
       g.directBoxes.push(box)
       g.totalBoxes++
+      g.totalAnimals += box.animal_count
       continue
     }
 
@@ -324,6 +345,7 @@ function groupBoxesByRootZone(boxes: EnrichedBox[], zones: BoxZone[]): RootZoneG
       root.directBoxes.push(box)
     }
     root.totalBoxes++
+    root.totalAnimals += box.animal_count
   }
 
   const result = Array.from(rootMap.values())
