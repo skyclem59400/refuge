@@ -22,6 +22,16 @@ function hours(start: string | null, end: string | null): number {
 
 export function CraDayEditModal({ memberId, day, onClose, onSaved }: Props) {
   const [isRest, setIsRest] = useState(day.is_rest_day)
+  // Les cases "Matin" / "Après-midi" permettent les demi-journées (intervention
+  // astreinte 7h30-10h30 sans après-midi par exemple). Initialisées selon les
+  // valeurs existantes, ou true par défaut si le jour était en repos (l'user
+  // décochera "Jour de repos" puis pourra ajuster).
+  const [hasMorning, setHasMorning] = useState(
+    day.is_rest_day ? true : !!(day.start_am && day.end_am)
+  )
+  const [hasAfternoon, setHasAfternoon] = useState(
+    day.is_rest_day ? true : !!(day.start_pm && day.end_pm)
+  )
   const [startAm, setStartAm] = useState(day.start_am?.slice(0, 5) || '08:00')
   const [endAm, setEndAm] = useState(day.end_am?.slice(0, 5) || '12:00')
   const [startPm, setStartPm] = useState(day.start_pm?.slice(0, 5) || '14:00')
@@ -34,24 +44,32 @@ export function CraDayEditModal({ memberId, day, onClose, onSaved }: Props) {
   // un férié (astreinte, intervention urgente, etc.) et il faut pouvoir le saisir.
   const isLocked = day.source === 'leave' || day.source === 'extended_leave'
   const isHoliday = day.source === 'holiday' || !!day.holiday_name
-  const total = isRest ? 0 : hours(startAm, endAm) + hours(startPm, endPm)
+  const total = isRest
+    ? 0
+    : (hasMorning ? hours(startAm, endAm) : 0) + (hasAfternoon ? hours(startPm, endPm) : 0)
 
   function save() {
+    if (!isRest && !hasMorning && !hasAfternoon) {
+      toast.error('Cochez au moins une demi-journée, ou activez "Jour de repos".')
+      return
+    }
     if (!isRest) {
-      for (const t of [endAm, endPm]) {
-        if (t > '17:00') {
-          toast.error('Aucun horaire ne peut dépasser 17h00.')
-          return
-        }
+      if (hasMorning && endAm > '17:00') {
+        toast.error('Aucun horaire ne peut dépasser 17h00.')
+        return
+      }
+      if (hasAfternoon && endPm > '17:00') {
+        toast.error('Aucun horaire ne peut dépasser 17h00.')
+        return
       }
     }
     startTransition(async () => {
       const r = await upsertCraEntry(memberId, day.date, {
         is_rest_day: isRest,
-        start_am: isRest ? null : startAm,
-        end_am: isRest ? null : endAm,
-        start_pm: isRest ? null : startPm,
-        end_pm: isRest ? null : endPm,
+        start_am: isRest || !hasMorning ? null : startAm,
+        end_am: isRest || !hasMorning ? null : endAm,
+        start_pm: isRest || !hasAfternoon ? null : startPm,
+        end_pm: isRest || !hasAfternoon ? null : endPm,
         notes: notes || null,
       })
       if (r.error) toast.error(r.error)
@@ -110,11 +128,42 @@ export function CraDayEditModal({ memberId, day, onClose, onSaved }: Props) {
               )}
 
               {!isRest && (
-                <div className="grid grid-cols-2 gap-3">
-                  <TimeInput label="Début matin" value={startAm} onChange={setStartAm} />
-                  <TimeInput label="Fin matin" value={endAm} onChange={setEndAm} />
-                  <TimeInput label="Début aprem" value={startPm} onChange={setStartPm} />
-                  <TimeInput label="Fin aprem" value={endPm} onChange={setEndPm} />
+                <div className="space-y-4">
+                  {/* Matin */}
+                  <div className={`rounded-lg border p-3 ${hasMorning ? 'border-primary/40 bg-primary/5' : 'border-border bg-surface-dark/30'}`}>
+                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                      <input
+                        type="checkbox"
+                        checked={hasMorning}
+                        onChange={(e) => setHasMorning(e.target.checked)}
+                      />
+                      <span className="text-sm font-semibold">Matin</span>
+                    </label>
+                    {hasMorning && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <TimeInput label="Début" value={startAm} onChange={setStartAm} />
+                        <TimeInput label="Fin" value={endAm} onChange={setEndAm} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Après-midi */}
+                  <div className={`rounded-lg border p-3 ${hasAfternoon ? 'border-primary/40 bg-primary/5' : 'border-border bg-surface-dark/30'}`}>
+                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                      <input
+                        type="checkbox"
+                        checked={hasAfternoon}
+                        onChange={(e) => setHasAfternoon(e.target.checked)}
+                      />
+                      <span className="text-sm font-semibold">Après-midi</span>
+                    </label>
+                    {hasAfternoon && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <TimeInput label="Début" value={startPm} onChange={setStartPm} />
+                        <TimeInput label="Fin" value={endPm} onChange={setEndPm} />
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
