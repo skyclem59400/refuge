@@ -4,6 +4,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/establishment/permissions'
 import { buildCraSaisiePdf } from '@/lib/pdf/cra-saisie-pdf'
 import { sendEmail } from '@/lib/email/client'
+import { logActivity } from '@/lib/actions/activity-log'
 
 const MONTH_FR = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -140,6 +141,20 @@ export async function sendCraToAccountant(
         sent_to: recipientEmail,
       })
       .eq('id', status.id)
+
+    await logActivity({
+      action: 'update',
+      entityType: 'cra_status',
+      entityId: status.id,
+      entityName: `CRA ${memberName} — ${monthLabel}`,
+      parentType: 'establishment_member',
+      parentId: memberId,
+      details: {
+        status: { old: status.status, new: 'sent' },
+        sent_to: recipientEmail,
+        is_external: isExternal,
+      },
+    })
 
     return { data: { sentTo: recipientEmail, isExternal } }
   } catch (e) {

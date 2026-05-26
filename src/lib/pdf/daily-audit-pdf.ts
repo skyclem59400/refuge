@@ -77,6 +77,7 @@ export async function buildDailyAuditPdf(opts: BuildOptions): Promise<DailyAudit
     judicial_incomplete: s.judicialIncomplete.length,
     animals_to_review: s.animalsToReview.length,
     actions_yesterday: s.totalActionsYesterday,
+    suspicious_changes: s.suspiciousChanges.length,
   }))
 
   const { data: runRow, error: insertErr } = await admin

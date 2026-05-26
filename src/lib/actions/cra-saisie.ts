@@ -2,6 +2,8 @@
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { requirePermission, requireEstablishment } from '@/lib/establishment/permissions'
+import { logActivity } from '@/lib/actions/activity-log'
+import { trackChanges } from '@/lib/utils/activity'
 import type {
   CraDay,
   CraDaySource,
@@ -394,27 +396,43 @@ export async function upsertCraEntry(
 
     const { data: existing } = await admin
       .from('cra_entries')
-      .select('id')
+      .select('*')
       .eq('member_id', memberId)
       .eq('date', date)
       .maybeSingle()
 
     if (existing?.id) {
+      const newValues = {
+        is_rest_day: payload.is_rest_day,
+        start_am: payload.start_am,
+        end_am: payload.end_am,
+        start_pm: payload.start_pm,
+        end_pm: payload.end_pm,
+        notes: payload.notes ?? null,
+      }
       const { data, error } = await admin
         .from('cra_entries')
         .update({
-          is_rest_day: payload.is_rest_day,
-          start_am: payload.start_am,
-          end_am: payload.end_am,
-          start_pm: payload.start_pm,
-          end_pm: payload.end_pm,
-          notes: payload.notes ?? null,
+          ...newValues,
           entered_by: user?.id || null,
         })
         .eq('id', existing.id)
         .select()
         .single()
       if (error) return { error: error.message }
+
+      const changes = trackChanges(existing as Record<string, unknown>, newValues)
+      if (Object.keys(changes).length > 0) {
+        await logActivity({
+          action: 'update',
+          entityType: 'cra_entry',
+          entityId: data.id,
+          entityName: `CRA ${date}`,
+          parentType: 'establishment_member',
+          parentId: memberId,
+          details: changes,
+        })
+      }
       return { data: data as CraEntry }
     }
 
@@ -436,6 +454,24 @@ export async function upsertCraEntry(
       .single()
 
     if (error) return { error: error.message }
+
+    await logActivity({
+      action: 'create',
+      entityType: 'cra_entry',
+      entityId: data.id,
+      entityName: `CRA ${date}`,
+      parentType: 'establishment_member',
+      parentId: memberId,
+      details: {
+        date,
+        is_rest_day: payload.is_rest_day,
+        start_am: payload.start_am,
+        end_am: payload.end_am,
+        start_pm: payload.start_pm,
+        end_pm: payload.end_pm,
+      },
+    })
+
     return { data: data as CraEntry }
   } catch (e) {
     return { error: (e as Error).message }
@@ -450,12 +486,32 @@ export async function deleteCraEntry(
   try {
     await requirePermission('manage_leaves')
     const admin = createAdminClient()
+
+    const { data: existing } = await admin
+      .from('cra_entries')
+      .select('id')
+      .eq('member_id', memberId)
+      .eq('date', date)
+      .maybeSingle()
+
     const { error } = await admin
       .from('cra_entries')
       .delete()
       .eq('member_id', memberId)
       .eq('date', date)
     if (error) return { error: error.message }
+
+    if (existing?.id) {
+      await logActivity({
+        action: 'delete',
+        entityType: 'cra_entry',
+        entityId: existing.id,
+        entityName: `CRA ${date}`,
+        parentType: 'establishment_member',
+        parentId: memberId,
+        details: { date },
+      })
+    }
     return { data: true }
   } catch (e) {
     return { error: (e as Error).message }
@@ -520,6 +576,16 @@ export async function submitCraToMember(
       })
       .eq('id', r.id)
     if (error) return { error: error.message }
+
+    await logActivity({
+      action: 'update',
+      entityType: 'cra_status',
+      entityId: r.id,
+      entityName: `CRA ${monthLabel(month)} ${year}`,
+      parentType: 'establishment_member',
+      parentId: memberId,
+      details: { status: { old: r.status, new: 'submitted' } },
+    })
 
     // Notification au collaborateur (in-app + email)
     const { data: memberData } = await admin
@@ -607,6 +673,16 @@ export async function validateCraAsMember(
       .eq('id', r.id)
     if (error) return { error: error.message }
 
+    await logActivity({
+      action: 'update',
+      entityType: 'cra_status',
+      entityId: r.id,
+      entityName: `CRA ${monthLabel(month)} ${year}`,
+      parentType: 'establishment_member',
+      parentId: memberId,
+      details: { status: { old: r.status, new: 'validated_by_member' } },
+    })
+
     // Le collaborateur a validé → les ADMINS (Clément, Céline) sont en charge
     // de la validation finale avant envoi comptable.
     await notifyAdminsOfCraEvent({
@@ -654,6 +730,16 @@ export async function validateCraAsAdmin(
       })
       .eq('id', r.id)
     if (error) return { error: error.message }
+
+    await logActivity({
+      action: 'update',
+      entityType: 'cra_status',
+      entityId: r.id,
+      entityName: `CRA ${monthLabel(month)} ${year}`,
+      parentType: 'establishment_member',
+      parentId: memberId,
+      details: { status: { old: r.status, new: 'validated_by_admin' } },
+    })
 
     // Mary peut maintenant envoyer au comptable → notifie les managers
     await notifyManagersOfCraEvent({
@@ -712,6 +798,19 @@ export async function requestCraChange(
       })
       .eq('id', r.id)
     if (updErr) return { error: updErr.message }
+
+    await logActivity({
+      action: 'update',
+      entityType: 'cra_status',
+      entityId: r.id,
+      entityName: `CRA ${monthLabel(month)} ${year}`,
+      parentType: 'establishment_member',
+      parentId: memberId,
+      details: {
+        status: { old: r.status, new: 'change_requested' },
+        comment: comment.trim().slice(0, 200),
+      },
+    })
 
     // Trace audit
     await admin.from('cra_change_requests').insert({
@@ -783,6 +882,19 @@ export async function resolveChangeRequest(
         change_request_comment: null,
       })
       .eq('id', cr.cra_status_id)
+
+    await logActivity({
+      action: 'update',
+      entityType: 'cra_status',
+      entityId: cr.cra_status_id,
+      entityName: `CRA — résolution demande`,
+      parentType: 'establishment_member',
+      parentId: cr.member_id,
+      details: {
+        status: { old: 'change_requested', new: 'draft' },
+        resolution_notes: resolutionNotes.slice(0, 200),
+      },
+    })
 
     return { data: true }
   } catch (e) {

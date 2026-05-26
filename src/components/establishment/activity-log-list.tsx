@@ -38,6 +38,8 @@ const ENTITY_LABELS: Record<string, string> = {
   member: 'le membre',
   permission_group: 'le groupe',
   establishment: 'l\'etablissement',
+  cra_entry: 'la saisie CRA',
+  cra_status: 'le CRA mensuel',
 }
 
 const ENTITY_FILTER_LABELS: Record<string, string> = {
@@ -54,6 +56,8 @@ const ENTITY_FILTER_LABELS: Record<string, string> = {
   member: 'Membres',
   permission_group: 'Groupes',
   establishment: 'Etablissement',
+  cra_entry: 'CRA — saisies',
+  cra_status: 'CRA — workflow',
 }
 
 const DETAIL_LABELS: Record<string, string> = {
@@ -119,6 +123,17 @@ const DETAIL_LABELS: Record<string, string> = {
   veterinarian: 'veterinaire',
   next_due_date: 'prochaine echeance',
   cost: 'cout',
+  // CRA
+  is_rest_day: 'jour de repos',
+  start_am: 'début matin',
+  end_am: 'fin matin',
+  start_pm: 'début après-midi',
+  end_pm: 'fin après-midi',
+  hours_total: 'heures totales',
+  comment: 'commentaire',
+  resolution_notes: 'résolution',
+  sent_to: 'envoyé à',
+  is_external: 'externe',
   plateforme: 'plateforme',
   intervention: 'intervention',
   appelant: 'appelant',

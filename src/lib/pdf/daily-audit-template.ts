@@ -222,6 +222,27 @@ function buildJudicialSection(section: DailyAuditSection): string {
   `
 }
 
+function buildSuspiciousSection(section: DailyAuditSection): string {
+  if (section.suspiciousChanges.length === 0) {
+    return ''
+  }
+  const rows = section.suspiciousChanges
+    .map((s) => `<tr>
+      <td>${escapeHtml(s.byName ?? '—')}</td>
+      <td>${escapeHtml(s.entityName ?? '—')}</td>
+      <td class="warn">${escapeHtml(s.reason)}</td>
+      <td><span class="muted">${escapeHtml(s.oldValue)}</span> → <strong>${escapeHtml(s.newValue)}</strong></td>
+    </tr>`)
+    .join('')
+  return `
+    <h3>⚠ Changements suspects (J-1)</h3>
+    <table class="data">
+      <thead><tr><th>Auteur</th><th>Cible</th><th>Raison</th><th>Avant → Après</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `
+}
+
 function buildEstablishmentReport(section: DailyAuditSection): string {
   return `
     <section class="estab">
@@ -234,6 +255,8 @@ function buildEstablishmentReport(section: DailyAuditSection): string {
 
       <h3>${section.critical.length > 0 ? '🚨 À traiter en priorité' : '✓ Pas d\'alerte critique'}</h3>
       ${buildCriticalSection(section)}
+
+      ${buildSuspiciousSection(section)}
 
       ${buildEngagementSection(section)}
 

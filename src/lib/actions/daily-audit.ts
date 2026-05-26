@@ -73,6 +73,17 @@ interface AuditJudicialGap {
   daysToHearing: number | null
 }
 
+export interface AuditSuspiciousChange {
+  byName: string | null
+  action: string
+  entityType: string
+  entityName: string | null
+  reason: string
+  oldValue: string
+  newValue: string
+  at: string
+}
+
 export interface DailyAuditSection {
   establishmentId: string
   establishmentName: string
@@ -105,6 +116,9 @@ export interface DailyAuditSection {
 
   // Procedures judiciaires
   judicialIncomplete: AuditJudicialGap[]
+
+  // Changements suspects detectes dans les activity_logs hier
+  suspiciousChanges: AuditSuspiciousChange[]
 
   // Score
   scoreOutOf100: number
@@ -166,15 +180,23 @@ export async function computeDailyAuditForEstablishment(
   const { startISO, endISO, isoDate } = yesterdayBoundsParis()
   const today = new Date().toISOString().slice(0, 10)
 
-  // 1. Activity logs hier (engagement)
+  // 1. Activity logs hier (engagement + detection d'incoherences)
   const { data: activityRaw } = await admin
     .from('activity_logs')
-    .select('user_id, action, entity_type')
+    .select('user_id, action, entity_type, entity_id, entity_name, details, created_at')
     .eq('establishment_id', establishmentId)
     .gte('created_at', startISO)
     .lt('created_at', endISO)
 
-  const activityList = (activityRaw || []) as Array<{ user_id: string | null; action: string; entity_type: string }>
+  const activityList = (activityRaw || []) as Array<{
+    user_id: string | null
+    action: string
+    entity_type: string
+    entity_id: string | null
+    entity_name: string | null
+    details: Record<string, unknown> | null
+    created_at: string
+  }>
   const totalActionsYesterday = activityList.length
 
   const actionsByUser = new Map<string, number>()
@@ -460,6 +482,101 @@ export async function computeDailyAuditForEstablishment(
     return b.missing.length - a.missing.length
   })
 
+  // 8.bis Detection de changements suspects dans les activity_logs hier
+  //
+  // Heuristiques :
+  //   - Animal birth_date : ecart > 365 jours entre old et new = suspect
+  //     (cas reel : adoption en fourriere d'un chien estime 2 ans, modifie
+  //     plus tard pour devenir "8 jours" — donne un age incoherent)
+  //   - Animal : suppression (entity_type=animal + action=delete)
+  //   - Procedure judiciaire : modification des champs cle (saisie_date,
+  //     hearing_date, jurisdiction, dossier_number) flagee pour relecture
+  const suspiciousChanges: AuditSuspiciousChange[] = []
+  const JUDICIAL_FIELDS = new Set([
+    'judicial_jurisdiction',
+    'judicial_seizure_date',
+    'judicial_dossier_number',
+    'judicial_hearing_date',
+    'judicial_decision_date',
+    'judicial_lawyer_name',
+    'judicial_owner_client_id',
+    'judicial_owner_name',
+  ])
+
+  function asChangeObj(v: unknown): { old: unknown; new: unknown } | null {
+    if (v && typeof v === 'object' && 'old' in v && 'new' in v) {
+      return v as { old: unknown; new: unknown }
+    }
+    return null
+  }
+
+  function fmt(v: unknown): string {
+    if (v === null || v === undefined) return '∅'
+    return String(v)
+  }
+
+  for (const a of activityList) {
+    const by = a.user_id ? namesMap.get(a.user_id) || null : null
+
+    // Suppression d'animal
+    if (a.entity_type === 'animal' && a.action === 'delete') {
+      suspiciousChanges.push({
+        byName: by,
+        action: a.action,
+        entityType: a.entity_type,
+        entityName: a.entity_name,
+        reason: 'Suppression d\'un animal',
+        oldValue: a.entity_name ?? '—',
+        newValue: '∅',
+        at: a.created_at,
+      })
+      continue
+    }
+
+    if (!a.details || a.action !== 'update') continue
+
+    // Animal: date de naissance incoherente
+    if (a.entity_type === 'animal') {
+      const bdChange = asChangeObj(a.details.birth_date)
+      if (bdChange) {
+        const oldDate = typeof bdChange.old === 'string' ? bdChange.old : null
+        const newDate = typeof bdChange.new === 'string' ? bdChange.new : null
+        if (oldDate && newDate) {
+          const diffDays = Math.abs(daysBetween(oldDate, newDate))
+          if (diffDays > 365) {
+            suspiciousChanges.push({
+              byName: by,
+              action: a.action,
+              entityType: a.entity_type,
+              entityName: a.entity_name,
+              reason: `Date de naissance modifiée de ${diffDays} jours (>365)`,
+              oldValue: oldDate,
+              newValue: newDate,
+              at: a.created_at,
+            })
+          }
+        }
+      }
+
+      // Procedure judiciaire : champs cles touches
+      for (const field of Object.keys(a.details)) {
+        if (!JUDICIAL_FIELDS.has(field)) continue
+        const ch = asChangeObj(a.details[field])
+        if (!ch) continue
+        suspiciousChanges.push({
+          byName: by,
+          action: a.action,
+          entityType: a.entity_type,
+          entityName: a.entity_name,
+          reason: `Procédure judiciaire — champ ${field} modifié`,
+          oldValue: fmt(ch.old),
+          newValue: fmt(ch.new),
+          at: a.created_at,
+        })
+      }
+    }
+  }
+
   // 9. Critiques (en haut du rapport, rouge)
   const critical: AuditCriticalItem[] = []
   for (const j of judicialIncomplete) {
@@ -493,6 +610,16 @@ export async function computeDailyAuditForEstablishment(
     }
   }
 
+  // Changements suspects : promus en critique si presents
+  for (const s of suspiciousChanges) {
+    critical.push({
+      level: 'warning',
+      category: 'Incohérence',
+      label: `${s.entityName ?? '—'} — ${s.reason}`,
+      detail: `${s.byName ?? 'Inconnu'} : ${s.oldValue} → ${s.newValue}`,
+    })
+  }
+
   // 10. Score /100 — simple heuristic
   let score = 100
   score -= critical.filter((c) => c.level === 'critical').length * 10
@@ -501,6 +628,7 @@ export async function computeDailyAuditForEstablishment(
   score -= craGaps.length * 5
   score -= animalsToReview.length * 1
   score -= inactiveMembers.length * 3
+  score -= suspiciousChanges.length * 4
   score = Math.max(0, Math.min(100, score))
 
   return {
@@ -519,6 +647,7 @@ export async function computeDailyAuditForEstablishment(
     craGaps,
     animalsToReview: animalsToReview.slice(0, 15),
     judicialIncomplete,
+    suspiciousChanges,
     scoreOutOf100: score,
   }
 }

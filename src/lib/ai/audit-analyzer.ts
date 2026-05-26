@@ -57,6 +57,12 @@ OBLIGATIONS MÉTIER ET LÉGALES À SURVEILLER
    - Conformité : registres à jour, identification, conditions hébergement, suivi sanitaire
    - Sanctions possibles si manquements (fermeture administrative, retrait agrément)
 
+8. **Vigilance sur les incohérences de saisie** :
+   - Une date de naissance modifiée de plus d'un an signale presque toujours une erreur (Mary saisissait un âge estimé, quelqu'un a corrigé sans vérifier)
+   - Pour un chien adulte en fourrière, un "âge" à quelques jours est physiquement impossible
+   - Toute modification d'un champ de procédure judiciaire (juridiction, date saisie, audience, avocat) doit être validée par un admin car ces données engagent l'association devant le tribunal
+   - Une suppression d'animal effacerait son dossier — vérifier qu'elle est légitime (doublon, erreur de saisie) et non une perte de traçabilité
+
 TON STYLE D'ANALYSE
 - **Concis et opérationnel** : 4-6 paragraphes maximum, pas de blabla
 - **Priorise les risques métier** : juridique (procédures judiciaires) > sanitaire (rappels en retard) > administratif (CRA) > qualité (fiches animaux) > engagement équipe
@@ -148,6 +154,19 @@ export async function generateAuditAnalysis(
         hearing_date: j.hearingDate,
         days_to_hearing: j.daysToHearing,
         missing: j.missing,
+      })),
+    },
+    suspicious_changes: {
+      count: s.suspiciousChanges.length,
+      items: s.suspiciousChanges.map((c) => ({
+        by: c.byName,
+        action: c.action,
+        entity_type: c.entityType,
+        entity_name: c.entityName,
+        reason: c.reason,
+        from: c.oldValue,
+        to: c.newValue,
+        at: c.at,
       })),
     },
   }))
