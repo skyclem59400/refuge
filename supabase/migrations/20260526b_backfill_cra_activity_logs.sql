@@ -41,7 +41,7 @@ SELECT
     'start_pm', e.start_pm,
     'end_pm', e.end_pm
   ),
-  e.created_at
+  e.entered_at
 FROM cra_entries e
 WHERE e.entered_by IS NOT NULL
   AND NOT EXISTS (
