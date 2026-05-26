@@ -241,6 +241,18 @@ function getEntityLink(log: ActivityLog): string | null {
   }
 }
 
+/** Lien vers l'entité parente du log (animal concerné par une photo, par un
+ *  mouvement, client concerné par un contrat, membre concerné par un CRA, etc.). */
+function getParentLink(log: ActivityLog): string | null {
+  if (!log.parent_id || !log.parent_type) return null
+  switch (log.parent_type) {
+    case 'animal': return `/animals/${log.parent_id}`
+    case 'client': return `/clients/${log.parent_id}`
+    case 'establishment_member': return `/etablissement/membres/${log.parent_id}`
+    default: return null
+  }
+}
+
 function buildSentence(log: ActivityLog, userName: string): { text: string; entityName: string | null; entityLink: string | null } {
   const verb = ACTION_VERBS[log.action] || log.action
   const entityLabel = ENTITY_LABELS[log.entity_type] || log.entity_type
@@ -405,6 +417,7 @@ export function ActivityLogList({ logs, userNames, userKinds, parentNames }: Act
                   ? {
                       preposition: PARENT_PREPOSITION[log.parent_type] ?? 'pour',
                       name: parentNames[log.parent_id],
+                      link: getParentLink(log),
                     }
                   : null
 
@@ -443,7 +456,16 @@ export function ActivityLogList({ logs, userNames, userKinds, parentNames }: Act
                           {' '}
                           <span className="text-muted">{parentLabel.preposition}</span>
                           {' '}
-                          <span className="font-semibold">{parentLabel.name}</span>
+                          {parentLabel.link ? (
+                            <Link
+                              href={parentLabel.link}
+                              className="font-semibold text-primary hover:text-primary-light transition-colors"
+                            >
+                              {parentLabel.name}
+                            </Link>
+                          ) : (
+                            <span className="font-semibold">{parentLabel.name}</span>
+                          )}
                         </>
                       )}
                     </p>
