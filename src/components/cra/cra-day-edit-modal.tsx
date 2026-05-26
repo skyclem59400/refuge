@@ -29,7 +29,11 @@ export function CraDayEditModal({ memberId, day, onClose, onSaved }: Props) {
   const [notes, setNotes] = useState(day.notes || '')
   const [isPending, startTransition] = useTransition()
 
-  const isLocked = day.source === 'leave' || day.source === 'holiday' || day.source === 'extended_leave'
+  // Seuls les congés validés et les arrêts longue durée bloquent vraiment la saisie.
+  // Les jours fériés restent éditables : on peut travailler exceptionnellement
+  // un férié (astreinte, intervention urgente, etc.) et il faut pouvoir le saisir.
+  const isLocked = day.source === 'leave' || day.source === 'extended_leave'
+  const isHoliday = day.source === 'holiday' || !!day.holiday_name
   const total = isRest ? 0 : hours(startAm, endAm) + hours(startPm, endPm)
 
   function save() {
@@ -81,15 +85,29 @@ export function CraDayEditModal({ memberId, day, onClose, onSaved }: Props) {
           {isLocked ? (
             <div className="p-4 rounded-xl border border-orange-500/40 bg-orange-500/10 text-sm text-orange-200">
               {day.source === 'leave' && `Ce jour est un congé (${day.leave_label}). Modifiez la demande de congé directement si besoin.`}
-              {day.source === 'holiday' && `Jour férié : ${day.holiday_name}.`}
               {day.source === 'extended_leave' && `Arrêt longue durée.`}
             </div>
           ) : (
             <>
+              {isHoliday && (
+                <div className="p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 text-xs text-amber-200">
+                  <strong>Jour férié : {day.holiday_name}.</strong> Si vous avez travaillé exceptionnellement
+                  ce jour (astreinte, intervention urgente, etc.), saisissez vos horaires ci-dessous.
+                  Sinon laissez en jour de repos.
+                </div>
+              )}
+
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={isRest} onChange={(e) => setIsRest(e.target.checked)} />
                 <span className="text-sm font-semibold">Jour de repos</span>
               </label>
+
+              {isRest && (
+                <div className="p-3 rounded-xl border border-primary/30 bg-primary/5 text-xs text-primary-light">
+                  💡 <strong>Décochez « Jour de repos »</strong> ci-dessus pour saisir vos horaires
+                  (ex : intervention astreinte un dimanche de 7h30 à 10h30).
+                </div>
+              )}
 
               {!isRest && (
                 <div className="grid grid-cols-2 gap-3">
