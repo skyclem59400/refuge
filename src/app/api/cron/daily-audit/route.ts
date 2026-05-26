@@ -23,7 +23,14 @@ async function handleRequest(req: NextRequest) {
   }
 
   try {
-    const run = await buildDailyAuditPdf({ triggerSource: 'cron' })
+    // Scope optionnel : si DAILY_AUDIT_ESTABLISHMENT_IDS est defini (CSV d'UUID),
+    // limite l'audit a ces etablissements. Sinon audite tous (retro-compat).
+    const scopeRaw = process.env.DAILY_AUDIT_ESTABLISHMENT_IDS
+    const establishmentIds = scopeRaw
+      ? scopeRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
+      : undefined
+
+    const run = await buildDailyAuditPdf({ triggerSource: 'cron', establishmentIds })
 
     const dateLabel = new Date(run.auditDate + 'T00:00:00').toLocaleDateString('fr-FR', {
       weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',

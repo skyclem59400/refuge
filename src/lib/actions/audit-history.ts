@@ -37,7 +37,7 @@ export interface AuditHistoryRow {
   generated_by_name?: string | null
 }
 
-async function requireAdmin(): Promise<{ userId: string }> {
+async function requireAdmin(): Promise<{ userId: string; establishmentId: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Non authentifié')
@@ -45,7 +45,7 @@ async function requireAdmin(): Promise<{ userId: string }> {
   const ctx = await getEstablishmentContext()
   if (!ctx?.permissions.isAdmin) throw new Error('Réservé aux administrateurs')
 
-  return { userId: user.id }
+  return { userId: user.id, establishmentId: ctx.establishment.id }
 }
 
 export async function listAuditRuns(limit = 30): Promise<{ data?: AuditHistoryRow[]; error?: string }> {
@@ -104,8 +104,12 @@ export async function generateAuditNow(options?: { sendEmail?: boolean }): Promi
   error?: string
 }> {
   try {
-    const { userId } = await requireAdmin()
-    const run = await buildDailyAuditPdf({ triggerSource: 'manual', generatedByUserId: userId })
+    const { userId, establishmentId } = await requireAdmin()
+    const run = await buildDailyAuditPdf({
+      triggerSource: 'manual',
+      generatedByUserId: userId,
+      establishmentIds: [establishmentId],
+    })
 
     let emailSent = false
     if (options?.sendEmail) {

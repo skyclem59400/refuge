@@ -26,6 +26,8 @@ interface BuildOptions {
   triggerSource: 'cron' | 'manual'
   /** UUID du super admin qui a declenche manuellement (null pour cron). */
   generatedByUserId?: string | null
+  /** Si fourni, restreint l'audit a ces etablissements. Sinon : tous. */
+  establishmentIds?: string[]
 }
 
 /**
@@ -38,8 +40,8 @@ interface BuildOptions {
 export async function buildDailyAuditPdf(opts: BuildOptions): Promise<DailyAuditRunResult> {
   const admin = createAdminClient()
 
-  // 1. Calcul des sections
-  const sections = await computeDailyAudit()
+  // 1. Calcul des sections (filtre etablissement si fourni)
+  const sections = await computeDailyAudit(opts.establishmentIds)
   const auditDate = sections[0]?.auditDate || new Date().toISOString().slice(0, 10)
   const criticalCount = sections.reduce(
     (acc, s) => acc + s.critical.filter((c) => c.level === 'critical').length,

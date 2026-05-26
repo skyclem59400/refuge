@@ -652,9 +652,15 @@ export async function computeDailyAuditForEstablishment(
   }
 }
 
-export async function computeDailyAudit(): Promise<DailyAuditSection[]> {
+export async function computeDailyAudit(
+  establishmentIds?: string[],
+): Promise<DailyAuditSection[]> {
   const admin = createAdminClient()
-  const { data: estabsRaw } = await admin.from('establishments').select('id, name').order('name')
+  let query = admin.from('establishments').select('id, name').order('name')
+  if (establishmentIds && establishmentIds.length > 0) {
+    query = query.in('id', establishmentIds)
+  }
+  const { data: estabsRaw } = await query
   const estabs = (estabsRaw || []) as Array<{ id: string; name: string }>
   const sections: DailyAuditSection[] = []
   for (const e of estabs) {
