@@ -115,11 +115,13 @@ export function CommunesList({ epcis, communes, currentFilters, stats }: Props) 
           <select
             value={currentFilters.epci ?? ''}
             onChange={(e) => updateFilter('epci', e.target.value)}
-            className="px-3 py-2 border rounded-md text-sm bg-background min-w-[200px]"
+            className="px-3 py-2 border border-border rounded-md text-sm bg-surface text-text min-w-[260px] focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+            style={{ colorScheme: 'dark' }}
           >
-            <option value="">Toutes les EPCI</option>
+            <option value="" className="bg-surface text-text">Toutes les EPCI</option>
+            <option value="none" className="bg-surface text-text">Communes indépendantes (sans EPCI)</option>
             {epcis.map((e) => (
-              <option key={e.code_siren} value={e.code_siren}>
+              <option key={e.code_siren} value={e.code_siren} className="bg-surface text-text">
                 {e.short_name} — {e.full_name} ({e.member_count})
               </option>
             ))}
@@ -160,7 +162,13 @@ export function CommunesList({ epcis, communes, currentFilters, stats }: Props) 
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <div>{epci?.short_name ?? '—'}</div>
+                        {epci ? (
+                          <div>{epci.short_name}</div>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
+                            Indépendante
+                          </span>
+                        )}
                         <div className="text-xs text-muted">Dept {c.department}</div>
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">

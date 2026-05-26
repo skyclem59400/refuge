@@ -42,7 +42,10 @@ export default async function CommunesPage({
   // (active + pending). L'utilisateur peut explicitement demander toutes les communes
   // via ?status=all (utile pour l'admin lors de l'ajout de nouvelles conventions).
   let filtered = communes ?? []
-  if (params.epci) {
+  if (params.epci === 'none') {
+    // Communes independantes : aucune EPCI rattachee
+    filtered = filtered.filter((c) => c.epci_code_siren === null)
+  } else if (params.epci) {
     filtered = filtered.filter((c) => c.epci_code_siren === params.epci)
   }
   if (params.status === 'all') {
@@ -66,6 +69,7 @@ export default async function CommunesPage({
   }
 
   // Stats globales
+  const independentCount = communes?.filter((c) => c.epci_code_siren === null).length ?? 0
   const stats = {
     total: communes?.length ?? 0,
     active: communes?.filter((c) => c.convention_status === 'active').length ?? 0,
@@ -80,6 +84,7 @@ export default async function CommunesPage({
         <p className="text-sm text-muted mt-1">
           {stats.total} communes du territoire SDA · {stats.active} sous convention active ·{' '}
           {stats.pending} en cours · {stats.none} hors convention
+          {independentCount > 0 && ` · ${independentCount} indépendante${independentCount > 1 ? 's' : ''}`}
         </p>
       </div>
 
