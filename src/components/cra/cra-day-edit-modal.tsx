@@ -23,14 +23,16 @@ function hours(start: string | null, end: string | null): number {
 export function CraDayEditModal({ memberId, day, onClose, onSaved }: Props) {
   const [isRest, setIsRest] = useState(day.is_rest_day)
   // Les cases "Matin" / "Après-midi" permettent les demi-journées (intervention
-  // astreinte 7h30-10h30 sans après-midi par exemple). Initialisées selon les
-  // valeurs existantes, ou true par défaut si le jour était en repos (l'user
-  // décochera "Jour de repos" puis pourra ajuster).
+  // astreinte 7h30-10h30 sans après-midi par exemple).
+  // Cas 1 : le jour avait deja des horaires saisis → on respecte ce qui existe
+  // Cas 2 : le jour etait en repos (dimanche, ferie) → on pre-coche SEULEMENT
+  //   le matin (cas typique : intervention astreinte courte). L'user pourra
+  //   cocher l'apres-midi en plus si besoin.
   const [hasMorning, setHasMorning] = useState(
     day.is_rest_day ? true : !!(day.start_am && day.end_am)
   )
   const [hasAfternoon, setHasAfternoon] = useState(
-    day.is_rest_day ? true : !!(day.start_pm && day.end_pm)
+    day.is_rest_day ? false : !!(day.start_pm && day.end_pm)
   )
   const [startAm, setStartAm] = useState(day.start_am?.slice(0, 5) || '08:00')
   const [endAm, setEndAm] = useState(day.end_am?.slice(0, 5) || '12:00')
@@ -60,6 +62,18 @@ export function CraDayEditModal({ memberId, day, onClose, onSaved }: Props) {
       }
       if (hasAfternoon && endPm > '17:00') {
         toast.error('Aucun horaire ne peut dépasser 17h00.')
+        return
+      }
+      if (hasMorning && endAm <= startAm) {
+        toast.error('Matin : l\'heure de fin doit être après l\'heure de début.')
+        return
+      }
+      if (hasAfternoon && endPm <= startPm) {
+        toast.error('Après-midi : l\'heure de fin doit être après l\'heure de début.')
+        return
+      }
+      if (hasMorning && hasAfternoon && startPm < endAm) {
+        toast.error(`L'après-midi (${startPm}) ne peut pas commencer avant la fin du matin (${endAm}). Ajustez les horaires ou décochez une demi-journée.`)
         return
       }
     }

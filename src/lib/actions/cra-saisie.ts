@@ -376,6 +376,20 @@ export async function upsertCraEntry(
       payload.end_am = null
       payload.start_pm = null
       payload.end_pm = null
+    } else {
+      // Validation de cohérence chronologique (même règles que la contrainte
+      // DB ce_times_ordered, mais avec un message clair côté UI).
+      if (payload.start_am && payload.end_am && payload.end_am <= payload.start_am) {
+        return { error: 'Matin : l\'heure de fin doit être après l\'heure de début.' }
+      }
+      if (payload.start_pm && payload.end_pm && payload.end_pm <= payload.start_pm) {
+        return { error: 'Après-midi : l\'heure de fin doit être après l\'heure de début.' }
+      }
+      if (payload.end_am && payload.start_pm && payload.start_pm < payload.end_am) {
+        return {
+          error: `L'après-midi (${payload.start_pm}) ne peut pas commencer avant la fin du matin (${payload.end_am}). Décochez l'après-midi si vous ne travaillez que le matin.`,
+        }
+      }
     }
 
     const { data: existing } = await admin
