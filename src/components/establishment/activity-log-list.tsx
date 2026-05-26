@@ -13,6 +13,18 @@ interface ActivityLogListProps {
   /** Mapping user_id -> kind (admin / salarie / benevole / auto_entrepreneur / autre).
    *  Si omis, le filtre par type est masque. */
   readonly userKinds?: Record<string, MemberKind>
+  /** Mapping parent_id -> nom affichable. Utilise pour les logs dont
+   *  parent_type est renseigne (establishment_member, animal, ...) pour
+   *  indiquer "pour qui / quoi" l'action a eu lieu.
+   *  Couvre member_id (CRA, astreintes, semaines types) et animal_id
+   *  (photos, soins, sorties, mouvements, ...). */
+  readonly parentNames?: Record<string, string>
+}
+
+const PARENT_PREPOSITION: Record<string, string> = {
+  establishment_member: 'pour',
+  animal: 'sur',
+  client: 'pour',
 }
 
 const KIND_LABELS: Record<MemberKind, string> = {
@@ -242,7 +254,7 @@ function buildSentence(log: ActivityLog, userName: string): { text: string; enti
   }
 }
 
-export function ActivityLogList({ logs, userNames, userKinds }: ActivityLogListProps) {
+export function ActivityLogList({ logs, userNames, userKinds, parentNames }: ActivityLogListProps) {
   const [search, setSearch] = useState('')
   const [actionFilter, setActionFilter] = useState<string>('all')
   const [entityFilter, setEntityFilter] = useState<string>('all')
@@ -388,6 +400,13 @@ export function ActivityLogList({ logs, userNames, userKinds }: ActivityLogListP
               const userName = userNames[log.user_id] || 'Utilisateur inconnu'
               const sentence = buildSentence(log, userName)
               const details = buildDetailString(log.details)
+              const parentLabel =
+                log.parent_type && log.parent_id && parentNames && parentNames[log.parent_id]
+                  ? {
+                      preposition: PARENT_PREPOSITION[log.parent_type] ?? 'pour',
+                      name: parentNames[log.parent_id],
+                    }
+                  : null
 
               return (
                 <div key={log.id} className="flex items-start gap-3 px-5 py-3 hover:bg-surface-hover transition-colors">
@@ -417,6 +436,14 @@ export function ActivityLogList({ logs, userNames, userKinds }: ActivityLogListP
                           ) : (
                             <span className="font-semibold">{sentence.entityName}</span>
                           )}
+                        </>
+                      )}
+                      {parentLabel && (
+                        <>
+                          {' '}
+                          <span className="text-muted">{parentLabel.preposition}</span>
+                          {' '}
+                          <span className="font-semibold">{parentLabel.name}</span>
                         </>
                       )}
                     </p>
