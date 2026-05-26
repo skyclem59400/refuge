@@ -1004,3 +1004,214 @@ Bug : la FK pointait par erreur vers `establishment_members(id)` alors que le co
 - 3 mails satisfaction envoyés à clement.scailteux@gmail.com (un par variante), Brevo accepte, charte SDA OK, logo OK
 - Endpoint `/api/test/satisfaction-email` créé pour preview rapide (à retirer plus tard)
 - INSERT test sur `judicial_attachments` avec user_id réel : passe (FK fix validée)
+
+---
+
+## Session 2026-05-23 — Réconciliation /requisitions vs filtre judicial_procedure
+
+### 27. Renommage /requisitions → /procedures + filtre sur judicial_procedure (commit `549eae0`)
+
+**Symptôme remonté par Clément :** la page Réquisition affichait 4 animaux, alors que le filtre "Procédure : oui" dans /animals en montrait 10. Incohérence visible.
+
+**Cause :** deux concepts confondus dans l'UI.
+- `animals.origin_type = 'requisition'` = **mode d'arrivée** historique figé (4 animaux : OLAF, NICOLETTA, SIMBA, DUSTER, tous arrivés par réquisition stricte du procureur)
+- `animals.judicial_procedure = true` = **état actuel** d'une procédure judiciaire en cours (10 animaux, dont les 4 réquisitions + 6 chiens trouvés errants mais marqués en procédure après enquête)
+
+La page `/requisitions` filtrait sur `origin_type`. Le filtre `/animals` filtre sur `judicial_procedure`. Sémantiques différentes, vocabulaire identique → confusion.
+
+**Changements (sur recommandation validée par Clément) :**
+- `git mv src/app/(app)/requisitions → src/app/(app)/procedures` (historique préservé)
+- Filtre changé : `origin_type='requisition'` → `judicial_procedure=true`
+- Titre "Requisition" → "Procédure judiciaire" + accents corrects
+- Sous-titre dynamique : `"X animaux en procédure judiciaire en cours (dont N arrivés par réquisition)"`
+- Nouvelle colonne **Origine** avec `ORIGIN_LABELS: Record<AnimalOrigin, string>` exhaustif (typé : compile error si on ajoute une origine sans la libeller). Badge primary pour les réquisitions strictes, badge neutre pour les autres modes d'arrivée.
+- `nav-config.ts` : sidebar `/procedures` + label "Procédure judiciaire"
+
+**Effet métier :** la page reflète maintenant le vrai besoin — voir tous les animaux **bloqués juridiquement** (qu'on ne peut pas adopter / sortir), peu importe leur mode d'admission. La nuance "réquisition vs autre" reste visible via la colonne Origine.
+
+**Insight architecture :** garder deux champs distincts (`origin_type` historique + `judicial_procedure` état) est juste métier. Seul le routage UI doit refléter le besoin de lecture, pas le détail de saisie.
+
+---
+
+## Session 2026-05-24 — Fiche membre + vue zone agrégée + backfill contrats
+
+### 28. Fiche détaillée par membre /etablissement/membres/[id] (commit `2ca5f87`)
+
+**Symptôme remonté par Clément :** "j'ai le sentiment que les contrats n'ont pas été intégrés directement à chaque personne, dans chaque espace, avec la possibilité pour les admins de voir tout le monde."
+
+**Diagnostic :** avant ce commit, la donnée existait (table `member_documents` + actions filtrables par `memberId`) mais l'UI manquait :
+- `/admin/contrats` : page admin globale qui groupait visuellement par collaborateur (encart par personne), mais reste un seul écran centralisé
+- `/espace-collaborateur/contrats` : page perso filtrée sur le membre courant
+- **Pas de fiche par membre** où l'admin pourrait voir tout sur un collaborateur (identité + permissions + contrats + à terme congés/CRA)
+- Liste des membres dans `/etablissement` non cliquable (aucun `<Link>` sortant dans `members-list.tsx`)
+
+**Implémentation :**
+- **Nouvelle route `/etablissement/membres/[id]/page.tsx`** (server component, `dynamic = 'force-dynamic'`)
+  - Charge le membre via `establishment_members` (1 query) + enrichit avec `get_users_info` RPC (full_name/email/avatar)
+  - Charge les groupes via `member_groups` → `permission_groups` (2 queries — copié du pattern `getEstablishmentMembers` après avoir vérifié le vrai nom de la table de jointure : `member_groups`, pas `member_group_links` comme je l'avais deviné en premier)
+  - Charge les documents via `getMemberDocuments({ memberId: id })`
+  - En-tête : avatar 64px + nom + email + badges (rôle, type de contrat via `CONTRACT_TYPE_LABELS`, groupes)
+  - Section "Contrats & documents RH" intégrée : `MemberDocumentUpload` (si admin) + `MemberDocumentList` (toujours)
+  - Bouton "← Retour aux membres"
+- **`MemberDocumentUpload` enrichi** d'une prop optionnelle `lockedMemberId?: string`
+  - Si présente, le state `memberId` est initialisé avec cette valeur et le dropdown collaborateur est masqué
+  - Le `resetForm()` re-fixe sur `lockedMemberId` (au lieu de vider)
+  - Évite de dupliquer le composant en mode "single member"
+- **`MembersList` modifié** : le nom du membre devient un `<Link href="/etablissement/membres/${member.id}">` (couleur primary au hover + underline). Reste du composant (groupes, reset mdp, retirer) inchangé.
+
+**Permissions :**
+- Accès à toutes les fiches : `canManageEstablishment` OU `canManagePayslips`
+- Accès à sa propre fiche : tout membre (badge "Vous" affiché)
+- Upload / delete : strictement `manage_payslips` (déjà géré côté server action)
+
+**Insight tooling :** la première version utilisait `select('*, groups:member_group_links(group:permission_groups(*))')` (nested embed). Le build TS passait, mais en runtime ça aurait planté car la table de jointure s'appelle **`member_groups`** (pas `member_group_links`). Sauvée par la vérification de `getEstablishmentMembers` qui lui faisait du multi-queries explicite. Règle : **ne jamais deviner un schéma DB, toujours grep une fonction existante qui interroge cette table.**
+
+### 29. Vue agrégée par zone /boxes/zones/[id] + script backfill contrats (commit `0905b32`)
+
+**Symptôme remonté par Clément :** "le problème dans le fonctionnement actuel, c'est que tu as par exemple enclos Pierrette, et derrière, tu dois faire des boxes avec X place. Sauf que, là, il faut que je puisse visualiser facilement l'enclos Pierrette et l'intégralité des animaux qui sont avec."
+
+**Diagnostic :** modèle Zone > Box > Animaux calibré pour SDA (chenil avec boxes individuels). Pour la Ferme Ô Quatre Vents (enclos extérieur = un troupeau libre), forcer 1 box par animal n'a pas de sens. L'utilisateur veut voir "Enclos Pierrette : 20 chèvres" directement.
+
+**Choix d'architecture (option recommandée et validée) :**
+- **Pas de migration DB** (on garde `animals.box_id` FK unique). Les boxes restent l'unité de stockage technique.
+- **Zone = unité de lecture principale** : on agrège visuellement les animaux de tous les boxes d'une zone racine (+ sous-zones).
+- Pattern minimaliste, réversible, sans surface de bug.
+
+**Changements `/boxes/page.tsx` :**
+- `RootZoneGroup` enrichi d'un `totalAnimals` calculé dans `groupBoxesByRootZone` (somme de `box.animal_count` pour les boxes directs + sous-zones)
+- En-tête de zone : nouveau badge `<PawPrint /> X animaux` à côté de `X boxes`
+- Nouveau bouton "Voir tous les animaux" → `/boxes/zones/[id]` (visible dès qu'il y a ≥ 1 animal)
+
+**Nouvelle route `/boxes/zones/[id]/page.tsx` :**
+- Charge la zone (404 si on tombe sur une sous-zone : on redirige conceptuellement vers la racine)
+- Charge `listBoxZones` + `getBoxes` (à l'époque, sans optimisation — corrigé dans la session suivante)
+- Filtre les boxes appartenant à la zone racine ou à ses sous-zones via `allZoneIds = new Set([zone.id, ...subzones.map(z => z.id)])`
+- Agrège la liste plate d'animaux avec le `box_name` d'origine pour traçabilité
+- **Tri intelligent** : noms numériques d'abord en ordre numérique (1, 2, 3… 20 — au lieu du tri alphabétique qui donnerait 1, 10, 11, 12, 2, 20, 3…). Code :
+  ```ts
+  animals.sort((a, b) => {
+    const na = Number(a.name); const nb = Number(b.name)
+    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb
+    if (!Number.isNaN(na)) return -1
+    if (!Number.isNaN(nb)) return 1
+    return a.name.localeCompare(b.name)
+  })
+  ```
+- Grille responsive `grid-cols-2 sm:3 md:4 lg:5 xl:6` avec cards photo + nom + sexe + espèce + statut
+- Si plusieurs boxes dans la zone : affichage du nom du box sous chaque carte (`📦 box_name`). Sinon masqué (info redondante).
+- Couleur de zone reprise via `getZoneColor(zone.id)` (déterministe — même couleur que sur /boxes)
+
+**Action métier réalisée en parallèle :** affectation des 20 animaux numérotés (chèvres + 1 mouton n°7) de la Ferme à l'enclos Pierette via UPDATE direct en SQL. Aucune contrainte DB ne bloque le mouton dans un box étiqueté `species_type='goat'` (c'est juste un libellé UI). Capacité 25, OK.
+
+### 30. Script backfill contrats `scripts/upload-initial-contracts.mjs` (même commit `0905b32`)
+
+**Contexte :** lors de la session 2026-05-22, j'avais documenté que Clément devait uploader manuellement les 6 contrats CDI dans `/admin/contrats` (je n'ai pas accès aux fichiers binaires des pièces jointes Claude). Quand il m'a relancé "tu as déjà mis les contrats à chaque collaborateur ?", j'ai confirmé : 0 ligne dans `member_documents`.
+
+**Solution :** script Node CLI exécuté en local avec les credentials Supabase service_role.
+
+**Mapping confirmé** (FREMAUX Maryline = Mary la manager — j'avais à tort noté Mary comme distincte de Maryline dans ma mémoire ; corrigé dans `sda_salaries_actifs.md`) :
+
+| PDF (~/Downloads/) | member_id | Label |
+|---|---|---|
+| ROSELLE Franck CDI.pdf | ece49e8a-… | CDI initial |
+| FREMAUX Maryline CDI.pdf | 44d5419f-… (Mary) | CDI initial |
+| DELVILLE Marina contrat.pdf | 610bf4ca-… | Contrat de travail |
+| SENECHAL Carole CDI.pdf | d6d4c766-… | CDI initial |
+| DAUX Eric CDI.pdf | 46ff29b5-… | CDI initial |
+| DELOCH Yann CDI.pdf | 34f2d72a-… | CDI initial |
+
+**Caractéristiques du script :**
+- `node --env-file=.env.local scripts/upload-initial-contracts.mjs` (env natif Node 20.6+, pas de `dotenv` requis)
+- Upload via `supabase.storage.from('employment-docs').upload(...)` avec path `{estab}/{member}/contract/{ts}-{safe_name}`
+- Insert direct dans `member_documents` (bypass `uploadMemberDocument` car celui-ci attend un cookie de session — impossible en CLI)
+- **Idempotent par rollback** : si l'insert DB échoue, le fichier storage est supprimé (`storage.remove([path])`) — pas de fichier orphelin. Même contrat que la server action prod.
+- Pas de notification au collaborateur (volontaire : éviter de spammer 6 notifs pour des contrats qu'ils ont déjà en main)
+- Vérif post-exécution via SQL : 6 rows insérées (298 Ko à 1302 Ko)
+
+---
+
+## Session 2026-05-25 — Refonte UX vignette box + fix photo mobile
+
+### 31. Fix bug photo mobile : tap miniature affiche au lieu de supprimer (commit `8445d84`)
+
+**Symptôme remonté par Clément :** "sur téléphone lorsque l'on est sur les photos d'un animal, si on clique sur une autre photo ça propose supprimer directement la photo plutôt que de l'afficher."
+
+**Cause :** l'overlay d'actions (Star + Trash2) au-dessus de chaque thumbnail utilisait `opacity-0 group-hover:opacity-100`. Sur Safari iOS, un tap déclenche un `:hover` éphémère qui révèle l'overlay le temps du tap. Comme les boutons restaient `pointer-events: auto`, le tap atterrissait sur la poubelle au centre de la miniature au lieu du div parent qui voulait sélectionner la photo.
+
+**Fix :**
+- Overlay limité aux appareils à hover réel via `[@media(hover:hover)]:group-hover:opacity-100` + `[@media(hover:hover)]:group-hover:pointer-events-auto`
+- Par défaut : `pointer-events-none` → l'overlay reste invisible **et** non-cliquable sur tactile, même si Safari simule un hover éphémère
+- Compensation : barre d'actions visible **sous la grande photo** (Définir comme principale / Supprimer) qui agit sur `displayPhoto`. Accessible sur tous écrans. Pattern à généraliser pour les overlays "au survol".
+
+### 32. Clic vignette box → page de détail plein écran (commit `15237ba`)
+
+**Symptôme remonté par Clément (capture drawer Pierette avec 20 chèvres en liste verticale) :** "en terme d'affichage je souhaiterais que l'on puisse simplement visualiser tous les animaux, car là c'est pas pratique."
+
+**Diagnostic :** `BoxDetailDrawer` ouvert au clic listait les animaux verticalement. Pratique pour un box chenil avec 3-4 chiens, inadapté pour un troupeau de 20.
+
+**Changements :**
+- **Nouveau composant `BoxActionsBar`** (client) : boutons Assigner / Modifier / Fiche PDF, réutilise les popovers existants `AssignAnimalsPopover` et `EditBoxDrawer`
+- **Nouvelle route `/boxes/[id]/page.tsx`** : grille flat des animaux + barre d'actions + en-tête avec fil d'ariane vers la zone (couleur de zone reprise pour cohérence). Tri intelligent (numérique d'abord, comme `/boxes/zones/[id]`)
+- **`box-tile.tsx` modifié** : `onClick={() => router.push(`/boxes/${box.id}`)}` au lieu d'`setShowDetail(true)`. Suppression des states `showDetail/showAssign/showEdit` et des imports inutiles (`BoxDetailDrawer`, `AssignAnimalsPopover`, `EditBoxDrawer`). Drag & drop d'animaux entre boxes préservé. Props `allBoxes`/`zones`/`groupKey` gardées dans l'interface (commentaire) pour compat de l'API parent.
+- **`BoxDetailDrawer` laissé dans le repo** (non utilisé) : contient `MoveAnimalMenu` et `AssignOutingModal` qu'on pourra réactiver via un bouton "Vue détaillée" si besoin
+
+### 33. Triple fix perf : /boxes/[id] + retour + switch d'établissement (commit `24d42a4`)
+
+**3 symptômes remontés par Clément :**
+1. "C'est extrêmement long entre le moment où l'on clique et où l'on arrive sur tous les animaux de la parcelle."
+2. "Et quand on fait retour au box, c'est assez long, je trouve."
+3. "Lorsque l'on change d'établissement, ça ne se fait pas directement. Ça reste bloqué. Il faut faire un refresh pour bien accéder à l'établissement, et ça met de temps en temps des erreurs."
+
+**Fix 1 — `/boxes/[id]` lent (pattern N+1) :**
+
+`getBoxes().find()` chargeait TOUS les boxes + animaux + photos de l'établissement pour en garder 1. Sur Ferme (1 box) invisible, sur SDA (~30 boxes, 100+ animaux) → ~500ms-2s gaspillés à chaque clic.
+
+Nouvelle action `getBoxById(boxId)` :
+- 1 query `boxes` (+ zone via nested select)
+- 1 query `animals` filtrée par `box_id = boxId`
+- 1 query `animal_photos` filtrée par les `animal_id` du box uniquement
+- 3 queries fixes au lieu de proportionnelles à la taille de l'établissement
+
+Page `/boxes/[id]` refactor : `getBoxById(id)` au lieu de `getBoxes().find()`.
+
+**Fix 2 — Retour lent :**
+
+`<Link href="/boxes">` déclenche un re-render serveur complet de la page principale (force-dynamic, cookies). Aucun prefetch utile.
+
+Nouveau composant client `BackToBoxes` :
+- `router.back()` en priorité si `window.history.length > 1` (restaure l'état précédent depuis la bfcache navigateur — instantané)
+- Fallback `router.push(href)` si pas d'historique (arrivée via URL directe)
+- Pattern à généraliser pour tous les liens "Retour"
+
+**Fix 3 — Switch d'établissement bloqué + erreurs :**
+
+`router.refresh()` après `switchEstablishment` invalidait la cache de tous les server components mais laissait l'UI bloquée pendant la re-hydratation (plusieurs centaines de ms). Pendant ce temps, des queries en cours retournaient encore des données de l'**ancien** établissement → erreurs visibles (mismatch context).
+
+Fix :
+- `window.location.href = '/dashboard'` après le switch : hard navigation qui purge cookies + cache Next App Router + state navigateur en une fois. Garantit un état propre, élimine la race condition.
+- Pourquoi c'est OK ici : action **rare** (~1-2 fois par jour), c'est exactement ce que l'utilisateur attend (un "vrai" changement de contexte). Pattern standard chez Linear / Notion.
+- Indicateur visuel pendant `isPending` : "Bascule en cours…" sous le nom + spinner remplaçant le chevron + spinner sur l'item ciblé. L'utilisateur sait que ça travaille.
+
+### Bilan session 2026-05-23 → 2026-05-25
+
+**6 commits livrés :**
+
+| # | Commit | Sujet |
+|---|---|---|
+| 1 | `549eae0` | Renommage /requisitions → /procedures + filtre judicial_procedure |
+| 2 | `2ca5f87` | Fiche membre /etablissement/membres/[id] avec contrats intégrés |
+| 3 | `0905b32` | Vue agrégée par zone + script backfill contrats |
+| 4 | `8445d84` | Fix photo mobile (tap = afficher, plus supprimer) |
+| 5 | `15237ba` | Clic vignette box = page de détail plein écran |
+| 6 | `24d42a4` | Perf /boxes/[id] (getBoxById) + retour (router.back) + switch établissement (hard nav) |
+
+**Actions DB hors git :**
+- 20 animaux numérotés (Ferme) affectés au box Pierette via UPDATE direct
+- 6 contrats CDI uploadés via script `scripts/upload-initial-contracts.mjs` (table `member_documents` + bucket `employment-docs`)
+
+**Patterns à retenir :**
+- **N+1 sur read-by-id** : avant de faire `.find()` sur le résultat d'un "list all", créer une fonction "by id" dédiée. Surtout si la page est server-rendered et appelée souvent.
+- **Hard nav pour switch de tenant** : `router.refresh()` rate trop souvent les invalidations de cache cookies. Pour une action de changement de contexte, hard reload est le pattern fiable. Compenser par un indicateur visuel.
+- **`router.back()` pour retour** : avec `force-dynamic`, Next ne peut pas prefetch. `router.back()` utilise le cache navigateur. Quasi-toujours instantané.
+- **Overlay actions au survol = piège mobile** : utiliser `[@media(hover:hover)]` + `pointer-events-none` par défaut pour éviter le tap-hover Safari iOS.
+- **Toujours grep un schéma DB** plutôt que deviner les noms de tables de jointure. `member_groups` ≠ `member_group_links`.
