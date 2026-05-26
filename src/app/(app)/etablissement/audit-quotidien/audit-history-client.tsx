@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   RefreshCw, FileText, Send, Bot, AlertOctagon, AlertTriangle, CheckCircle2,
-  Sparkles, Clock, User, Loader2, Eye,
+  Sparkles, Clock, User, Loader2, Eye, Trash2,
 } from 'lucide-react'
-import { generateAuditNow, getAuditPdfSignedUrl, type AuditHistoryRow } from '@/lib/actions/audit-history'
+import { generateAuditNow, getAuditPdfSignedUrl, deleteAuditRun, type AuditHistoryRow } from '@/lib/actions/audit-history'
 
 interface Props {
   readonly initialRuns: AuditHistoryRow[]
@@ -69,6 +69,20 @@ export function AuditHistoryClient({ initialRuns }: Props) {
         return
       }
       window.open(res.data.url, '_blank', 'noopener,noreferrer')
+    })
+  }
+
+  function handleDelete(runId: string, dateLabel: string) {
+    if (!confirm(`Supprimer définitivement l'audit du ${dateLabel} (PDF + ligne historique) ?`)) return
+    startTransition(async () => {
+      const res = await deleteAuditRun(runId)
+      if (res.error) {
+        toast.error(res.error)
+        return
+      }
+      toast.success('Audit supprimé')
+      setRuns((prev) => prev.filter((r) => r.id !== runId))
+      router.refresh()
     })
   }
 
@@ -208,18 +222,29 @@ export function AuditHistoryClient({ initialRuns }: Props) {
                       )}
                     </td>
                     <td className="px-4 py-2">
-                      {r.pdf_storage_path ? (
+                      <div className="flex items-center gap-1.5">
+                        {r.pdf_storage_path ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPdf(r.id)}
+                            disabled={isPending}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 disabled:opacity-50"
+                          >
+                            <Eye className="w-3 h-3" /> PDF
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted">PDF absent</span>
+                        )}
                         <button
                           type="button"
-                          onClick={() => handleOpenPdf(r.id)}
+                          onClick={() => handleDelete(r.id, formatDate(r.audit_date))}
                           disabled={isPending}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 disabled:opacity-50"
+                          title="Supprimer cet audit"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted hover:text-error hover:bg-error/10 border border-transparent hover:border-error/30 disabled:opacity-50"
                         >
-                          <Eye className="w-3 h-3" /> PDF
+                          <Trash2 className="w-3 h-3" />
                         </button>
-                      ) : (
-                        <span className="text-xs text-muted">PDF absent</span>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 )

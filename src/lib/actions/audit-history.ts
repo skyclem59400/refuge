@@ -146,3 +146,38 @@ export async function generateAuditNow(options?: { sendEmail?: boolean }): Promi
     return { error: (e as Error).message }
   }
 }
+
+export async function deleteAuditRun(runId: string): Promise<{ data?: true; error?: string }> {
+  try {
+    await requireAdmin()
+    const admin = createAdminClient()
+
+    const { data: row } = await admin
+      .from('daily_audit_runs')
+      .select('pdf_storage_path')
+      .eq('id', runId)
+      .maybeSingle()
+    if (!row) return { error: 'Audit introuvable' }
+
+    if (row.pdf_storage_path) {
+      const { error: storageErr } = await admin.storage
+        .from('audit-reports')
+        .remove([row.pdf_storage_path])
+      if (storageErr) {
+        // Best-effort : on continue meme si le storage echoue, on garde la trace
+        console.error('deleteAuditRun: storage remove failed:', storageErr.message)
+      }
+    }
+
+    const { error: dbErr } = await admin
+      .from('daily_audit_runs')
+      .delete()
+      .eq('id', runId)
+    if (dbErr) return { error: dbErr.message }
+
+    revalidatePath('/etablissement/audit-quotidien')
+    return { data: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
