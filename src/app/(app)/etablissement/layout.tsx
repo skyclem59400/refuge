@@ -10,7 +10,7 @@ export default async function EtablissementLayout({
   const ctx = await getEstablishmentContext()
   if (!ctx) redirect('/login')
 
-  const { canManageEstablishment, canManageVeterinarians, isAdmin, isOwner, canManageLeaves } = ctx.permissions
+  const { canManageEstablishment, canManageVeterinarians, isAdmin, isOwner } = ctx.permissions
 
   if (!canManageEstablishment && !canManageVeterinarians && !isAdmin && !isOwner) {
     redirect('/dashboard')
@@ -18,7 +18,6 @@ export default async function EtablissementLayout({
 
   const tabs: EstablishmentTab[] = [
     { href: '/etablissement', label: 'Établissement', show: canManageEstablishment || isAdmin || isOwner },
-    { href: '/admin/cra/saisie', label: 'CRA', show: canManageLeaves || isAdmin },
     { href: '/etablissement/audit-quotidien', label: 'Audit', show: isAdmin, badge: 'IA' },
     { href: '/etablissement/logs', label: 'Logs', show: isAdmin },
     { href: '/etablissement/veterinaires', label: 'Vétérinaires', show: canManageEstablishment || canManageVeterinarians || isAdmin || isOwner },
