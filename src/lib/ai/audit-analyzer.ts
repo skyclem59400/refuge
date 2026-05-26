@@ -63,6 +63,13 @@ OBLIGATIONS MÉTIER ET LÉGALES À SURVEILLER
    - Toute modification d'un champ de procédure judiciaire (juridiction, date saisie, audience, avocat) doit être validée par un admin car ces données engagent l'association devant le tribunal
    - Une suppression d'animal effacerait son dossier — vérifier qu'elle est légitime (doublon, erreur de saisie) et non une perte de traçabilité
 
+9. **Cohérence des fiches animales** :
+   - Un animal en \`judicial_procedure=true\` doit avoir \`origin_type='requisition'\` — si tagué « found » / « divagation » / « abandoned », c'est une erreur factuelle qui peut être opposée par la défense au tribunal
+   - Tout chien/chat hébergé sans n° de puce, tatouage NI médaille = non conforme ICAD : risque DDPP immédiat
+   - Une date de sortie avec un statut encore actif (shelter/pound/foster_family/boarding) = registre faussé
+   - Un statut terminal (adopted/transferred/etc) sans date de sortie = registre incomplet
+   - Le bloc « Incohérences sur les fiches animales » du payload liste les cas détectés mécaniquement — cite NOMMÉMENT les animaux concernés dans ton analyse et indique qui devrait corriger (Mary pour fiches récentes, l'admin pour judiciaire)
+
 TON STYLE D'ANALYSE
 - **Concis et opérationnel** : 4-6 paragraphes maximum, pas de blabla
 - **Priorise les risques métier** : juridique (procédures judiciaires) > sanitaire (rappels en retard) > administratif (CRA) > qualité (fiches animaux) > engagement équipe
@@ -167,6 +174,18 @@ export async function generateAuditAnalysis(
         from: c.oldValue,
         to: c.newValue,
         at: c.at,
+      })),
+    },
+    animal_inconsistencies: {
+      critical_count: s.animalInconsistencies.filter((i) => i.severity === 'critical').length,
+      warning_count: s.animalInconsistencies.filter((i) => i.severity === 'warning').length,
+      info_count: s.animalInconsistencies.filter((i) => i.severity === 'info').length,
+      top: s.animalInconsistencies.slice(0, 25).map((i) => ({
+        animal: i.animalName,
+        status: i.status,
+        rule: i.rule,
+        severity: i.severity,
+        detail: i.detail,
       })),
     },
   }))

@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/server'
+import { detectAnimalInconsistencies, type AnimalInconsistency } from '@/lib/audit/animal-consistency'
 
 /**
  * Audit quotidien — agrege l'activite de la veille (J-1) pour generer
@@ -119,6 +120,9 @@ export interface DailyAuditSection {
 
   // Changements suspects detectes dans les activity_logs hier
   suspiciousChanges: AuditSuspiciousChange[]
+
+  // Incoherences detectees sur les fiches animales
+  animalInconsistencies: AnimalInconsistency[]
 
   // Score
   scoreOutOf100: number
@@ -620,6 +624,26 @@ export async function computeDailyAuditForEstablishment(
     })
   }
 
+  // 8.ter Incoherences sur les fiches animales (regles metier statiques)
+  const animalInconsistencies = await detectAnimalInconsistencies(establishmentId)
+  for (const inc of animalInconsistencies) {
+    if (inc.severity === 'critical') {
+      critical.push({
+        level: 'critical',
+        category: 'Fiche animale',
+        label: `${inc.animalName} — ${inc.rule}`,
+        detail: inc.detail,
+      })
+    } else if (inc.severity === 'warning') {
+      critical.push({
+        level: 'warning',
+        category: 'Fiche animale',
+        label: `${inc.animalName} — ${inc.rule}`,
+        detail: inc.detail,
+      })
+    }
+  }
+
   // 10. Score /100 — simple heuristic
   let score = 100
   score -= critical.filter((c) => c.level === 'critical').length * 10
@@ -629,6 +653,8 @@ export async function computeDailyAuditForEstablishment(
   score -= animalsToReview.length * 1
   score -= inactiveMembers.length * 3
   score -= suspiciousChanges.length * 4
+  score -= animalInconsistencies.filter((i) => i.severity === 'critical').length * 5
+  score -= animalInconsistencies.filter((i) => i.severity === 'warning').length * 2
   score = Math.max(0, Math.min(100, score))
 
   return {
@@ -648,6 +674,7 @@ export async function computeDailyAuditForEstablishment(
     animalsToReview: animalsToReview.slice(0, 15),
     judicialIncomplete,
     suspiciousChanges,
+    animalInconsistencies,
     scoreOutOf100: score,
   }
 }

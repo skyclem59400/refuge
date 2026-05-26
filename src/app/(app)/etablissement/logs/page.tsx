@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { getActivityLogs } from '@/lib/actions/activity-log'
 import { getEstablishmentMembers } from '@/lib/actions/establishments'
-import { ActivityLogList } from '@/components/establishment/activity-log-list'
+import { ActivityLogList, type MemberKind } from '@/components/establishment/activity-log-list'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,9 +18,12 @@ export default async function EtablissementLogsPage() {
 
   const activityLogs = activityResult.data || []
   const allUserNames: Record<string, string> = {}
+  const allUserKinds: Record<string, MemberKind> = {}
   if (members) {
     for (const m of members) {
       allUserNames[m.user_id] = m.full_name || m.pseudo || m.email || m.user_id
+      // Priorite : si role_type === 'admin' on filtre comme admin, sinon contract_type
+      allUserKinds[m.user_id] = m.role_type === 'admin' ? 'admin' : (m.contract_type as MemberKind)
     }
   }
 
@@ -33,7 +36,7 @@ export default async function EtablissementLogsPage() {
         </p>
       </div>
 
-      <ActivityLogList logs={activityLogs} userNames={allUserNames} />
+      <ActivityLogList logs={activityLogs} userNames={allUserNames} userKinds={allUserKinds} />
     </div>
   )
 }

@@ -5,9 +5,22 @@ import Link from 'next/link'
 import { Activity, Search } from 'lucide-react'
 import type { ActivityLog } from '@/lib/types/database'
 
+export type MemberKind = 'admin' | 'salarie' | 'benevole' | 'auto_entrepreneur' | 'autre'
+
 interface ActivityLogListProps {
   readonly logs: ActivityLog[]
   readonly userNames: Record<string, string>
+  /** Mapping user_id -> kind (admin / salarie / benevole / auto_entrepreneur / autre).
+   *  Si omis, le filtre par type est masque. */
+  readonly userKinds?: Record<string, MemberKind>
+}
+
+const KIND_LABELS: Record<MemberKind, string> = {
+  admin: 'Administrateur',
+  salarie: 'Salarié',
+  benevole: 'Bénévole',
+  auto_entrepreneur: 'Auto-entrepreneur',
+  autre: 'Autre',
 }
 
 const ACTION_VERBS: Record<string, string> = {
@@ -40,6 +53,10 @@ const ENTITY_LABELS: Record<string, string> = {
   establishment: 'l\'etablissement',
   cra_entry: 'la saisie CRA',
   cra_status: 'le CRA mensuel',
+  cra_astreinte: 'l\'astreinte',
+  work_schedule: 'la semaine type',
+  photo: 'la photo',
+  user_profile: 'le profil',
 }
 
 const ENTITY_FILTER_LABELS: Record<string, string> = {
@@ -58,6 +75,10 @@ const ENTITY_FILTER_LABELS: Record<string, string> = {
   establishment: 'Etablissement',
   cra_entry: 'CRA — saisies',
   cra_status: 'CRA — workflow',
+  cra_astreinte: 'Astreintes',
+  work_schedule: 'Semaines types',
+  photo: 'Photos',
+  user_profile: 'Profils',
 }
 
 const DETAIL_LABELS: Record<string, string> = {
@@ -221,11 +242,12 @@ function buildSentence(log: ActivityLog, userName: string): { text: string; enti
   }
 }
 
-export function ActivityLogList({ logs, userNames }: ActivityLogListProps) {
+export function ActivityLogList({ logs, userNames, userKinds }: ActivityLogListProps) {
   const [search, setSearch] = useState('')
   const [actionFilter, setActionFilter] = useState<string>('all')
   const [entityFilter, setEntityFilter] = useState<string>('all')
   const [userFilter, setUserFilter] = useState<string>('all')
+  const [kindFilter, setKindFilter] = useState<MemberKind | 'all'>('all')
   const [visibleCount, setVisibleCount] = useState(50)
 
   const entityTypes = useMemo(() => [...new Set(logs.map((l) => l.entity_type))].sort((a, b) => a.localeCompare(b)), [logs])
@@ -236,6 +258,17 @@ export function ActivityLogList({ logs, userNames }: ActivityLogListProps) {
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [userNames])
+
+  // Kinds presents dans les logs (utile pour ne pas montrer un type vide)
+  const availableKinds = useMemo(() => {
+    if (!userKinds) return [] as MemberKind[]
+    const set = new Set<MemberKind>()
+    for (const log of logs) {
+      const k = userKinds[log.user_id]
+      if (k) set.add(k)
+    }
+    return Array.from(set).sort()
+  }, [logs, userKinds])
 
   const filtered = useMemo(() => {
     let result = logs
@@ -249,6 +282,9 @@ export function ActivityLogList({ logs, userNames }: ActivityLogListProps) {
     if (userFilter !== 'all') {
       result = result.filter((l) => l.user_id === userFilter)
     }
+    if (kindFilter !== 'all' && userKinds) {
+      result = result.filter((l) => userKinds[l.user_id] === kindFilter)
+    }
     if (search.length >= 2) {
       const q = search.toLowerCase()
       result = result.filter((l) =>
@@ -259,7 +295,7 @@ export function ActivityLogList({ logs, userNames }: ActivityLogListProps) {
     }
 
     return result
-  }, [logs, actionFilter, entityFilter, userFilter, search, userNames])
+  }, [logs, actionFilter, entityFilter, userFilter, kindFilter, search, userNames, userKinds])
 
   const visible = filtered.slice(0, visibleCount)
 
@@ -299,6 +335,19 @@ export function ActivityLogList({ logs, userNames }: ActivityLogListProps) {
             <option key={u.id} value={u.id}>{u.name}</option>
           ))}
         </select>
+        {userKinds && availableKinds.length > 1 && (
+          <select
+            value={kindFilter}
+            onChange={(e) => { setKindFilter(e.target.value as MemberKind | 'all'); setVisibleCount(50) }}
+            className="px-3 py-2 bg-surface-dark border border-border rounded-lg text-sm
+              focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+          >
+            <option value="all">Tous les types</option>
+            {availableKinds.map((k) => (
+              <option key={k} value={k}>{KIND_LABELS[k]}</option>
+            ))}
+          </select>
+        )}
         <select
           value={actionFilter}
           onChange={(e) => { setActionFilter(e.target.value); setVisibleCount(50) }}

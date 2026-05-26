@@ -2,7 +2,10 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { requirePermission, requireEstablishment } from '@/lib/establishment/permissions'
+import { logActivity } from '@/lib/actions/activity-log'
 import type { DayOfWeek, EstablishmentMember, MemberWorkSchedule } from '@/lib/types/database'
+
+const DAY_LABELS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
 
 /**
  * Server actions de gestion des semaines types (member_work_schedules).
@@ -189,6 +192,23 @@ export async function upsertWorkScheduleDay(
         .select()
         .single()
       if (error) return { error: error.message }
+
+      await logActivity({
+        action: 'update',
+        entityType: 'work_schedule',
+        entityId: existing.id,
+        entityName: `Semaine type — ${DAY_LABELS[dayOfWeek]}`,
+        parentType: 'establishment_member',
+        parentId: memberId,
+        details: {
+          is_rest_day: payload.is_rest_day,
+          start_am: payload.start_am,
+          end_am: payload.end_am,
+          start_pm: payload.start_pm,
+          end_pm: payload.end_pm,
+        },
+      })
+
       return { data: data as MemberWorkSchedule }
     }
 
@@ -208,6 +228,23 @@ export async function upsertWorkScheduleDay(
       .single()
 
     if (error) return { error: error.message }
+
+    await logActivity({
+      action: 'create',
+      entityType: 'work_schedule',
+      entityId: data.id,
+      entityName: `Semaine type — ${DAY_LABELS[dayOfWeek]}`,
+      parentType: 'establishment_member',
+      parentId: memberId,
+      details: {
+        is_rest_day: payload.is_rest_day,
+        start_am: payload.start_am,
+        end_am: payload.end_am,
+        start_pm: payload.start_pm,
+        end_pm: payload.end_pm,
+      },
+    })
+
     return { data: data as MemberWorkSchedule }
   } catch (e) {
     return { error: (e as Error).message }
@@ -249,6 +286,22 @@ export async function upsertHolidaySchedule(
       })
       .eq('id', memberId)
     if (error) return { error: error.message }
+
+    await logActivity({
+      action: 'update',
+      entityType: 'work_schedule',
+      entityId: memberId,
+      entityName: `Horaire jours fériés`,
+      parentType: 'establishment_member',
+      parentId: memberId,
+      details: {
+        start_am: payload.start_am,
+        end_am: payload.end_am,
+        start_pm: payload.start_pm,
+        end_pm: payload.end_pm,
+      },
+    })
+
     return { data: true }
   } catch (e) {
     return { error: (e as Error).message }

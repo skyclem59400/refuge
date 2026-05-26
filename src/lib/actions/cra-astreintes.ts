@@ -2,6 +2,7 @@
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/establishment/permissions'
+import { logActivity } from '@/lib/actions/activity-log'
 import type { CraAstreinte, CraAstreinteWithMember } from '@/lib/types/database'
 
 /**
@@ -163,17 +164,43 @@ export async function toggleAstreinteWeek(
       // Toggle off : supprime
       const { error } = await admin.from('cra_astreintes').delete().eq('id', existing.id)
       if (error) return { error: error.message }
+
+      await logActivity({
+        action: 'delete',
+        entityType: 'cra_astreinte',
+        entityId: existing.id,
+        entityName: `Astreinte ${weekMonday}`,
+        parentType: 'establishment_member',
+        parentId: memberId,
+        details: { week_start_monday: weekMonday },
+      })
+
       return { data: { created: false, deleted: true } }
     }
 
     // Création
-    const { error } = await admin.from('cra_astreintes').insert({
-      member_id: memberId,
-      establishment_id: establishmentId,
-      week_start_monday: weekMonday,
-      created_by: user?.id || null,
-    })
+    const { data: created, error } = await admin
+      .from('cra_astreintes')
+      .insert({
+        member_id: memberId,
+        establishment_id: establishmentId,
+        week_start_monday: weekMonday,
+        created_by: user?.id || null,
+      })
+      .select('id')
+      .single()
     if (error) return { error: error.message }
+
+    await logActivity({
+      action: 'create',
+      entityType: 'cra_astreinte',
+      entityId: created.id,
+      entityName: `Astreinte ${weekMonday}`,
+      parentType: 'establishment_member',
+      parentId: memberId,
+      details: { week_start_monday: weekMonday },
+    })
+
     return { data: { created: true, deleted: false } }
   } catch (e) {
     return { error: (e as Error).message }

@@ -243,6 +243,34 @@ function buildSuspiciousSection(section: DailyAuditSection): string {
   `
 }
 
+function buildAnimalInconsistenciesSection(section: DailyAuditSection): string {
+  if (section.animalInconsistencies.length === 0) {
+    return `<h3>Cohérence des fiches animales</h3>
+      <div class="empty-good">✓ Aucune incohérence détectée sur les fiches.</div>`
+  }
+  const sevColor = (s: string) => s === 'critical' ? '#dc2626' : s === 'warning' ? '#f59e0b' : '#64748b'
+  const sevLabel = (s: string) => s === 'critical' ? 'CRITIQUE' : s === 'warning' ? 'ATTENTION' : 'INFO'
+  const rows = section.animalInconsistencies.slice(0, 30)
+    .map((inc) => `<tr>
+      <td><span style="color:${sevColor(inc.severity)};font-weight:600;font-size:11px;">${sevLabel(inc.severity)}</span></td>
+      <td>${escapeHtml(inc.animalName)}</td>
+      <td>${escapeHtml(inc.rule)}</td>
+      <td>${escapeHtml(inc.detail)}</td>
+    </tr>`)
+    .join('')
+  const more = section.animalInconsistencies.length > 30
+    ? `<p class="muted" style="font-size:11px;margin-top:6px;">+ ${section.animalInconsistencies.length - 30} autres incohérences non affichées.</p>`
+    : ''
+  return `
+    <h3>Incohérences sur les fiches animales (${section.animalInconsistencies.length})</h3>
+    <table class="data">
+      <thead><tr><th>Niveau</th><th>Animal</th><th>Règle</th><th>Détail</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${more}
+  `
+}
+
 function buildEstablishmentReport(section: DailyAuditSection): string {
   return `
     <section class="estab">
@@ -269,6 +297,8 @@ function buildEstablishmentReport(section: DailyAuditSection): string {
       ${buildAnimalsSection(section)}
 
       ${buildJudicialSection(section)}
+
+      ${buildAnimalInconsistenciesSection(section)}
     </section>
   `
 }

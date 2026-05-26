@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { logActivity } from '@/lib/actions/activity-log'
 import type { UserProfile, UserProfileInput } from '@/lib/types/database'
 
 // ============================================================
@@ -129,6 +130,19 @@ export async function completeMyProfile(
     // Le profil applicatif est OK, on signale le warning mais on ne bloque pas
     console.error('user-profile: failed to update auth.users metadata', authErr)
   }
+
+  // Log fire-and-forget — pas bloquant si l'user n'est pas encore lie a un etablissement
+  await logActivity({
+    action: 'update',
+    entityType: 'user_profile',
+    entityId: user.id,
+    entityName: `${firstName} ${lastName}`,
+    details: {
+      profile_completed: true,
+      city,
+      email_migrated: emailChanged,
+    },
+  })
 
   revalidatePath('/onboarding')
   revalidatePath('/dashboard')

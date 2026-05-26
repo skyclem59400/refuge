@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireEstablishment, requirePermission } from '@/lib/establishment/permissions'
+import { logActivity } from '@/lib/actions/activity-log'
 
 // ============================================
 // Read actions (use createAdminClient)
@@ -83,6 +84,16 @@ export async function registerAnimalPhoto(params: {
       return { error: insertError.message }
     }
 
+    await logActivity({
+      action: 'create',
+      entityType: 'photo',
+      entityId: photo.id,
+      entityName: `Photo de l'animal`,
+      parentType: 'animal',
+      parentId: params.animalId,
+      details: { is_primary: isFirst },
+    })
+
     revalidatePath(`/animals/${params.animalId}`)
     revalidatePath('/animals')
     return { data: photo }
@@ -160,6 +171,16 @@ export async function uploadAnimalPhoto(animalId: string, formData: FormData) {
       return { error: insertError.message }
     }
 
+    await logActivity({
+      action: 'create',
+      entityType: 'photo',
+      entityId: photo.id,
+      entityName: `Photo de l'animal`,
+      parentType: 'animal',
+      parentId: animalId,
+      details: { is_primary: isFirst, file_name: file.name },
+    })
+
     revalidatePath(`/animals/${animalId}`)
     revalidatePath('/animals')
     return { data: photo }
@@ -201,6 +222,16 @@ export async function deleteAnimalPhoto(photoId: string) {
       return { error: deleteError.message }
     }
 
+    await logActivity({
+      action: 'delete',
+      entityType: 'photo',
+      entityId: photoId,
+      entityName: `Photo de l'animal`,
+      parentType: 'animal',
+      parentId: photo.animal_id,
+      details: { url: photo.url },
+    })
+
     revalidatePath(`/animals/${photo.animal_id}`)
     revalidatePath('/animals')
     return { success: true }
@@ -233,6 +264,16 @@ export async function setPrimaryAnimalPhoto(photoId: string, animalId: string) {
     if (setError) {
       return { error: setError.message }
     }
+
+    await logActivity({
+      action: 'update',
+      entityType: 'photo',
+      entityId: photoId,
+      entityName: `Photo principale`,
+      parentType: 'animal',
+      parentId: animalId,
+      details: { is_primary: { old: false, new: true } },
+    })
 
     revalidatePath(`/animals/${animalId}`)
     revalidatePath('/animals')
