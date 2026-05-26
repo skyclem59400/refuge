@@ -1,8 +1,8 @@
 /**
  * Logique de finalisation d'une adoption "active" :
  *  - étiqueter l'adoptant (Adoptant + Adhérent)
- *  - générer la facture (ligne adoption + ligne adhésion 30 €)
- *  - générer le reçu fiscal CERFA pour les 30 € d'adhésion
+ *  - générer la facture (ligne adoption + ligne adhésion 35 €)
+ *  - générer le reçu fiscal CERFA pour les 35 € d'adhésion
  *
  * Idempotente : on ne crée pas deux fois la facture ou la donation pour
  * un même contrat (vérifie via la colonne `documents.notes` qui contient
@@ -126,7 +126,7 @@ export async function finalizeAdoption(
   const adhesionLabel = "Adhésion annuelle SDA"
   const adoptionLineAmount = Math.max(0, adoptionFee - ADHESION_AMOUNT_EUR)
 
-  // 3. Facture (2 lignes : adoption + adhésion 30 €)
+  // 3. Facture (2 lignes : adoption + adhésion 35 €)
   try {
     // Idempotence stricte : la colonne adoption_contract_id porte un index
     // UNIQUE partiel — un seul document par contrat. On préfère .limit(1)
@@ -223,7 +223,7 @@ export async function finalizeAdoption(
     result.warnings.push(`Facture non générée : ${(err as Error).message}`)
   }
 
-  // 4. Donation (30 € adhésion) → génère le CERFA
+  // 4. Donation (35 € adhésion) → génère le CERFA
   try {
     // Idempotence : index UNIQUE partiel sur adoption_contract_id
     const { data: existingDonations } = await admin

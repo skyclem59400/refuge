@@ -53,7 +53,7 @@ const ORANGE = '#c96b3c'
 const ORANGE_BG = '#fdf4ee'
 const STONE_300 = '#d9e6ed'
 const STONE_500 = '#6b7f96'
-const ADHESION_FEE = 30
+const ADHESION_FEE = 35
 
 const ADOPTION_REFUND_AMOUNT = 50
 
