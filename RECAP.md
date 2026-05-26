@@ -1215,3 +1215,126 @@ Fix :
 - **`router.back()` pour retour** : avec `force-dynamic`, Next ne peut pas prefetch. `router.back()` utilise le cache navigateur. Quasi-toujours instantané.
 - **Overlay actions au survol = piège mobile** : utiliser `[@media(hover:hover)]` + `pointer-events-none` par défaut pour éviter le tap-hover Safari iOS.
 - **Toujours grep un schéma DB** plutôt que deviner les noms de tables de jointure. `member_groups` ≠ `member_group_links`.
+
+---
+
+## Session 2026-05-26 — CRA Matthieu + Audit IA quotidien + Adhésion 35€
+
+Session axée pilotage de la direction : fixes opérationnels suite à signalement Mary, mise en place d'un audit quotidien automatisé avec analyse IA, et correction d'une incohérence facturation/contrat.
+
+### 1. CRA — demi-journée Matthieu (commits `e895a89`, `e4561e2`)
+
+**Bug remonté par Mary le 26/05** : "Pas moyen d'enregistrer que le matin pour les dimanches" — erreur DB `new row for relation "cra_entries" violates check constraint "ce_times_ordered"`.
+
+**Cause** : sur un dimanche (jour de repos par défaut), quand Matthieu décochait "Jour de repos" dans la modale, **les deux** cases Matin + Après-midi étaient pré-cochées avec leurs horaires par défaut (14:00-17:00). S'il ajustait le matin pour finir après 14h (cas intervention astreinte 7h30-10h30 puis prolongation), `start_pm < end_am` violait la contrainte DB `ce_times_ordered`.
+
+**Fix en deux passes** :
+- `e895a89` : UX modale + validations
+  - Initialisation `hasAfternoon = false` quand `day.is_rest_day` (au lieu de `true`)
+  - Validation côté client : end > start, après-midi après matin (3 messages clairs)
+  - Validation côté serveur : message lisible au lieu du cryptique `ce_times_ordered`
+- `e4561e2` : élargissement à TOUS les jours (Clément : "pas que le dimanche, il travaille en demi-journées la semaine aussi")
+  - Handler sur le toggle "Jour de repos" : quand on décoche, force `hasMorning=true, hasAfternoon=false`
+  - Geste explicite = défaut prévisible, plus jamais d'erreur DB par mauvais défaut
+
+### 2. Workflow CRA externe — auto-entrepreneur (commit `e895a89`)
+
+**Besoin** : Matthieu est auto-entrepreneur (facturation directe), son CRA ne doit PAS être envoyé au comptable (pas de paie). Clément (président SDA) doit le recevoir personnellement.
+
+**Implémentation** dans `src/lib/actions/cra-send.ts` :
+- Détection `memberRow.contract_type === 'auto_entrepreneur'` après vérification du statut `validated_by_admin`
+- Routage email selon le type :
+  - Salarié → `establishments.accountant_email` (comportement existant)
+  - Auto-entrepreneur → `clement.scailteux@gmail.com` (hardcodé)
+- Sujet adapté : `[Externe — Suivi heures]` pour les externes
+- Corps email explicite : "ne pas transmettre au comptable (pas de paie, facturation directe)"
+- Retour API enrichi : `{ sentTo, isExternal }`
+
+### 3. Audit quotidien automatisé — V1 (commit `adeecde`)
+
+**Besoin** Clément : *"il y a du laissé aller au niveau des équipes qui est fatiguant, ils sont à fond pour saisir leurs congés mais pas pour maintenir à jour le logiciel. Je voudrais un audit quotidien avec PDF par mail."*
+
+**Décisions cadrées** :
+- Cadence : quotidien 7h00 + alerte instantanée si critique
+- Destinataire : `clement.scailteux@gmail.com` uniquement (toi pilotes, l'équipe ne voit pas)
+- Architecture : `/api/cron/daily-audit` protégé par `CRON_SECRET` (aligné sur le pattern `/api/cron/satisfaction` existant)
+- Multi-établissement : SDA + Ferme Ô 4 Vents dans le même PDF
+
+**Sections du rapport** (calculées dans `src/lib/actions/daily-audit.ts`) :
+- 🚨 **Critiques** : audience judiciaire <3j sans dossier, rappels santé >30j, CRA non envoyés après le 10
+- **Engagement équipe** : top 5 contributeurs J-1 + salariés inactifs (zéro action)
+- **Soins** : actes saisis hier + rappels en retard (animaux encore présents, filtrés des completés)
+- **Sorties** : saisies hier + sorties terminées >7j sans rating
+- **CRA** : mois N-1 non envoyé (non `sent`)
+- **Dossiers animaux** : présents sans photo / sans description publique / sans n° médaille / résidents >6 mois sans actu >60j
+- **Procédures judiciaires** : dossiers incomplets (juridiction, n° dossier, propriétaire mis en cause, avocat) + audiences proches
+- **Score /100** par établissement avec badge couleur (vert/ambre/orange/rouge)
+
+PDF généré via Puppeteer (template HTML A4 portrait) + envoyé via Brevo SMTP.
+
+### 4. Audit quotidien — V2 : analyse IA + stockage + page admin (commit `741ba0d`)
+
+Demande Clément suite à V1 : *"je veux une analyse IA qui connait notre activité et nos obligations… et je veux un bouton en tant que super admin de génération de rapport avec son stockage et son historique"*.
+
+**Analyse IA — Claude Haiku 4.5** (`src/lib/ai/audit-analyzer.ts`)
+- Modèle : `claude-haiku-4-5` (rapide, économique ~$0.01/run, ~$3/an pour 365 runs)
+- **Prompt caching** sur le system prompt (obligations métier SDA) → ~0.1× coût input après le premier run
+- System prompt = contexte SDA complet : RUP 1984, registres CERFA (50-4509 entrée/sortie + 50-4510 soins), identification ICAD obligatoire, suivi vétérinaire 4 jours, procédures judiciaires (juridiction + factures pour recouvrement tribunal), fourrière 8 jours francs, CRA salariés avant le 10, contrôles DDPP
+- Style imposé : 4-6 paragraphes, hiérarchisé par risque métier (juridique > sanitaire > admin > qualité > engagement), recommandations concrètes nominatives, markdown simple
+- Payload : JSON allégé des sections d'audit (~5K tokens input + ~1K output)
+- Erreur graceful : si l'API échoue (clé absente, billing épuisé, etc.), le PDF se génère sans la synthèse avec mention "⚠️ Analyse IA indisponible"
+- Output rendu en HTML markdown (titres, listes, gras) en page 1 du PDF avec gradient cyan signature
+
+**Stockage Supabase** (migration `20260526a_daily_audit_runs.sql`)
+- Bucket `audit-reports` (privé, 10 Mo max, allowed_mime_types=['application/pdf'])
+- Table `daily_audit_runs` : `audit_date`, `generated_at`, `trigger_source` (`cron`|`manual`), `generated_by_user_id`, `pdf_storage_path`, `pdf_size_bytes`, `ai_summary`, `ai_model`, `ai_tokens_input/output/cache_read`, `ai_error`, `stats` (JSONB snapshot par établissement), `sent_to`, `sent_at`, `send_error`
+- RLS : lecture admin only (jointure `establishment_members` → `member_groups` → `permission_groups` is_system 'Administrateur')
+
+**Orchestrateur central** (`src/lib/pdf/daily-audit-pdf.ts` refait)
+- Fonction `buildDailyAuditPdf({ triggerSource, generatedByUserId? })` : calcule sections → appelle IA → génère PDF → upload bucket → insert ligne historique → retourne `DailyAuditRunResult` complet
+- Helper `markAuditRunSent(runId, sentTo, sendError?)` pour fermer le cycle après envoi mail
+
+**Endpoint cron mis à jour** (`/api/cron/daily-audit`)
+- Auth `CRON_SECRET` inchangé
+- Appelle l'orchestrateur, envoie l'email (sujet adapté selon nombre de critiques), `markAuditRunSent` avec succès/erreur, log usage IA dans la réponse JSON
+- Email enrichi : mention de l'analyse IA en page 1 + lien vers `/etablissement/audit-quotidien`
+
+**Page admin** (`/etablissement/audit-quotidien`)
+- Server action `listAuditRuns(limit=30)` + `getAuditPdfSignedUrl(runId)` (signed URL 30 min) + `generateAuditNow({ sendEmail?: bool })` (relancent le cron en mode manuel)
+- UI client : bouton "Générer (sans mail)" + "Générer + envoyer", historique tabulaire (date, source cron/manuel + nom de l'admin, score badge, alertes, lien PDF, modale synthèse IA in-app)
+- Permission : `ctx.permissions.isAdmin` requis (redirect `/dashboard` sinon)
+
+**Configuration prod requise** (à faire dans Coolify avant que ça marche) :
+- `ANTHROPIC_API_KEY` : nouvelle clé à créer sur `console.anthropic.com/settings/keys` (compte avec carte bancaire + ~5$ de crédit)
+- `CRON_SECRET` : déjà en place pour `/api/cron/satisfaction`
+- Cron externe (cron-job.org gratuit ou pg_cron Supabase) pour POST quotidien 7h00 sur `/api/cron/daily-audit`
+
+### 5. Fix adhésion contrat d'adoption : 30€ → 35€ (commit `07d7e81`)
+
+**Incohérence détectée** signalée par Clément : *"dans tous les contrats, on est à 35 euros d'adhésion"*.
+
+| Fichier | Avant | Après |
+|---|---|---|
+| `src/lib/pdf/adoption-contract-template.ts:56` `ADHESION_FEE` | `30` | `35` |
+| `src/lib/actions/adoption-finalize.ts:16` `ADHESION_AMOUNT_EUR` | `35` (déjà OK) | `35` |
+| Commentaires `adoption-finalize.ts` (lignes 5, 129, 226) | "30 €" | "35 €" |
+
+**Risque évité** : litige adoptant (contrat signé pour 30€, facture comptable 35€). Le calcul `adoptionLineAmount = adoption_fee - ADHESION_FEE` était également désynchronisé, donc la ligne "participation soins" dans le PDF affichait un montant différent de la facture.
+
+**Dette assumée** : la constante reste dupliquée entre les 2 fichiers. À centraliser dans un futur refactor (`src/lib/config/refuge-pricing.ts` par exemple).
+
+### Patterns à retenir
+
+- **Constantes financières dupliquées = piège récurrent.** Toute valeur tarifaire (adhésion, refund période d'accueil, frais non remboursables) doit vivre en UN seul endroit. Si le code l'a en 2 endroits, c'est une question de "quand" pas de "si" pour la désynchronisation.
+- **Pre-cochage UX agressif crée des bugs DB.** Le défaut "tout coché par confort" rend implicite ce qui devrait être explicite. Préférer : décoche tout par défaut, l'utilisateur active ce qu'il veut. Les contraintes DB (`ce_times_ordered`) sont là pour rattraper les défauts UX mauvais — mieux vaut ne pas s'y appuyer.
+- **Erreurs DB → message lisible côté serveur.** Ne jamais laisser un `error.message` PostgreSQL remonter au toast. Mapping vers messages métier (`l'après-midi ne peut pas commencer avant la fin du matin`). Coût : 15 lignes de code, gain : 0 ticket support.
+- **Prompt caching = ROI immédiat sur usage récurrent.** Pour l'audit IA quotidien (365 runs/an avec system prompt identique), le cache amortit ~90% du coût input. À utiliser dès que la même base de contexte est rejouée >2 fois.
+- **Pattern cron externe + endpoint protégé.** Le tandem `/api/cron/*` + `CRON_SECRET` (Bearer header) + cron-job.org gratuit est la voie la plus simple sans dépendance pg_cron / GitHub Actions / Vercel cron. Suffit pour les workloads "1 par jour à heure fixe".
+
+### Méta
+
+- 5 commits poussés sur main (`e895a89`, `e4561e2`, `adeecde`, `741ba0d`, `07d7e81`)
+- 2 migrations Supabase appliquées (`20260520e` recalibrée, `20260526a_daily_audit_runs`)
+- Bucket Supabase `audit-reports` créé (privé, 10 Mo, PDF only)
+- Pas de breaking change — les comptes pseudo / l'auth / les contrats existants continuent de fonctionner
+- Coût IA estimé : ~$3/an pour l'audit quotidien (Haiku 4.5 + prompt cache)
