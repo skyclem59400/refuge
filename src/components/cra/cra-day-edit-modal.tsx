@@ -130,7 +130,22 @@ export function CraDayEditModal({ memberId, day, onClose, onSaved }: Props) {
               )}
 
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={isRest} onChange={(e) => setIsRest(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={isRest}
+                  onChange={(e) => {
+                    const next = e.target.checked
+                    setIsRest(next)
+                    // Quand on DECOCHE "Jour de repos" (= on commence une saisie),
+                    // on force "matin seul" coche par defaut. C'est le cas le plus
+                    // frequent (demi-journee Matthieu, intervention astreinte courte).
+                    // L'utilisateur peut toujours cocher l'apres-midi en plus.
+                    if (!next) {
+                      setHasMorning(true)
+                      setHasAfternoon(false)
+                    }
+                  }}
+                />
                 <span className="text-sm font-semibold">Jour de repos</span>
               </label>
 
