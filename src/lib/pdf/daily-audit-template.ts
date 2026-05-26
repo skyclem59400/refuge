@@ -250,11 +250,68 @@ function buildEstablishmentReport(section: DailyAuditSection): string {
   `
 }
 
-export function buildDailyAuditHtml(sections: DailyAuditSection[]): string {
+function renderMarkdown(text: string): string {
+  // Minimaliste : titres ##, listes -, gras **, italique *
+  return text
+    .split('\n')
+    .map((line) => {
+      const trimmed = line.trimEnd()
+      if (trimmed.startsWith('## ')) return `<h3 class="ai-h">${escapeHtml(trimmed.slice(3))}</h3>`
+      if (trimmed.startsWith('# ')) return `<h2 class="ai-h">${escapeHtml(trimmed.slice(2))}</h2>`
+      if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        return `<li>${formatInline(trimmed.slice(2))}</li>`
+      }
+      if (trimmed === '') return ''
+      return `<p>${formatInline(trimmed)}</p>`
+    })
+    .join('\n')
+    .replace(/(<li>.+?<\/li>\s*)+/g, (m) => `<ul class="ai-list">${m}</ul>`)
+}
+
+function formatInline(text: string): string {
+  // Gras **...** puis italique *...* (ordre important)
+  let out = escapeHtml(text)
+  out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  out = out.replace(/\*([^*]+)\*/g, '<em>$1</em>')
+  return out
+}
+
+function buildAiSection(aiAnalysis: string | null, aiError: string | null): string {
+  if (aiAnalysis && aiAnalysis.trim().length > 0) {
+    return `
+      <section class="ai-section">
+        <div class="ai-header">
+          <span class="ai-badge">🤖 Analyse IA</span>
+          <span class="ai-model">Claude Haiku 4.5</span>
+        </div>
+        <div class="ai-content">${renderMarkdown(aiAnalysis)}</div>
+      </section>
+      <div class="page-break"></div>
+    `
+  }
+  if (aiError) {
+    return `
+      <section class="ai-section ai-error">
+        <div class="ai-header">
+          <span class="ai-badge">⚠️ Analyse IA indisponible</span>
+        </div>
+        <p class="muted">${escapeHtml(aiError)}</p>
+      </section>
+    `
+  }
+  return ''
+}
+
+export function buildDailyAuditHtml(
+  sections: DailyAuditSection[],
+  aiAnalysis?: string | null,
+  aiError?: string | null,
+): string {
   const dateLabel = sections[0]?.auditDate
     ? formatDateFr(sections[0].auditDate)
     : '—'
 
+  const aiBlock = buildAiSection(aiAnalysis ?? null, aiError ?? null)
   const reports = sections.map(buildEstablishmentReport).join('<div class="page-break"></div>')
 
   return `<!DOCTYPE html>
@@ -382,6 +439,40 @@ export function buildDailyAuditHtml(sections: DailyAuditSection[]): string {
     font-size: 9px;
     text-align: center;
   }
+  .ai-section {
+    background: linear-gradient(135deg, #f0f9ff 0%, #ecfeff 100%);
+    border-left: 4px solid #0891b2;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  .ai-section.ai-error {
+    background: #fffbeb;
+    border-left-color: #f59e0b;
+  }
+  .ai-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .ai-badge {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0e7490;
+  }
+  .ai-model {
+    font-size: 10px;
+    color: #64748b;
+    background: rgba(255,255,255,0.6);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  .ai-content { font-size: 11px; line-height: 1.5; color: #1f2937; }
+  .ai-content p { margin: 6px 0; }
+  .ai-content .ai-h { font-size: 12px; color: #0e7490; margin: 12px 0 4px; padding: 0; border: none; text-transform: none; letter-spacing: 0; }
+  .ai-content .ai-list { margin: 4px 0 8px; padding-left: 18px; }
+  .ai-content li { margin: 2px 0; }
 </style>
 </head>
 <body>
@@ -391,6 +482,8 @@ export function buildDailyAuditHtml(sections: DailyAuditSection[]): string {
       Activité du <strong>${dateLabel}</strong> — Généré automatiquement
     </div>
   </header>
+
+  ${aiBlock}
 
   ${reports}
 

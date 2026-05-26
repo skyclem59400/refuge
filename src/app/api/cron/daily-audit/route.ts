@@ -1,21 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { buildDailyAuditPdf } from '@/lib/pdf/daily-audit-pdf'
+import { buildDailyAuditPdf, markAuditRunSent } from '@/lib/pdf/daily-audit-pdf'
 import { sendEmail } from '@/lib/email/client'
-
-/**
- * Endpoint cron quotidien — Audit equipe + PDF par mail.
- *
- * Configuration cron (cron-job.org ou pg_cron) :
- *   POST https://sda.optimus-services.fr/api/cron/daily-audit
- *   Header: Authorization: Bearer <CRON_SECRET>
- *
- * Cadence recommandee : tous les jours 7h00 heure Paris.
- *
- * Comportement :
- *   1. Calcule l'audit J-1 multi-etablissement
- *   2. Genere un PDF agrege
- *   3. Envoie le PDF a clement.scailteux@gmail.com (president SDA)
- */
 
 const RECIPIENT_EMAIL = 'clement.scailteux@gmail.com'
 const RECIPIENT_NAME = 'Clément Scailteux'
@@ -33,48 +18,57 @@ async function handleRequest(req: NextRequest) {
   if (!secret) {
     return NextResponse.json({ error: 'CRON_SECRET non configuré côté serveur' }, { status: 500 })
   }
-  const authHeader = req.headers.get('authorization') || ''
-  if (authHeader !== `Bearer ${secret}`) {
+  if (req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const { buffer, filename, auditDate, criticalCount } = await buildDailyAuditPdf()
+    const run = await buildDailyAuditPdf({ triggerSource: 'cron' })
 
-    const dateLabel = new Date(auditDate + 'T00:00:00').toLocaleDateString('fr-FR', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
+    const dateLabel = new Date(run.auditDate + 'T00:00:00').toLocaleDateString('fr-FR', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     })
 
-    const subject = criticalCount > 0
-      ? `🚨 Audit Optimus du ${dateLabel} — ${criticalCount} alerte${criticalCount > 1 ? 's' : ''} critique${criticalCount > 1 ? 's' : ''}`
+    const subject = run.criticalCount > 0
+      ? `🚨 Audit Optimus du ${dateLabel} — ${run.criticalCount} alerte${run.criticalCount > 1 ? 's' : ''} critique${run.criticalCount > 1 ? 's' : ''}`
       : `Audit Optimus du ${dateLabel}`
 
     const html = `
       <p>Bonjour Clément,</p>
       <p>Voici l'audit de l'activité Optimus pour le <strong>${dateLabel}</strong>.</p>
-      ${criticalCount > 0
-        ? `<p style="color:#dc2626;"><strong>⚠️ ${criticalCount} alerte${criticalCount > 1 ? 's' : ''} critique${criticalCount > 1 ? 's' : ''}</strong> à traiter en priorité (audience judiciaire imminente, rappels santé très en retard, etc.).</p>`
+      ${run.aiAnalysis
+        ? `<p>📊 L'analyse IA (Claude Haiku 4.5) figure en page 1 du PDF avec ses recommandations.</p>`
+        : ''}
+      ${run.criticalCount > 0
+        ? `<p style="color:#dc2626;"><strong>⚠️ ${run.criticalCount} alerte${run.criticalCount > 1 ? 's' : ''} critique${run.criticalCount > 1 ? 's' : ''}</strong> à traiter en priorité.</p>`
         : `<p>Aucune alerte critique aujourd'hui. ✓</p>`}
       <p>Le détail (engagement équipe, soins, sorties, CRA, dossiers à compléter, procédures judiciaires) est dans le PDF en pièce jointe.</p>
+      <p>Tu peux aussi consulter l'historique des audits dans <a href="https://sda.optimus-services.fr/etablissement/audit-quotidien">/etablissement/audit-quotidien</a>.</p>
       <p style="margin-top:24px;color:#94a3b8;font-size:12px;">Rapport généré automatiquement par Optimus.</p>
     `
 
-    await sendEmail({
-      to: RECIPIENT_EMAIL,
-      toName: RECIPIENT_NAME,
-      subject,
-      html,
-      attachments: [{ filename, content: buffer, contentType: 'application/pdf' }],
-    })
+    let sendError: string | null = null
+    try {
+      await sendEmail({
+        to: RECIPIENT_EMAIL,
+        toName: RECIPIENT_NAME,
+        subject,
+        html,
+        attachments: [{ filename: run.filename, content: run.buffer, contentType: 'application/pdf' }],
+      })
+    } catch (e) {
+      sendError = (e as Error).message
+    }
+    await markAuditRunSent(run.runId, RECIPIENT_EMAIL, sendError)
 
     return NextResponse.json({
-      ok: true,
-      auditDate,
-      criticalCount,
+      ok: !sendError,
+      runId: run.runId,
+      auditDate: run.auditDate,
+      criticalCount: run.criticalCount,
       sentTo: RECIPIENT_EMAIL,
+      sendError,
+      aiUsage: run.aiUsage,
     })
   } catch (e) {
     console.error('daily-audit cron error:', e)
