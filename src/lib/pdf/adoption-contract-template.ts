@@ -115,7 +115,19 @@ export function buildAdoptionContractHtml(
   logoBase64: string | undefined,
   animalPhotoBase64: string | undefined,
   createdByName?: string | null,
+  /** 'full' (défaut) = contrat principal + annexe (download direct).
+   *  'main' = contrat principal seul (utilisé pour la signature Documenso :
+   *    on génère le PDF main seul, on connaît son nombre de pages, on sait
+   *    sur quelle page tomber la 1ère SIGNATURE).
+   *  'annex' = annexe seule (idem, pour la 2e SIGNATURE).
+   *  Les PDFs main+annex sont ensuite mergés via pdf-lib. */
+  part: 'full' | 'main' | 'annex' = 'full',
 ): string {
+  const includeMain = part === 'full' || part === 'main'
+  const includeAnnex = part === 'full' || part === 'annex'
+  // Quand on génère l'annexe SEULE, on désactive le page-break-before qui
+  // créerait une page vide initiale.
+  const annexPageBreak = part === 'annex' ? 'auto' : 'always'
   const adopterAddressLines = [
     htmlEscape(adopter.address) || '',
     [adopter.postal_code, adopter.city].filter(Boolean).map(htmlEscape).join(' '),
@@ -335,7 +347,7 @@ export function buildAdoptionContractHtml(
 
     /* === Annex (Conditions) === */
     .annex {
-      page-break-before: always;
+      page-break-before: ${annexPageBreak};
       padding-top: 4mm;
     }
     .annex-title {
@@ -466,6 +478,7 @@ export function buildAdoptionContractHtml(
 </head>
 <body>
 
+  ${includeMain ? `
   <!-- ============== Header ============== -->
   <header class="header">
     <div class="header-left">
@@ -655,7 +668,9 @@ export function buildAdoptionContractHtml(
       </div>
     </div>
   </div>
+  ` : ''}
 
+  ${includeAnnex ? `
   <!-- ============== Annex : Conditions d'adoption ============== -->
   <div class="annex">
     <header class="header">
@@ -729,6 +744,7 @@ export function buildAdoptionContractHtml(
     </div>
     <div class="footer-accent"></div>
   </div>
+  ` : ''}
 
 </body>
 </html>`

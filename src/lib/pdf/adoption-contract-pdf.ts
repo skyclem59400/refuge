@@ -11,6 +11,10 @@ interface BuildResult {
   filename: string
   contractNumber: string
   pageCount: number
+  /** Présent uniquement si options.splitForSignature = true.
+   * Nombre de pages du contrat principal (= 1ère partie du PDF mergé).
+   * La 1ère SIGNATURE doit être placée sur cette page, la 2e sur `pageCount`. */
+  mainPageCount?: number
 }
 
 interface BuildOptions {
@@ -18,6 +22,65 @@ interface BuildOptions {
    * affiché dans les 2 encarts "Signature du Refuge SDA" (contrat principal +
    * annexe) à la place du label générique. */
   createdByUserId?: string | null
+  /** Si true, génère 2 PDFs séparés (contrat principal seul + annexe seule)
+   * puis les merge via pdf-lib. Permet de connaître précisément à quelle
+   * page tombe la signature du contrat principal (= mainPageCount), pour
+   * placer 2 champs SIGNATURE Documenso aux 2 bons endroits.
+   * Pour le download direct (route API), garder false (1 seul PDF). */
+  splitForSignature?: boolean
+}
+
+/** Helper interne : génère un PDF depuis un HTML via Puppeteer, avec le footer
+ * running paraphes activé. Réutilisé pour le mode normal ET pour les 2 PDFs
+ * du mode split. */
+async function htmlToPdfBuffer(html: string): Promise<Buffer> {
+  const puppeteer = await import('puppeteer')
+  const browser = await puppeteer.default.launch({
+    headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--user-data-dir=/tmp/chrome-data',
+    ],
+  })
+
+  try {
+    const page = await browser.newPage()
+    await page.setContent(html, { waitUntil: 'networkidle0' })
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '0', right: '0', bottom: '16mm', left: '0' },
+      displayHeaderFooter: true,
+      headerTemplate: '<div></div>',
+      footerTemplate: `
+        <div style="width:100%; padding:0 12mm; font-size:8pt; font-family:Helvetica,Arial,sans-serif; color:#6b7f96; display:flex; justify-content:space-between; align-items:center;">
+          <span>Page <span class="pageNumber"></span>/<span class="totalPages"></span></span>
+          <span style="display:inline-flex; align-items:center; gap:4mm;">
+            <span style="font-weight:700; color:#1e3a5f; letter-spacing:0.5pt;">Paraphes</span>
+            <span style="display:inline-block; min-width:32mm; height:9mm; border:1px solid #d9e6ed; border-radius:3px;"></span>
+          </span>
+        </div>
+      `,
+    })
+    return Buffer.from(pdfBuffer)
+  } finally {
+    await browser.close()
+  }
+}
+
+async function countPages(buffer: Buffer): Promise<number> {
+  try {
+    const { PDFDocument } = await import('pdf-lib')
+    const pdfDoc = await PDFDocument.load(buffer)
+    return pdfDoc.getPageCount()
+  } catch (e) {
+    console.warn('[adoption-contract-pdf] page count failed:', (e as Error).message)
+    return 1
+  }
 }
 
 export async function buildAdoptionContractPdf(contractId: string, options: BuildOptions = {}): Promise<BuildResult> {
@@ -111,58 +174,50 @@ export async function buildAdoptionContractPdf(contractId: string, options: Buil
     }
   }
 
-  const html = buildAdoptionContractHtml(contract, contract.animals, contract.adopter, companyInfo, logoBase64, animalPhotoBase64, createdByName)
+  const filename = `contrat_adoption_${contract.contract_number}.pdf`
 
-  const puppeteer = await import('puppeteer')
-  const browser = await puppeteer.default.launch({
-    headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--user-data-dir=/tmp/chrome-data',
-    ],
-  })
-
-  const page = await browser.newPage()
-  await page.setContent(html, { waitUntil: 'networkidle0' })
-  // Footer running avec encart paraphes en bas à droite (cf. foster-contract-pdf
-  // pour le détail du raisonnement). Documenso pose ensuite un champ INITIALS
-  // pile dans cet encart sur chaque page sauf la dernière (signature finale).
-  const pdfBuffer = await page.pdf({
-    format: 'A4',
-    printBackground: true,
-    margin: { top: '0', right: '0', bottom: '16mm', left: '0' },
-    displayHeaderFooter: true,
-    headerTemplate: '<div></div>',
-    footerTemplate: `
-      <div style="width:100%; padding:0 12mm; font-size:8pt; font-family:Helvetica,Arial,sans-serif; color:#6b7f96; display:flex; justify-content:space-between; align-items:center;">
-        <span>Page <span class="pageNumber"></span>/<span class="totalPages"></span></span>
-        <span style="display:inline-flex; align-items:center; gap:4mm;">
-          <span style="font-weight:700; color:#1e3a5f; letter-spacing:0.5pt;">Paraphes</span>
-          <span style="display:inline-block; min-width:32mm; height:9mm; border:1px solid #d9e6ed; border-radius:3px;"></span>
-        </span>
-      </div>
-    `,
-  })
-  await browser.close()
-
-  const buffer = Buffer.from(pdfBuffer)
-  let pageCount = 1
-  try {
-    const { PDFDocument } = await import('pdf-lib')
-    const pdfDoc = await PDFDocument.load(buffer)
-    pageCount = pdfDoc.getPageCount()
-  } catch (e) {
-    console.warn('[adoption-contract-pdf] page count failed:', (e as Error).message)
+  // ----- Mode normal (1 seul PDF avec main + annex enchaînés) -----
+  if (!options.splitForSignature) {
+    const html = buildAdoptionContractHtml(contract, contract.animals, contract.adopter, companyInfo, logoBase64, animalPhotoBase64, createdByName, 'full')
+    const buffer = await htmlToPdfBuffer(html)
+    const pageCount = await countPages(buffer)
+    return { buffer, filename, contractNumber: contract.contract_number, pageCount }
   }
+
+  // ----- Mode split (2 PDFs séparés mergés) -----
+  // On génère le contrat principal SEUL puis l'annexe SEULE, on les merge via
+  // pdf-lib. Permet de connaître précisément à quelle page tombe chaque
+  // signature : SIGNATURE 1 sur mainPageCount (= dernière page du contrat
+  // principal), SIGNATURE 2 sur pageCount (= dernière page du PDF total).
+  const htmlMain = buildAdoptionContractHtml(contract, contract.animals, contract.adopter, companyInfo, logoBase64, animalPhotoBase64, createdByName, 'main')
+  const htmlAnnex = buildAdoptionContractHtml(contract, contract.animals, contract.adopter, companyInfo, logoBase64, animalPhotoBase64, createdByName, 'annex')
+
+  const [bufMain, bufAnnex] = await Promise.all([
+    htmlToPdfBuffer(htmlMain),
+    htmlToPdfBuffer(htmlAnnex),
+  ])
+  const mainPageCount = await countPages(bufMain)
+  const annexPageCount = await countPages(bufAnnex)
+
+  // Merge via pdf-lib
+  const { PDFDocument } = await import('pdf-lib')
+  const merged = await PDFDocument.create()
+  const docMain = await PDFDocument.load(bufMain)
+  const docAnnex = await PDFDocument.load(bufAnnex)
+
+  const mainPages = await merged.copyPages(docMain, docMain.getPageIndices())
+  for (const p of mainPages) merged.addPage(p)
+  const annexPages = await merged.copyPages(docAnnex, docAnnex.getPageIndices())
+  for (const p of annexPages) merged.addPage(p)
+
+  const mergedBytes = await merged.save()
+  const buffer = Buffer.from(mergedBytes)
 
   return {
     buffer,
-    filename: `contrat_adoption_${contract.contract_number}.pdf`,
+    filename,
     contractNumber: contract.contract_number,
-    pageCount,
+    pageCount: mainPageCount + annexPageCount,
+    mainPageCount,
   }
 }

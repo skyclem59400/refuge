@@ -58,13 +58,20 @@ export async function sendAdoptionContractForSignature(contractId: string) {
       .eq('id', establishmentId)
       .single()
 
-    // 1. Generate PDF (avec nom du membre qui envoie pré-rempli dans les 2
-    // encarts "Signature du Refuge SDA" — contrat principal + annexe).
+    // 1. Generate PDF en mode SPLIT (2 PDFs séparés mergés) pour connaître
+    // précisément la page de fin du contrat principal. L'adoptant doit signer
+    // aux 2 endroits : fin contrat principal + fin annexe.
     let pdfResult
     try {
-      pdfResult = await buildAdoptionContractPdf(contractId, { createdByUserId: userId })
+      pdfResult = await buildAdoptionContractPdf(contractId, {
+        createdByUserId: userId,
+        splitForSignature: true,
+      })
     } catch (e) {
       return { error: `Erreur génération PDF : ${(e as Error).message}` }
+    }
+    if (!pdfResult.mainPageCount) {
+      return { error: 'Page count du contrat principal manquant (bug interne)' }
     }
 
     const animalName = contract.animal?.name ?? 'votre futur compagnon'
@@ -105,25 +112,20 @@ export async function sendAdoptionContractForSignature(contractId: string) {
     }
 
     // 4. Positionner les champs Documenso :
-    //    a) Sur la dernière page (= fin de l'annexe "Conditions d'adoption"),
-    //       dans la sigbox "Adoptant" colonne GAUCHE (pageX ~8) :
-    //       - NAME : auto-rempli avec le nom complet du recipient
-    //       - DATE : auto-rempli avec la date de signature
-    //       - SIGNATURE : champ à dessiner par le signataire
-    //    b) Sur chaque page intermédiaire, un INITIALS (paraphe) dans le
-    //       footer running Puppeteer (encart "Paraphes" en bas à droite).
-    //
-    // TODO (itération suivante) : ajouter une 2e SIGNATURE sur la fin du
-    // contrat principal (avant l'annexe). Nécessite soit un système de
-    // markers Puppeteer + page.evaluate pour mesurer la page exacte, soit
-    // un refactor du builder pour générer 2 PDFs (main + annex) puis les
-    // merger avec pdf-lib (plus robuste). En attendant, l'INITIALS sur la
-    // page principale + la SIGNATURE finale sur l'annexe (qui contient les
-    // engagements juridiques) couvre l'essentiel.
+    //    a) 2 SIGNATURES de l'adoptant : une à la fin du contrat principal
+    //       (page mainPageCount, qui correspond à la dernière page du PDF
+    //       main avant qu'on lui colle l'annexe via pdf-lib), et une à la
+    //       fin de l'annexe (page pageCount). Les 2 dans la sigbox Adoptant
+    //       colonne GAUCHE (pageX ~8).
+    //    b) Sur les autres pages, un INITIALS (paraphe) dans le footer
+    //       running Puppeteer (encart "Paraphes" en bas à droite).
+    const mainPage = pdfResult.mainPageCount
     const lastPage = pdfResult.pageCount
+    const signaturePages = new Set([mainPage, lastPage])
 
-    // Paraphes sur chaque page sauf la dernière (qui a la signature finale)
-    for (let pageNumber = 1; pageNumber < lastPage; pageNumber++) {
+    // Paraphes sur toutes les pages SAUF celles qui ont une signature finale
+    for (let pageNumber = 1; pageNumber <= lastPage; pageNumber++) {
+      if (signaturePages.has(pageNumber)) continue
       try {
         await addField(document.id, {
           recipientId: recipient.id,
@@ -139,25 +141,28 @@ export async function sendAdoptionContractForSignature(contractId: string) {
       }
     }
 
-    // Signature finale dans la sigbox adoptant (colonne gauche)
-    const fieldsToAdd: Array<{ type: 'NAME' | 'DATE' | 'SIGNATURE'; pageY: number; pageHeight: number }> = [
+    // 2 signatures complètes (NAME + DATE + SIGNATURE) sur les 2 pages
+    // de signature : contrat principal + annexe.
+    const sigFields: Array<{ type: 'NAME' | 'DATE' | 'SIGNATURE'; pageY: number; pageHeight: number }> = [
       { type: 'NAME', pageY: 76, pageHeight: 4 },
       { type: 'DATE', pageY: 81, pageHeight: 4 },
       { type: 'SIGNATURE', pageY: 86, pageHeight: 8 },
     ]
-    for (const field of fieldsToAdd) {
-      try {
-        await addField(document.id, {
-          recipientId: recipient.id,
-          type: field.type,
-          pageNumber: lastPage,
-          pageX: 8,
-          pageY: field.pageY,
-          pageWidth: 38,
-          pageHeight: field.pageHeight,
-        })
-      } catch (e) {
-        console.warn(`[adoption-contract-signature] addField ${field.type} failed:`, (e as Error).message)
+    for (const pageNumber of [mainPage, lastPage]) {
+      for (const field of sigFields) {
+        try {
+          await addField(document.id, {
+            recipientId: recipient.id,
+            type: field.type,
+            pageNumber,
+            pageX: 8,
+            pageY: field.pageY,
+            pageWidth: 38,
+            pageHeight: field.pageHeight,
+          })
+        } catch (e) {
+          console.warn(`[adoption-contract-signature] addField ${field.type} p${pageNumber} failed:`, (e as Error).message)
+        }
       }
     }
 
