@@ -258,24 +258,32 @@ export function LeaveCoverageCalendar({
             </button>
           </div>
 
-          {/* Présents — salariés uniquement (les bénévoles et autres collaborateurs
-              ne sont pas comptés dans la couverture). */}
+          {/* Présents — salariés uniquement, hors jour de repos hebdomadaire.
+              Note : le ratio "4/7" affiché dans la grille reste basé sur l'effectif
+              total sous contrat (logique RH historique). Cette section sert à voir
+              concrètement QUI travaille ce jour selon planning, pour planifier
+              autour des congés (ex : "lundi Matthieu est au repos hebdo mais
+              pourrait venir si on change son planning"). */}
           <div className="space-y-2">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">
-                Presents
+                Presents (selon planning)
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {selectedDayData.active_salaried
-                  .filter((id) => {
-                    const absentIds = new Set(
-                      selectedDayData.absent
-                        .filter((a) => includePending || a.reason !== 'leave_pending')
-                        .map((a) => a.member_id)
-                    )
-                    return !absentIds.has(id)
-                  })
-                  .map((id) => {
+                {(() => {
+                  const absentIds = new Set(
+                    selectedDayData.absent
+                      .filter((a) => includePending || a.reason !== 'leave_pending')
+                      .map((a) => a.member_id)
+                  )
+                  const restIds = new Set(selectedDayData.members_on_rest_day)
+                  const presents = selectedDayData.active_salaried.filter(
+                    (id) => !absentIds.has(id) && !restIds.has(id)
+                  )
+                  if (presents.length === 0) {
+                    return <span className="text-xs text-muted italic">Aucun salarié programmé ce jour</span>
+                  }
+                  return presents.map((id) => {
                     const m = memberMap.get(id)
                     return (
                       <span
@@ -290,9 +298,37 @@ export function LeaveCoverageCalendar({
                         )}
                       </span>
                     )
-                  })}
+                  })
+                })()}
               </div>
             </div>
+
+            {/* Au repos hebdo — membres dont la semaine type marque ce jour comme
+                jour de repos. Bleu (≠ rouge absent congé) pour signaler que c'est
+                un état "normal" et que ces personnes peuvent potentiellement venir
+                en dépannage si nécessaire. */}
+            {selectedDayData.members_on_rest_day.length > 0 && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">
+                  Au repos hebdo
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedDayData.members_on_rest_day.map((id) => {
+                    const m = memberMap.get(id)
+                    return (
+                      <span
+                        key={id}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border bg-sky-500/10 text-sky-400 border-sky-500/30"
+                        title="Jour de repos selon la semaine type — peut éventuellement être sollicité"
+                      >
+                        {memberLabel(m)}
+                        <span className="text-[9px] uppercase opacity-70">Repos</span>
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Absents — salariés uniquement (cohérent avec la liste des présents). */}
             {(() => {

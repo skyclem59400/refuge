@@ -7,6 +7,8 @@ import type {
   LeaveRequest,
   LeaveType,
   ContractType,
+  MemberWorkSchedule,
+  DayOfWeek,
 } from '@/lib/types/database'
 
 function isMemberOnExtendedLeave(member: EstablishmentMember, day: string): boolean {
@@ -45,6 +47,13 @@ export interface CoverageDay {
   active_auto: string[]
   active_other: string[]
   absent: CoverageAbsence[]
+  /** Membres "au repos hebdomadaire" ce jour selon leur semaine type
+   * (member_work_schedules.is_rest_day=true pour ce day_of_week). Ils ne
+   * sont PAS comptés dans `absent` (ce n'est pas un congé) mais permettent
+   * d'identifier qui pourrait éventuellement venir en remplacement si on
+   * modifie son planning ponctuel (ex: Matthieu de repos lundi peut être
+   * sollicité pour couvrir un congé d'autres). */
+  members_on_rest_day: string[]
   available_salaried_count: number
   available_total_count: number
   /** Effectif salarié total sous contrat ce jour (présents + absents salariés). */
@@ -75,7 +84,7 @@ export async function getCoverageRange(params: {
     const { establishmentId } = await requirePermission('manage_leaves')
     const admin = createAdminClient()
 
-    const [estRes, membersRes, requestsRes, typesRes] = await Promise.all([
+    const [estRes, membersRes, requestsRes, typesRes, schedulesRes] = await Promise.all([
       admin
         .from('establishments')
         .select('min_daily_staff')
@@ -97,17 +106,35 @@ export async function getCoverageRange(params: {
         .select('*')
         .eq('establishment_id', establishmentId)
         .eq('is_active', true),
+      admin
+        .from('member_work_schedules')
+        .select('member_id, day_of_week, is_rest_day')
+        .eq('establishment_id', establishmentId)
+        .is('valid_until', null),
     ])
 
     if (estRes.error) return { error: estRes.error.message }
     if (membersRes.error) return { error: membersRes.error.message }
     if (requestsRes.error) return { error: requestsRes.error.message }
     if (typesRes.error) return { error: typesRes.error.message }
+    if (schedulesRes.error) return { error: schedulesRes.error.message }
 
     const threshold = estRes.data?.min_daily_staff ?? 3
     const members = (membersRes.data || []) as EstablishmentMember[]
     const requests = (requestsRes.data || []) as LeaveRequest[]
     const leaveTypes = (typesRes.data || []) as LeaveType[]
+    const schedules = (schedulesRes.data || []) as Pick<MemberWorkSchedule, 'member_id' | 'day_of_week' | 'is_rest_day'>[]
+
+    // Indexe les jours de repos par (member_id, day_of_week). Manque de ligne
+    // = jour pas encore configuré dans la semaine type → considéré comme
+    // "non-repos" par défaut (le membre travaille a priori ce jour-là).
+    const restDayByMember = new Map<string, Set<DayOfWeek>>()
+    for (const s of schedules) {
+      if (!s.is_rest_day) continue
+      const set = restDayByMember.get(s.member_id) || new Set<DayOfWeek>()
+      set.add(s.day_of_week as DayOfWeek)
+      restDayByMember.set(s.member_id, set)
+    }
 
     const userIds = members.map((m) => m.user_id).filter(Boolean)
     if (userIds.length > 0) {
@@ -185,6 +212,17 @@ export async function getCoverageRange(params: {
         active_salaried.length +
         absent.filter((a) => a.contract_type === 'salarie').length
 
+      // Membres au repos hebdo : salariés ou auto_entrepreneurs qui ne sont
+      // ni en arrêt long, ni en congé, et dont la semaine type marque ce jour
+      // comme jour de repos.
+      const members_on_rest_day: string[] = []
+      for (const m of members) {
+        if (m.contract_type !== 'salarie' && m.contract_type !== 'auto_entrepreneur') continue
+        if (allAbsentIds.has(m.id)) continue
+        const restSet = restDayByMember.get(m.id)
+        if (restSet?.has(weekday as DayOfWeek)) members_on_rest_day.push(m.id)
+      }
+
       days.push({
         date: day,
         weekday,
@@ -193,6 +231,7 @@ export async function getCoverageRange(params: {
         active_auto,
         active_other,
         absent,
+        members_on_rest_day,
         available_salaried_count: salariedApprovedAvail,
         available_total_count: totalApprovedAvail,
         total_salaried_count: totalSalaried,
