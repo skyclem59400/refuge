@@ -28,7 +28,7 @@ function mapDocumensoStatus(status: DocumensoStatus, recipientSigned: boolean): 
 
 export async function sendAdoptionContractForSignature(contractId: string) {
   try {
-    const { establishmentId } = await requirePermission('manage_animals')
+    const { establishmentId, userId } = await requirePermission('manage_animals')
     const supabase = await createClient()
     const admin = createAdminClient()
 
@@ -58,10 +58,11 @@ export async function sendAdoptionContractForSignature(contractId: string) {
       .eq('id', establishmentId)
       .single()
 
-    // 1. Generate PDF
+    // 1. Generate PDF (avec nom du membre qui envoie pré-rempli dans les 2
+    // encarts "Signature du Refuge SDA" — contrat principal + annexe).
     let pdfResult
     try {
-      pdfResult = await buildAdoptionContractPdf(contractId)
+      pdfResult = await buildAdoptionContractPdf(contractId, { createdByUserId: userId })
     } catch (e) {
       return { error: `Erreur génération PDF : ${(e as Error).message}` }
     }
@@ -103,13 +104,46 @@ export async function sendAdoptionContractForSignature(contractId: string) {
       return { error: "Documenso n'a pas créé de destinataire" }
     }
 
-    // 4. Positionner les champs Documenso sur la sigbox "Adoptant"
-    //    de la dernière page (colonne droite, bas de page).
+    // 4. Positionner les champs Documenso :
+    //    a) Sur la dernière page (= fin de l'annexe "Conditions d'adoption"),
+    //       dans la sigbox "Adoptant" colonne GAUCHE (pageX ~8) :
+    //       - NAME : auto-rempli avec le nom complet du recipient
+    //       - DATE : auto-rempli avec la date de signature
+    //       - SIGNATURE : champ à dessiner par le signataire
+    //    b) Sur chaque page intermédiaire, un INITIALS (paraphe) dans le
+    //       footer running Puppeteer (encart "Paraphes" en bas à droite).
+    //
+    // TODO (itération suivante) : ajouter une 2e SIGNATURE sur la fin du
+    // contrat principal (avant l'annexe). Nécessite soit un système de
+    // markers Puppeteer + page.evaluate pour mesurer la page exacte, soit
+    // un refactor du builder pour générer 2 PDFs (main + annex) puis les
+    // merger avec pdf-lib (plus robuste). En attendant, l'INITIALS sur la
+    // page principale + la SIGNATURE finale sur l'annexe (qui contient les
+    // engagements juridiques) couvre l'essentiel.
     const lastPage = pdfResult.pageCount
+
+    // Paraphes sur chaque page sauf la dernière (qui a la signature finale)
+    for (let pageNumber = 1; pageNumber < lastPage; pageNumber++) {
+      try {
+        await addField(document.id, {
+          recipientId: recipient.id,
+          type: 'INITIALS',
+          pageNumber,
+          pageX: 78,
+          pageY: 95.5,
+          pageWidth: 14,
+          pageHeight: 4,
+        })
+      } catch (e) {
+        console.warn(`[adoption-contract-signature] addField INITIALS p${pageNumber} failed:`, (e as Error).message)
+      }
+    }
+
+    // Signature finale dans la sigbox adoptant (colonne gauche)
     const fieldsToAdd: Array<{ type: 'NAME' | 'DATE' | 'SIGNATURE'; pageY: number; pageHeight: number }> = [
-      { type: 'NAME', pageY: 79, pageHeight: 4 },
-      { type: 'DATE', pageY: 84, pageHeight: 4 },
-      { type: 'SIGNATURE', pageY: 89, pageHeight: 8 },
+      { type: 'NAME', pageY: 76, pageHeight: 4 },
+      { type: 'DATE', pageY: 81, pageHeight: 4 },
+      { type: 'SIGNATURE', pageY: 86, pageHeight: 8 },
     ]
     for (const field of fieldsToAdd) {
       try {
@@ -117,7 +151,7 @@ export async function sendAdoptionContractForSignature(contractId: string) {
           recipientId: recipient.id,
           type: field.type,
           pageNumber: lastPage,
-          pageX: 55,
+          pageX: 8,
           pageY: field.pageY,
           pageWidth: 38,
           pageHeight: field.pageHeight,

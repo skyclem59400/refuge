@@ -1,5 +1,6 @@
 import type { CompanyInfo } from '@/lib/types/database'
 import { getSpeciesLabel } from '@/lib/species'
+import { buildCachetSvg } from './cachet'
 
 interface AdoptionContractPdfData {
   contract_number: string
@@ -112,7 +113,8 @@ export function buildAdoptionContractHtml(
   adopter: AdoptionPdfClient,
   company: CompanyInfo | undefined,
   logoBase64: string | undefined,
-  animalPhotoBase64: string | undefined
+  animalPhotoBase64: string | undefined,
+  createdByName?: string | null,
 ): string {
   const adopterAddressLines = [
     htmlEscape(adopter.address) || '',
@@ -123,6 +125,7 @@ export function buildAdoptionContractHtml(
   const companyAddress = company?.address || '11 route nationale, 59400 Estourmel, France'
   const companyEmail = company?.email || 'accueil@sda-nord.com'
   const companySiret = company?.siret || '32110272500025'
+  const refugeCachetSvg = buildCachetSvg(company || { name: companyName })
 
   const animalNameDisplay = htmlEscape(animal.name) +
     (animal.name_secondary ? ` <span class="muted">/ ${htmlEscape(animal.name_secondary)}</span>` : '')
@@ -408,6 +411,35 @@ export function buildAdoptionContractHtml(
       font-size: 8.5pt;
       color: ${STONE_500};
     }
+    .sigbox-body.is-refuge {
+      display: flex;
+      align-items: center;
+      gap: 3mm;
+      padding: 2mm 3mm;
+      color: ${NAVY};
+    }
+    .sigbox-body.is-refuge .cachet {
+      width: 26mm;
+      height: 26mm;
+      flex-shrink: 0;
+    }
+    .sigbox-body.is-refuge .cachet svg { display: block; width: 100%; height: 100%; }
+    .sigbox-body.is-refuge .signer-name {
+      flex: 1;
+      font-size: 9pt;
+      font-weight: 700;
+      color: ${NAVY};
+      line-height: 1.3;
+    }
+    .sigbox-body.is-refuge .signer-label {
+      font-size: 7.5pt;
+      font-weight: 400;
+      color: ${STONE_500};
+      text-transform: uppercase;
+      letter-spacing: 0.5pt;
+      display: block;
+      margin-bottom: 1mm;
+    }
 
     .signed-at {
       margin: 6mm 0 3mm;
@@ -614,7 +646,13 @@ export function buildAdoptionContractHtml(
     </div>
     <div class="sigbox">
       <div class="sigbox-head">Signature du Refuge SDA</div>
-      <div class="sigbox-body">Pour la SDA d'Estourmel</div>
+      <div class="sigbox-body is-refuge">
+        <div class="cachet">${refugeCachetSvg}</div>
+        <div class="signer-name">
+          <span class="signer-label">Pour ${htmlEscape(companyName)}</span>
+          ${createdByName ? htmlEscape(createdByName) : 'Le représentant'}
+        </div>
+      </div>
     </div>
   </div>
 
@@ -669,7 +707,13 @@ export function buildAdoptionContractHtml(
       </div>
       <div class="sigbox">
         <div class="sigbox-head">Signature du Refuge SDA</div>
-        <div class="sigbox-body">Pour la SDA d'Estourmel</div>
+        <div class="sigbox-body is-refuge">
+          <div class="cachet">${refugeCachetSvg}</div>
+          <div class="signer-name">
+            <span class="signer-label">Pour ${htmlEscape(companyName)}</span>
+            ${createdByName ? htmlEscape(createdByName) : 'Le représentant'}
+          </div>
+        </div>
       </div>
     </div>
 
