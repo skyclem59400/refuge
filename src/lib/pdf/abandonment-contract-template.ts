@@ -6,6 +6,7 @@ import {
 import { getSpeciesLabel } from '@/lib/species'
 import { ABANDONMENT_MOTIF_LABELS, type AbandonmentMotif } from '@/lib/types/database'
 import type { CompanyInfo } from '@/lib/types/database'
+import { buildCachetSvg } from './cachet'
 
 interface AbandonmentPdfContract {
   contract_number: string
@@ -89,11 +90,13 @@ export function buildAbandonmentContractHtml(
   cedant: AbandonmentPdfCedant,
   companyInfo?: CompanyInfo,
   logoBase64?: string,
+  createdByName?: string | null,
 ): string {
   const orgName = companyInfo?.legal_name || companyInfo?.name || 'SDA Estourmel'
   const orgAddress = companyInfo?.address || '11 route nationale, 59400 Estourmel'
   const orgEmail = companyInfo?.email || 'accueil@sda-nord.com'
   const orgSiret = companyInfo?.siret || ''
+  const refugeCachetSvg = buildCachetSvg(companyInfo || { name: orgName })
 
   const cedantFullName = fmtCedantName(cedant)
   const cedantAddressBlock = [
@@ -281,6 +284,35 @@ export function buildAbandonmentContractHtml(
     border-bottom: 1px solid ${SDA_BORDER};
   }
   .signature-body { flex: 1; padding: 4mm; }
+  .signature-body.is-refuge {
+    display: flex;
+    align-items: center;
+    gap: 3mm;
+    padding: 2mm 3mm;
+    color: ${SDA_NAVY};
+  }
+  .signature-body.is-refuge .cachet {
+    width: 26mm;
+    height: 26mm;
+    flex-shrink: 0;
+  }
+  .signature-body.is-refuge .cachet svg { display: block; width: 100%; height: 100%; }
+  .signature-body.is-refuge .signer-name {
+    flex: 1;
+    font-size: 9pt;
+    font-weight: 700;
+    color: ${SDA_NAVY};
+    line-height: 1.3;
+  }
+  .signature-body.is-refuge .signer-label {
+    font-size: 7.5pt;
+    font-weight: 400;
+    color: ${SDA_NAVY_LIGHT};
+    text-transform: uppercase;
+    letter-spacing: 0.5pt;
+    display: block;
+    margin-bottom: 1mm;
+  }
 
   .footer {
     margin-top: 10mm;
@@ -411,7 +443,13 @@ export function buildAbandonmentContractHtml(
       </div>
       <div class="signature">
         <div class="signature-head">Signature de ${orgName}</div>
-        <div class="signature-body"></div>
+        <div class="signature-body is-refuge">
+          <div class="cachet">${refugeCachetSvg}</div>
+          <div class="signer-name">
+            <span class="signer-label">Pour ${orgName}</span>
+            ${createdByName ? createdByName : 'Le représentant'}
+          </div>
+        </div>
       </div>
     </div>
 

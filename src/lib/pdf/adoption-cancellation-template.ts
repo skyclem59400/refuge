@@ -1,3 +1,5 @@
+import { buildCachetSvg } from './cachet'
+
 interface CancellationData {
   contract_number: string
   establishment: { name: string; legal_name: string | null; address: string | null; siret: string | null }
@@ -29,10 +31,19 @@ const METHOD_LABEL: Record<string, string> = {
   autre: 'Autre',
 }
 
-export function buildAdoptionCancellationHtml(d: CancellationData, logoBase64?: string): string {
+export function buildAdoptionCancellationHtml(
+  d: CancellationData,
+  logoBase64?: string,
+  createdByName?: string | null,
+): string {
   const logoHtml = logoBase64
     ? `<img src="${logoBase64}" class="logo" alt="logo" />`
     : ''
+  const refugeCachetSvg = buildCachetSvg({
+    name: d.establishment.name,
+    legal_name: d.establishment.legal_name ?? undefined,
+    address: d.establishment.address ?? undefined,
+  })
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -79,6 +90,26 @@ export function buildAdoptionCancellationHtml(d: CancellationData, logoBase64?: 
   .signature-block .place-date { font-size: 10px; color: #94a3b8; margin: 4px 0; }
   .signature-block .line { border-bottom: 1px solid #94a3b8; height: 50px; margin-top: 8px; }
   .signature-block .name { font-size: 10px; color: #64748b; margin-top: 4px; font-style: italic; }
+
+  .signature-block.is-refuge .refuge-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+    min-height: 50px;
+  }
+  .signature-block.is-refuge .cachet {
+    width: 70px;
+    height: 70px;
+    flex-shrink: 0;
+  }
+  .signature-block.is-refuge .cachet svg { display: block; width: 100%; height: 100%; }
+  .signature-block.is-refuge .signer {
+    flex: 1;
+    font-size: 11px;
+    font-weight: 700;
+    color: #1e3a5f;
+  }
 
   .footer { margin-top: 26px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 9px; color: #94a3b8; text-align: center; }
 </style>
@@ -170,11 +201,13 @@ export function buildAdoptionCancellationHtml(d: CancellationData, logoBase64?: 
   }
 
   <div class="signature-section">
-    <div class="signature-block">
+    <div class="signature-block is-refuge">
       <div class="label">Pour le refuge</div>
       <div class="place-date">Fait le ${fmtDate(d.return_date)}</div>
-      <div class="line"></div>
-      <div class="name">Nom et signature du representant</div>
+      <div class="refuge-content">
+        <div class="cachet">${refugeCachetSvg}</div>
+        <div class="signer">${createdByName ? createdByName : 'Le représentant'}</div>
+      </div>
     </div>
     <div class="signature-block">
       <div class="label">L'adoptant</div>

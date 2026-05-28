@@ -28,7 +28,7 @@ function mapDocumensoStatus(status: DocumensoStatus, recipientSigned: boolean): 
 
 export async function sendAbandonmentContractForSignature(contractId: string) {
   try {
-    const { establishmentId } = await requirePermission('manage_movements')
+    const { establishmentId, userId } = await requirePermission('manage_movements')
     const supabase = await createClient()
     const admin = createAdminClient()
 
@@ -59,10 +59,11 @@ export async function sendAbandonmentContractForSignature(contractId: string) {
       .eq('id', establishmentId)
       .single()
 
-    // 1. Génère le PDF
+    // 1. Génère le PDF (avec nom du membre qui envoie pré-rempli dans l'encart
+    // "Signature du Refuge SDA").
     let pdfResult
     try {
-      pdfResult = await buildAbandonmentContractPdf(contractId)
+      pdfResult = await buildAbandonmentContractPdf(contractId, { createdByUserId: userId })
     } catch (e) {
       return { error: `Erreur génération PDF : ${(e as Error).message}` }
     }
@@ -104,12 +105,39 @@ export async function sendAbandonmentContractForSignature(contractId: string) {
       return { error: "Documenso n'a pas créé de destinataire" }
     }
 
-    // 3. Positionne les champs de signature côté gauche (cédant) de la dernière page
+    // 3. Positionner les champs Documenso :
+    //    a) Sur la dernière page, dans la sigbox "Cédant" (colonne GAUCHE — pageX 10) :
+    //       - NAME : auto-rempli avec le nom complet du recipient
+    //       - DATE : auto-rempli avec la date de signature
+    //       - SIGNATURE : champ à dessiner par le signataire
+    //    b) Sur chaque page intermédiaire, un INITIALS (paraphe) dans le
+    //       footer running Puppeteer (encart "Paraphes" en bas à droite,
+    //       pageY ~95-99). Pratique juridique standard : chaque page paraphée
+    //       pour éviter substitution.
     const lastPage = pdfResult.pageCount
+
+    // Paraphes sur chaque page sauf la dernière (qui a la signature finale)
+    for (let pageNumber = 1; pageNumber < lastPage; pageNumber++) {
+      try {
+        await addField(document.id, {
+          recipientId: recipient.id,
+          type: 'INITIALS',
+          pageNumber,
+          pageX: 78,
+          pageY: 95.5,
+          pageWidth: 14,
+          pageHeight: 4,
+        })
+      } catch (e) {
+        console.warn(`[abandonment-contract-signature] addField INITIALS p${pageNumber} failed:`, (e as Error).message)
+      }
+    }
+
+    // Signature finale dans la sigbox cédant (colonne gauche, pageX 10)
     const fieldsToAdd: Array<{ type: 'NAME' | 'DATE' | 'SIGNATURE'; pageY: number; pageHeight: number }> = [
-      { type: 'NAME', pageY: 79, pageHeight: 4 },
-      { type: 'DATE', pageY: 84, pageHeight: 4 },
-      { type: 'SIGNATURE', pageY: 89, pageHeight: 8 },
+      { type: 'NAME', pageY: 76, pageHeight: 4 },
+      { type: 'DATE', pageY: 81, pageHeight: 4 },
+      { type: 'SIGNATURE', pageY: 86, pageHeight: 8 },
     ]
     for (const field of fieldsToAdd) {
       try {

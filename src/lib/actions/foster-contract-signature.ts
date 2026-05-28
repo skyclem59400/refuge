@@ -36,7 +36,7 @@ function mapDocumensoStatus(status: DocumensoStatus, recipientSigned: boolean): 
 
 export async function sendContractForSignature(contractId: string) {
   try {
-    const { establishmentId } = await requirePermission('manage_animals')
+    const { establishmentId, userId } = await requirePermission('manage_animals')
     const supabase = await createClient()
     const admin = createAdminClient()
 
@@ -67,10 +67,11 @@ export async function sendContractForSignature(contractId: string) {
       return { error: 'Ce contrat a deja ete envoye pour signature' }
     }
 
-    // 1. Generate the contract PDF
+    // 1. Generate the contract PDF (avec nom du membre qui envoie pré-rempli
+    // dans l'encart "Signature du Refuge SDA").
     let pdfResult
     try {
-      pdfResult = await buildFosterContractPdf(contractId)
+      pdfResult = await buildFosterContractPdf(contractId, { createdByUserId: userId })
     } catch (e) {
       return { error: `Erreur generation PDF : ${(e as Error).message}` }
     }
@@ -117,16 +118,40 @@ export async function sendContractForSignature(contractId: string) {
       return { error: 'Documenso n’a pas cree de destinataire' }
     }
 
-    // 3. Positionner les champs Documenso sur la sigbox "Famille d'accueil"
-    //    de la dernière page (colonne droite, bas de page).
-    //    - NAME : auto-rempli avec le nom complet du recipient
-    //    - DATE : auto-rempli avec la date de signature
-    //    - SIGNATURE : champ à dessiner par le signataire
+    // 3. Positionner les champs Documenso :
+    //    a) Sur la dernière page, dans la sigbox "Famille d'accueil"
+    //       (colonne GAUCHE du grid à 2 colonnes — pageX ~8) :
+    //       - NAME : auto-rempli avec le nom complet du recipient
+    //       - DATE : auto-rempli avec la date de signature
+    //       - SIGNATURE : champ à dessiner par le signataire
+    //    b) Sur chaque page intermédiaire, un INITIALS (paraphe) dans le
+    //       footer running Puppeteer (encart "Paraphes" en bas à droite,
+    //       pageY ~95-99). Pratique juridique standard : chaque page paraphée
+    //       pour éviter substitution.
     const lastPage = pdfResult.pageCount
+
+    // Paraphes sur chaque page sauf la dernière (qui a la signature finale)
+    for (let pageNumber = 1; pageNumber < lastPage; pageNumber++) {
+      try {
+        await addField(document.id, {
+          recipientId: recipient.id,
+          type: 'INITIALS',
+          pageNumber,
+          pageX: 78,
+          pageY: 95.5,
+          pageWidth: 14,
+          pageHeight: 4,
+        })
+      } catch (e) {
+        console.warn(`[foster-contract-signature] addField INITIALS p${pageNumber} failed:`, (e as Error).message)
+      }
+    }
+
+    // Signature finale dans la sigbox FA (colonne gauche)
     const fieldsToAdd: Array<{ type: 'NAME' | 'DATE' | 'SIGNATURE'; pageY: number; pageHeight: number }> = [
-      { type: 'NAME', pageY: 79, pageHeight: 4 },
-      { type: 'DATE', pageY: 84, pageHeight: 4 },
-      { type: 'SIGNATURE', pageY: 89, pageHeight: 8 },
+      { type: 'NAME', pageY: 76, pageHeight: 4 },
+      { type: 'DATE', pageY: 81, pageHeight: 4 },
+      { type: 'SIGNATURE', pageY: 86, pageHeight: 8 },
     ]
     for (const field of fieldsToAdd) {
       try {
@@ -134,7 +159,7 @@ export async function sendContractForSignature(contractId: string) {
           recipientId: recipient.id,
           type: field.type,
           pageNumber: lastPage,
-          pageX: 55,
+          pageX: 8,
           pageY: field.pageY,
           pageWidth: 38,
           pageHeight: field.pageHeight,

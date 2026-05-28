@@ -35,7 +35,7 @@ const EXTERNAL_PREFIX = 'adoption_cancellation_'
  */
 export async function sendAdoptionCancellationForSignature(contractId: string) {
   try {
-    const { establishmentId } = await requirePermission('manage_animals')
+    const { establishmentId, userId } = await requirePermission('manage_animals')
     const supabase = await createClient()
     const admin = createAdminClient()
 
@@ -80,10 +80,11 @@ export async function sendAdoptionCancellationForSignature(contractId: string) {
       .eq('id', establishmentId)
       .single()
 
-    // 1. Build the cancellation PDF
+    // 1. Build the cancellation PDF (avec nom du membre qui envoie pré-rempli
+    // dans l'encart "Pour le refuge").
     let pdfResult
     try {
-      pdfResult = await buildAdoptionCancellationPdf(contractId)
+      pdfResult = await buildAdoptionCancellationPdf(contractId, { createdByUserId: userId })
     } catch (e) {
       return { error: `Erreur generation PDF : ${(e as Error).message}` }
     }
@@ -122,12 +123,39 @@ export async function sendAdoptionCancellationForSignature(contractId: string) {
     const recipient = (document.recipients ?? document.Recipient ?? [])[0]
     if (!recipient) return { error: 'Documenso n\'a pas cree de destinataire' }
 
-    // 3. Add signature fields on the last page (right column, bottom — same coords as adoption)
-    const lastPage = 1 // l'avenant est court (1 page)
+    // 3. Positionner les champs Documenso :
+    //    a) Sur la dernière page, dans le bloc adoptant (colonne DROITE du
+    //       grid à 2 colonnes — pageX 55) :
+    //       - NAME : auto-rempli avec le nom complet du recipient
+    //       - DATE : auto-rempli avec la date de signature
+    //       - SIGNATURE : champ à dessiner par le signataire
+    //    b) Sur chaque page intermédiaire, un INITIALS (paraphe) dans le
+    //       footer running Puppeteer (encart "Paraphes" en bas à droite,
+    //       pageY ~95-99).
+    const lastPage = pdfResult.pageCount
+
+    // Paraphes sur chaque page sauf la dernière (qui a la signature finale)
+    for (let pageNumber = 1; pageNumber < lastPage; pageNumber++) {
+      try {
+        await addField(document.id, {
+          recipientId: recipient.id,
+          type: 'INITIALS',
+          pageNumber,
+          pageX: 78,
+          pageY: 95.5,
+          pageWidth: 14,
+          pageHeight: 4,
+        })
+      } catch (e) {
+        console.warn(`[adoption-cancellation-signature] addField INITIALS p${pageNumber} failed:`, (e as Error).message)
+      }
+    }
+
+    // Signature finale dans le bloc adoptant (colonne droite)
     const fieldsToAdd: Array<{ type: 'NAME' | 'DATE' | 'SIGNATURE'; pageY: number; pageHeight: number }> = [
-      { type: 'NAME', pageY: 79, pageHeight: 4 },
-      { type: 'DATE', pageY: 84, pageHeight: 4 },
-      { type: 'SIGNATURE', pageY: 89, pageHeight: 8 },
+      { type: 'NAME', pageY: 76, pageHeight: 4 },
+      { type: 'DATE', pageY: 81, pageHeight: 4 },
+      { type: 'SIGNATURE', pageY: 86, pageHeight: 8 },
     ]
     for (const field of fieldsToAdd) {
       try {

@@ -1,6 +1,19 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { buildAdoptionCancellationHtml } from './adoption-cancellation-template'
-import { renderHtmlToPdf, fetchLogoBase64 } from './render'
+import { fetchLogoBase64 } from './render'
+
+interface BuildResult {
+  buffer: Buffer
+  filename: string
+  /** Nombre de pages du PDF généré, utile pour positionner les fields Documenso sur la dernière page. */
+  pageCount: number
+}
+
+interface BuildOptions {
+  /** ID auth.users du membre qui crée/envoie le contrat. Si fourni, son nom est
+   * affiché dans l'encart "Pour le refuge" à la place du label générique. */
+  createdByUserId?: string | null
+}
 
 function addDays(iso: string, days: number): string {
   const d = new Date(iso + 'T00:00:00')
@@ -9,8 +22,9 @@ function addDays(iso: string, days: number): string {
 }
 
 export async function buildAdoptionCancellationPdf(
-  contractId: string
-): Promise<{ buffer: Buffer; filename: string }> {
+  contractId: string,
+  options: BuildOptions = {}
+): Promise<BuildResult> {
   const admin = createAdminClient()
 
   const { data: c, error } = await admin
@@ -59,6 +73,20 @@ export async function buildAdoptionCancellationPdf(
     : null
 
   const logoBase64 = await fetchLogoBase64(est?.logo_url ?? null)
+
+  // Récupérer le nom complet du membre qui envoie l'avenant (pour pré-remplir
+  // l'encart "Pour le refuge"). RPC get_users_info renvoie email + full_name.
+  let createdByName: string | null = null
+  if (options.createdByUserId) {
+    try {
+      const { data: usersInfo } = await admin.rpc('get_users_info', { user_ids: [options.createdByUserId] })
+      const info = (usersInfo as Array<{ id: string; full_name: string | null; email: string }> | null)?.[0]
+      createdByName = info?.full_name?.trim() || info?.email || null
+    } catch (e) {
+      console.warn('[adoption-cancellation-pdf] get_users_info failed:', (e as Error).message)
+    }
+  }
+
   const html = buildAdoptionCancellationHtml(
     {
       contract_number: c.contract_number,
@@ -87,10 +115,56 @@ export async function buildAdoptionCancellationPdf(
       return_reason: c.return_reason,
       trial_period_ends_at: trialEnds,
     },
-    logoBase64
+    logoBase64,
+    createdByName
   )
 
-  const buffer = await renderHtmlToPdf(html)
+  const puppeteer = await import('puppeteer')
+  const browser = await puppeteer.default.launch({
+    headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--user-data-dir=/tmp/chrome-data',
+    ],
+  })
+
+  const page = await browser.newPage()
+  await page.setContent(html, { waitUntil: 'networkidle0' })
+  // Footer running sur chaque page avec un encart paraphes en bas à droite.
+  // Documenso pose ensuite un champ INITIALS (paraphe) pile dans cet encart sur
+  // chaque page sauf la dernière qui a la signature finale.
+  const pdfBuffer = await page.pdf({
+    format: 'A4',
+    printBackground: true,
+    margin: { top: '0', right: '0', bottom: '16mm', left: '0' },
+    displayHeaderFooter: true,
+    headerTemplate: '<div></div>',
+    footerTemplate: `
+      <div style="width:100%; padding:0 12mm; font-size:8pt; font-family:Helvetica,Arial,sans-serif; color:#6b7f96; display:flex; justify-content:space-between; align-items:center;">
+        <span>Page <span class="pageNumber"></span>/<span class="totalPages"></span></span>
+        <span style="display:inline-flex; align-items:center; gap:4mm;">
+          <span style="font-weight:700; color:#1e3a5f; letter-spacing:0.5pt;">Paraphes</span>
+          <span style="display:inline-block; min-width:32mm; height:9mm; border:1px solid #d9e6ed; border-radius:3px;"></span>
+        </span>
+      </div>
+    `,
+  })
+  await browser.close()
+
+  const buffer = Buffer.from(pdfBuffer)
+  let pageCount = 1
+  try {
+    const { PDFDocument } = await import('pdf-lib')
+    const pdfDoc = await PDFDocument.load(buffer)
+    pageCount = pdfDoc.getPageCount()
+  } catch (e) {
+    console.warn('[adoption-cancellation-pdf] page count failed:', (e as Error).message)
+  }
+
   const filename = `Avenant_annulation_${c.contract_number}.pdf`
-  return { buffer, filename }
+  return { buffer, filename, pageCount }
 }
