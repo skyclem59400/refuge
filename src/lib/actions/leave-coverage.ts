@@ -199,22 +199,11 @@ export async function getCoverageRange(params: {
       )
       const allAbsentIds = new Set(absent.map((a) => a.member_id))
 
-      const salariedApprovedAvail = active_salaried.filter((id) => !approvedAbsentIds.has(id)).length
-      const salariedWithPendingAvail = active_salaried.filter((id) => !allAbsentIds.has(id)).length
-      const totalApprovedAvail =
-        salariedApprovedAvail +
-        active_auto.filter((id) => !approvedAbsentIds.has(id)).length +
-        active_other.filter((id) => !approvedAbsentIds.has(id)).length
-
-      // Effectif salarié total sous contrat ce jour-là :
-      // présents (active_salaried) + absents salariés (arrêt long ou congé).
-      const totalSalaried =
-        active_salaried.length +
-        absent.filter((a) => a.contract_type === 'salarie').length
-
       // Membres au repos hebdo : salariés ou auto_entrepreneurs qui ne sont
       // ni en arrêt long, ni en congé, et dont la semaine type marque ce jour
-      // comme jour de repos.
+      // comme jour de repos. Calculé AVANT le compteur de dispos pour qu'il
+      // les exclue aussi (un membre en repos n'est pas "disponible" — c'est
+      // son jour off).
       const members_on_rest_day: string[] = []
       for (const m of members) {
         if (m.contract_type !== 'salarie' && m.contract_type !== 'auto_entrepreneur') continue
@@ -222,6 +211,28 @@ export async function getCoverageRange(params: {
         const restSet = restDayByMember.get(m.id)
         if (restSet?.has(weekday as DayOfWeek)) members_on_rest_day.push(m.id)
       }
+      const restDaySet = new Set(members_on_rest_day)
+
+      // "Dispo" = présent réellement programmé ce jour : actif sous contrat,
+      // pas en congé, pas en repos hebdo. C'est le chiffre affiché dans la
+      // grille (numérateur du ratio "X/Y"). Le dénominateur Y reste l'effectif
+      // total sous contrat (logique : "X présents sur Y salariés").
+      const salariedApprovedAvail = active_salaried.filter(
+        (id) => !approvedAbsentIds.has(id) && !restDaySet.has(id)
+      ).length
+      const salariedWithPendingAvail = active_salaried.filter(
+        (id) => !allAbsentIds.has(id) && !restDaySet.has(id)
+      ).length
+      const totalApprovedAvail =
+        salariedApprovedAvail +
+        active_auto.filter((id) => !approvedAbsentIds.has(id) && !restDaySet.has(id)).length +
+        active_other.filter((id) => !approvedAbsentIds.has(id)).length
+
+      // Effectif salarié total sous contrat ce jour-là :
+      // présents (active_salaried) + absents salariés (arrêt long ou congé).
+      const totalSalaried =
+        active_salaried.length +
+        absent.filter((a) => a.contract_type === 'salarie').length
 
       days.push({
         date: day,
@@ -292,7 +303,12 @@ export async function getCoverageImpactForRequest(
       if (memberIsSalaried && member && d.active_salaried.includes(member.id)) {
         approvedIds.add(member.id)
       }
-      const avail = d.active_salaried.filter((id) => !approvedIds.has(id)).length
+      // Exclut les repos hebdo aussi (sinon on surévalue la dispo en simulant
+      // l'approbation d'une demande pendant un jour où le membre est de repos).
+      const restIds = new Set(d.members_on_rest_day)
+      const avail = d.active_salaried.filter(
+        (id) => !approvedIds.has(id) && !restIds.has(id),
+      ).length
       return { ...d, available_salaried_count: avail }
     })
 

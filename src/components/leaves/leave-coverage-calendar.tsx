@@ -182,9 +182,15 @@ export function LeaveCoverageCalendar({
           const pendingBlocking = includePending
             ? d.absent.filter((a) => a.reason === 'leave_pending').length
             : 0
+          // "Dispo" = présents réels selon planning hebdo (exclut congés + repos hebdo).
+          // Le filtre côté serveur dans getCoverageRange tient déjà compte des
+          // restDayIds, donc on calcule simplement à partir de active_salaried
+          // moins les absents (en repos hebdo si on inclut les pending) et moins
+          // les repos hebdo.
+          const restIds = new Set(d.members_on_rest_day)
           const avail = includePending
             ? d.active_salaried.filter(
-                (id) => !d.absent.map((a) => a.member_id).includes(id)
+                (id) => !d.absent.map((a) => a.member_id).includes(id) && !restIds.has(id)
               ).length
             : d.available_salaried_count
           const totalAvail = d.total_salaried_count
@@ -242,11 +248,14 @@ export function LeaveCoverageCalendar({
               </h3>
               <p className="text-xs text-muted mt-0.5">
                 Salaries dispos : <span className="font-semibold text-text">
-                  {includePending
-                    ? selectedDayData.active_salaried.filter(
-                        (id) => !selectedDayData.absent.map((a) => a.member_id).includes(id)
-                      ).length
-                    : selectedDayData.available_salaried_count}
+                  {(() => {
+                    const restIdsDetail = new Set(selectedDayData.members_on_rest_day)
+                    return includePending
+                      ? selectedDayData.active_salaried.filter(
+                          (id) => !selectedDayData.absent.map((a) => a.member_id).includes(id) && !restIdsDetail.has(id)
+                        ).length
+                      : selectedDayData.available_salaried_count
+                  })()}
                 </span> / seuil {selectedDayData.threshold}
               </p>
             </div>
