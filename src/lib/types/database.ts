@@ -173,6 +173,10 @@ export interface PermissionGroup {
   manage_payslips: boolean
   manage_veterinarians: boolean
   view_animal_news: boolean
+  // Permissions site public (formulaires globaux)
+  manage_adoption_applications: boolean
+  manage_volunteer_applications: boolean
+  manage_abuse_reports: boolean
   created_at: string
   updated_at: string
 }
@@ -237,6 +241,9 @@ export interface Permissions {
   canManagePayslips: boolean
   canManageVeterinarians: boolean
   canViewAnimalNews: boolean
+  canManageAdoptionApplications: boolean
+  canManageVolunteerApplications: boolean
+  canManageAbuseReports: boolean
   isAdmin: boolean
   isOwner: boolean
 }
@@ -1945,3 +1952,177 @@ export type CraNotificationType =
   | 'cra_submitted'
   | 'cra_validated'
   | 'cra_sent'
+
+// =========================================================================
+// Public forms (formulaires globaux du site sda-nord.com)
+// Source : migration `public_forms_volunteer_abuse_reports` (mai 2026)
+// Reçues côté admin Optimus via les vues /admin/candidatures-* et
+// /admin/signalements-*. RLS scopée par établissement + permission booléenne.
+// =========================================================================
+
+// --- Adoption pre-qualification (extension de adoption_inquiries) ---
+
+export type AdoptionInquiryType = 'specific_animal' | 'pre_qualification'
+export type AdoptionInquiryStatus =
+  | 'pending'
+  | 'qualified'
+  | 'interview_scheduled'
+  | 'accepted'
+  | 'declined'
+  | 'archived'
+
+export interface AdoptionInquiry {
+  id: string
+  establishment_id: string
+  animal_id: string | null
+  client_id: string | null
+  appointment_id: string | null
+  inquiry_type: AdoptionInquiryType
+  first_name: string
+  last_name: string
+  email: string
+  phone: string
+  address: string | null
+  postal_code: string | null
+  city: string | null
+  questionnaire: Record<string, unknown>
+  status: AdoptionInquiryStatus
+  source: string
+  team_notes: string | null
+  refusal_reason: string | null
+  possible_blacklist_match: boolean
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+  updated_at: string
+}
+
+// --- Volunteer applications ---
+
+export type VolunteerSkill =
+  | 'dog_walking'
+  | 'animal_care'
+  | 'public_reception'
+  | 'transport'
+  | 'grooming'
+  | 'maintenance'
+  | 'communication'
+  | 'events'
+  | 'admin'
+
+export interface VolunteerAvailability {
+  days: Array<'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'>
+  slots: Array<'morning' | 'afternoon' | 'evening'>
+  frequency: 'weekly' | 'biweekly' | 'monthly' | 'occasional'
+  start_date?: string
+}
+
+export type VolunteerApplicationStatus =
+  | 'pending'
+  | 'qualified'
+  | 'interview_scheduled'
+  | 'accepted'
+  | 'declined'
+  | 'archived'
+
+export interface VolunteerApplication {
+  id: string
+  establishment_id: string
+  first_name: string
+  last_name: string
+  email: string
+  phone: string
+  birth_date: string | null
+  address: string | null
+  postal_code: string | null
+  city: string | null
+  motivation: string
+  availability: VolunteerAvailability
+  skills: VolunteerSkill[]
+  has_driving_license: boolean
+  physical_capacity: 'good' | 'limited' | 'restricted' | null
+  has_allergies: boolean
+  allergies_details: string | null
+  previous_experience: string | null
+  clean_record_declared: boolean
+  status: VolunteerApplicationStatus
+  admin_notes: string | null
+  qualified_at: string | null
+  qualified_by: string | null
+  source: string
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+  updated_at: string
+}
+
+// --- Abuse reports (signalements maltraitance) ---
+
+export type AnimalType = 'dog' | 'cat' | 'farm' | 'wildlife' | 'other'
+export type AnimalCondition = 'alive_apparently_ok' | 'injured' | 'dying' | 'dead'
+export type AbuseType =
+  | 'abandonment'
+  | 'neglect'
+  | 'physical_violence'
+  | 'inadequate_conditions'
+  | 'psychological'
+  | 'illegal_breeding'
+  | 'other'
+export type AbuseSeverity = 'urgent' | 'serious' | 'recurring' | 'suspicion'
+export type AbuseReportStatus =
+  | 'new'
+  | 'investigating'
+  | 'transmitted_authorities'
+  | 'on_site_intervention'
+  | 'resolved'
+  | 'unfounded'
+  | 'archived'
+
+export interface AbuseReport {
+  id: string
+  establishment_id: string
+  reporter_is_anonymous: boolean
+  reporter_first_name: string | null
+  reporter_last_name: string | null
+  reporter_email: string
+  reporter_phone: string | null
+  location_address: string
+  location_city: string
+  location_postal_code: string
+  location_details: string | null
+  location_latitude: number | null
+  location_longitude: number | null
+  animal_type: AnimalType
+  animal_count_estimate: number
+  animal_condition: AnimalCondition
+  abuse_types: AbuseType[]
+  severity: AbuseSeverity
+  first_observed_date: string | null
+  last_observed_date: string | null
+  description: string
+  prior_actions: string[]
+  prior_actions_details: string | null
+  has_witnesses: boolean
+  witnesses_contact: string | null
+  consent_share_authorities: boolean
+  status: AbuseReportStatus
+  admin_notes: string | null
+  resolved_at: string | null
+  resolved_by: string | null
+  resolution_summary: string | null
+  source: string
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AbuseReportPhoto {
+  id: string
+  report_id: string
+  storage_path: string
+  original_filename: string | null
+  size_bytes: number | null
+  mime_type: string | null
+  uploaded_at: string
+}

@@ -31,6 +31,9 @@ import {
   AlertCircle,
   FileSignature,
   HeartHandshake,
+  HandHeart,
+  AlertTriangle,
+  ClipboardCheck,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -81,6 +84,9 @@ const shelterSections: NavSection[] = [
       { href: '/nouvelles', label: 'Nouvelles', Icon: Sparkles, permission: 'canViewAnimalNews' },
       { href: '/appels', label: 'Appels', Icon: PhoneCall, permission: 'canManageEstablishment' },
       { href: '/contacts-entrants', label: 'Contacts entrants', Icon: Inbox, permission: 'isOwner' },
+      { href: '/admin/candidatures-adoption', label: 'Candidatures adoption', Icon: ClipboardCheck, permission: 'canManageAdoptionApplications' },
+      { href: '/admin/candidatures-benevoles', label: 'Candidatures bénévoles', Icon: HandHeart, permission: 'canManageVolunteerApplications' },
+      { href: '/admin/signalements-maltraitance', label: 'Signalements', Icon: AlertTriangle, permission: 'canManageAbuseReports' },
     ],
   },
   {

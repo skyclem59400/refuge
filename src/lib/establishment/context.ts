@@ -34,6 +34,9 @@ function buildPermissions(groups: PermissionGroup[], membership: EstablishmentMe
     canManagePayslips: has('manage_payslips'),
     canManageVeterinarians: has('manage_veterinarians') || has('manage_establishment'),
     canViewAnimalNews: has('view_animal_news'),
+    canManageAdoptionApplications: has('manage_adoption_applications'),
+    canManageVolunteerApplications: has('manage_volunteer_applications'),
+    canManageAbuseReports: has('manage_abuse_reports'),
   }
 }
 
