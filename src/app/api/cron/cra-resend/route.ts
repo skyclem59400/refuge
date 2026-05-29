@@ -36,8 +36,10 @@ const ACTOR_USER_ID = '76bbfc56-0d9f-4ca2-ae2c-b8c1e0b11aad'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // Puppeteer + 5 PDFs ≈ ~30s, marge confortable
 
-// Bump pour détecter quel build est live. v3 = bypass auth via serviceEstablishmentId.
-const ENDPOINT_VERSION = 'v3-service-bypass'
+// Bump pour détecter quel build est live.
+// v3 = bypass auth via serviceEstablishmentId
+// v4 = ajout du mode preview_to qui override le destinataire (test de mise en page)
+const ENDPOINT_VERSION = 'v4-preview-mode'
 
 export async function GET() {
   return Response.json({ version: ENDPOINT_VERSION })
@@ -50,17 +52,20 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: { establishment_id?: string; year?: number; month?: number; cc?: string[] }
+  let body: { establishment_id?: string; year?: number; month?: number; cc?: string[]; preview_to?: string }
   try {
     body = await req.json()
   } catch {
     return Response.json({ error: 'Body JSON invalide' }, { status: 400 })
   }
 
-  const { establishment_id, year, month } = body
+  const { establishment_id, year, month, preview_to } = body
   const ccList = Array.isArray(body.cc) ? body.cc.filter((e) => typeof e === 'string' && e.includes('@')) : []
   if (!establishment_id || !year || !month) {
     return Response.json({ error: 'establishment_id, year et month requis' }, { status: 400 })
+  }
+  if (preview_to !== undefined && (typeof preview_to !== 'string' || !preview_to.includes('@'))) {
+    return Response.json({ error: 'preview_to doit être une adresse email valide' }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -123,43 +128,57 @@ export async function POST(req: NextRequest) {
     try {
       const { buffer, filename } = await buildCraSaisiePdf(m.id, year, month, establishment_id)
 
-      const subject = `CRA ${memberName} — ${monthLabel}`
-      const html = `<p>Bonjour${est.accountant_name ? ' ' + est.accountant_name : ''},</p>
-         <p>Vous trouverez ci-joint le compte-rendu d'activité de <strong>${memberName}</strong> pour <strong>${monthLabel}</strong>.</p>
-         <p>Ce CRA a été validé par le collaborateur puis contrôlé par un administrateur de l'association.</p>
-         <p>Pour toute question, n'hésitez pas à nous contacter.</p>
-         <p>Cordialement,<br/>L'équipe ${est.name || 'SDA'}</p>`
+      const isPreview = !!preview_to
+      const recipient = isPreview ? preview_to! : est.accountant_email
+      const recipientName = isPreview ? undefined : (est.accountant_name || undefined)
+
+      const subject = isPreview
+        ? `[PREVIEW] CRA ${memberName} — ${monthLabel}`
+        : `CRA ${memberName} — ${monthLabel}`
+      const html = isPreview
+        ? `<p>Bonjour,</p>
+           <p>Ceci est un <strong>preview de mise en page</strong> du CRA de <strong>${memberName}</strong> pour <strong>${monthLabel}</strong>. Le comptable n'a PAS reçu ce mail.</p>
+           <p>Cordialement,<br/>L'équipe ${est.name || 'SDA'}</p>`
+        : `<p>Bonjour${est.accountant_name ? ' ' + est.accountant_name : ''},</p>
+           <p>Vous trouverez ci-joint le compte-rendu d'activité de <strong>${memberName}</strong> pour <strong>${monthLabel}</strong>.</p>
+           <p>Ce CRA a été validé par le collaborateur puis contrôlé par un administrateur de l'association.</p>
+           <p>Pour toute question, n'hésitez pas à nous contacter.</p>
+           <p>Cordialement,<br/>L'équipe ${est.name || 'SDA'}</p>`
 
       const { messageId } = await sendEmail({
-        to: est.accountant_email,
-        toName: est.accountant_name || undefined,
-        cc: ccList.length > 0 ? ccList : undefined,
+        to: recipient,
+        toName: recipientName,
+        cc: !isPreview && ccList.length > 0 ? ccList : undefined,
         subject,
         html,
         attachments: [{ filename, content: buffer, contentType: 'application/pdf' }],
       })
 
-      await admin
-        .from('cra_monthly_status')
-        .update({ sent_at: new Date().toISOString(), sent_to: est.accountant_email })
-        .eq('id', status.id)
+      // En preview, on ne touche ni au sent_at ni à l'activity_log : c'est juste un test
+      // de mise en page, l'envoi officiel reste celui des status sent_to/sent_at.
+      if (!isPreview) {
+        await admin
+          .from('cra_monthly_status')
+          .update({ sent_at: new Date().toISOString(), sent_to: est.accountant_email })
+          .eq('id', status.id)
 
-      await admin.from('activity_logs').insert({
-        establishment_id,
-        user_id: ACTOR_USER_ID,
-        action: 'update',
-        entity_type: 'cra_status',
-        entity_id: status.id,
-        entity_name: `CRA ${memberName} — ${monthLabel} (renvoi avec CC)`,
-        parent_type: 'establishment_member',
-        parent_id: m.id,
-        details: {
-          resend: true,
-          sent_to: est.accountant_email,
-          cc: ccList,
-          message_id: messageId,
-        },
-      })
+        await admin.from('activity_logs').insert({
+          establishment_id,
+          user_id: ACTOR_USER_ID,
+          action: 'update',
+          entity_type: 'cra_status',
+          entity_id: status.id,
+          entity_name: `CRA ${memberName} — ${monthLabel} (renvoi avec CC)`,
+          parent_type: 'establishment_member',
+          parent_id: m.id,
+          details: {
+            resend: true,
+            sent_to: est.accountant_email,
+            cc: ccList,
+            message_id: messageId,
+          },
+        })
+      }
 
       results.push({ member: memberName, status: 'ok', messageId })
     } catch (e) {

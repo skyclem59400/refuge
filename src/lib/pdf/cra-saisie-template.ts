@@ -87,28 +87,28 @@ export function buildCraSaisieHtml(view: CraMonthlyView, establishmentName: stri
   <meta charset="UTF-8">
   <title>CRA ${view.member_name} - ${monthLabel}</title>
   <style>
-    @page { size: A4 landscape; margin: 12mm; }
+    @page { size: A4 landscape; margin: 8mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; font-size: 11px; line-height: 1.4; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; font-size: 10px; line-height: 1.3; }
 
-    .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #1e3a5f; padding-bottom: 12px; margin-bottom: 16px; }
-    .header-left { display: flex; gap: 12px; align-items: center; }
-    .logo { width: 52px; height: 52px; border-radius: 16px; object-fit: cover; }
-    .establishment-name { font-size: 16px; font-weight: 700; color: #1e3a5f; }
-    .doc-title { font-size: 22px; font-weight: 700; color: #1e3a5f; letter-spacing: 1px; text-transform: uppercase; }
-    .doc-sub { font-size: 11px; color: #64748b; text-align: right; margin-top: 2px; }
+    .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #1e3a5f; padding-bottom: 6px; margin-bottom: 8px; }
+    .header-left { display: flex; gap: 10px; align-items: center; }
+    .logo { width: 40px; height: 40px; border-radius: 12px; object-fit: cover; }
+    .establishment-name { font-size: 14px; font-weight: 700; color: #1e3a5f; }
+    .doc-title { font-size: 18px; font-weight: 700; color: #1e3a5f; letter-spacing: 1px; text-transform: uppercase; }
+    .doc-sub { font-size: 10px; color: #64748b; text-align: right; margin-top: 1px; }
 
-    .identity { display: flex; gap: 28px; margin-bottom: 14px; padding: 12px 14px; background: #f1f5f9; border-radius: 8px; }
-    .identity .label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 700; }
-    .identity .value { font-size: 13px; font-weight: 600; color: #1e293b; margin-top: 2px; }
+    .identity { display: flex; gap: 22px; margin-bottom: 8px; padding: 7px 12px; background: #f1f5f9; border-radius: 6px; }
+    .identity .label { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 700; }
+    .identity .value { font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 1px; }
 
-    table.calendar { width: 100%; border-collapse: separate; border-spacing: 3px; table-layout: fixed; }
-    table.calendar th { background: #1e3a5f; color: white; padding: 6px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; border-radius: 4px; }
-    table.calendar td.cell { height: 68px; padding: 4px 5px; border-radius: 6px; vertical-align: top; border: 1px solid #e2e8f0; }
-    .cell .num { font-size: 11px; font-weight: 700; color: #0f172a; }
-    .cell .hours { font-size: 14px; font-weight: 800; color: #1e3a5f; margin-top: 2px; }
-    .cell .label { font-size: 9px; color: #475569; margin-top: 2px; line-height: 1.2; }
-    .cell .times { font-size: 8px; color: #64748b; margin-top: 1px; line-height: 1.2; }
+    table.calendar { width: 100%; border-collapse: separate; border-spacing: 2px; table-layout: fixed; }
+    table.calendar th { background: #1e3a5f; color: white; padding: 4px; font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; border-radius: 3px; }
+    table.calendar td.cell { height: 52px; padding: 3px 4px; border-radius: 5px; vertical-align: top; border: 1px solid #e2e8f0; }
+    .cell .num { font-size: 10px; font-weight: 700; color: #0f172a; }
+    .cell .hours { font-size: 12px; font-weight: 800; color: #1e3a5f; margin-top: 1px; }
+    .cell .label { font-size: 8px; color: #475569; margin-top: 1px; line-height: 1.15; }
+    .cell .times { font-size: 7.5px; color: #64748b; margin-top: 0; line-height: 1.15; }
     .cell.empty { background: transparent; border-color: transparent; }
     .cell.rest { background: #f8fafc; }
     .cell.holiday { background: #fef3c7; }
@@ -117,20 +117,20 @@ export function buildCraSaisieHtml(view: CraMonthlyView, establishmentName: stri
     .cell.worked { background: #ecfdf5; }
     .cell.override { background: #dbeafe; border-color: #93c5fd; }
 
-    .summary { margin-top: 18px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-    .kpi { padding: 10px 12px; background: #f8fafc; border-left: 3px solid #5ba8a0; border-radius: 6px; }
+    .summary { margin-top: 8px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .kpi { padding: 6px 10px; background: #f8fafc; border-left: 3px solid #5ba8a0; border-radius: 5px; }
     .kpi.astreinte { border-left-color: #c96b3c; background: #fff7ed; }
-    .kpi-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 700; }
-    .kpi-value { font-size: 18px; font-weight: 800; color: #1e3a5f; margin-top: 2px; }
+    .kpi-label { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 700; }
+    .kpi-value { font-size: 15px; font-weight: 800; color: #1e3a5f; margin-top: 1px; }
     .kpi.astreinte .kpi-value { color: #c96b3c; }
-    .astreinte-detail { margin-top: 10px; padding: 10px 12px; background: #fff7ed; border-left: 3px solid #c96b3c; border-radius: 6px; font-size: 10px; color: #92400e; }
+    .astreinte-detail { margin-top: 6px; padding: 6px 10px; background: #fff7ed; border-left: 3px solid #c96b3c; border-radius: 5px; font-size: 9px; color: #92400e; }
     .astreinte-detail strong { color: #c96b3c; }
 
-    .signature { margin-top: 18px; padding: 12px; background: #f8fafc; border-radius: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 10px; }
+    .signature { margin-top: 8px; padding: 7px 10px; background: #f8fafc; border-radius: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 9px; }
     .signature .block strong { color: #1e3a5f; }
 
-    footer { margin-top: 12px; text-align: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
-    .signature-strip { height: 4px; background: linear-gradient(90deg, #c96b3c, #5ba8a0, #1e3a5f); border-radius: 2px; margin-top: 8px; }
+    footer { margin-top: 4px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 4px; }
+    .signature-strip { height: 3px; background: linear-gradient(90deg, #c96b3c, #5ba8a0, #1e3a5f); border-radius: 2px; margin-top: 4px; }
   </style>
 </head>
 <body>
