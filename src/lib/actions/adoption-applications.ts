@@ -11,6 +11,8 @@ import type {
 interface ListFilters {
   status?: AdoptionInquiryStatus | null
   search?: string | null
+  /** true = uniquement avec user_id, false = uniquement sans user_id, null = tous */
+  hasAccount?: boolean | null
   limit?: number
 }
 
@@ -35,10 +37,15 @@ export async function listAdoptionApplications(
   if (filters.status) {
     query = query.eq('status', filters.status)
   }
+  if (filters.hasAccount === true) {
+    query = query.not('user_id', 'is', null)
+  } else if (filters.hasAccount === false) {
+    query = query.is('user_id', null)
+  }
   if (filters.search?.trim()) {
     const s = `%${filters.search.trim()}%`
     query = query.or(
-      `first_name.ilike.${s},last_name.ilike.${s},email.ilike.${s},city.ilike.${s}`
+      `first_name.ilike.${s},last_name.ilike.${s},email.ilike.${s},city.ilike.${s},ticket_number.ilike.${s}`
     )
   }
 

@@ -75,6 +75,8 @@ export const VOLUNTEER_PHYSICAL_LABELS: Record<string, string> = {
 interface ListFilters {
   status?: VolunteerApplicationStatus | null
   search?: string | null
+  /** true = uniquement avec user_id, false = uniquement sans user_id, null = tous */
+  hasAccount?: boolean | null
   limit?: number
 }
 
@@ -96,11 +98,16 @@ export async function listVolunteerApplications(
     .limit(filters.limit ?? 200)
 
   if (filters.status) q = q.eq('status', filters.status)
+  if (filters.hasAccount === true) {
+    q = q.not('user_id', 'is', null)
+  } else if (filters.hasAccount === false) {
+    q = q.is('user_id', null)
+  }
 
   if (filters.search?.trim()) {
     const s = `%${filters.search.trim()}%`
     q = q.or(
-      `first_name.ilike.${s},last_name.ilike.${s},email.ilike.${s},city.ilike.${s},phone.ilike.${s}`
+      `first_name.ilike.${s},last_name.ilike.${s},email.ilike.${s},city.ilike.${s},phone.ilike.${s},ticket_number.ilike.${s}`
     )
   }
 

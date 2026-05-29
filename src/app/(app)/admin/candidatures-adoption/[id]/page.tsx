@@ -3,6 +3,9 @@ import { notFound, redirect } from 'next/navigation'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { getAdoptionApplication } from '@/lib/actions/adoption-applications'
 import { ResolveActions } from '@/components/adoption-applications/resolve-actions'
+import { PortalAccountCard } from '@/components/portal-ticket/portal-account-card'
+import { TicketTimeline } from '@/components/portal-ticket/ticket-timeline'
+import { StaffMessageForm } from '@/components/portal-ticket/staff-message-form'
 import type { AdoptionInquiryStatus } from '@/lib/types/database'
 import {
   ArrowLeft,
@@ -186,9 +189,13 @@ export default async function CandidatureAdoptionDetailPage({ params }: PageProp
 
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
             <ClipboardCheck className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-bold">{fullName}</h1>
+            <h1 className="text-2xl font-bold font-mono">
+              {application.ticket_number}
+            </h1>
+            <span className="text-lg text-muted">·</span>
+            <h2 className="text-xl font-semibold">{fullName}</h2>
             {application.possible_blacklist_match && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/15 text-red-700">
                 <AlertTriangle className="w-3.5 h-3.5" /> Liste noire potentielle
@@ -210,6 +217,14 @@ export default async function CandidatureAdoptionDetailPage({ params }: PageProp
           {statusMeta.label}
         </span>
       </div>
+
+      <PortalAccountCard
+        userId={application.user_id}
+        ticketNumber={application.ticket_number}
+        createdAt={application.created_at}
+        statusLabel={statusMeta.label}
+        statusClassName={statusMeta.className}
+      />
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Questionnaire */}
@@ -317,6 +332,17 @@ export default async function CandidatureAdoptionDetailPage({ params }: PageProp
             currentStatus={application.status}
             currentNotes={application.team_notes}
           />
+
+          {/* Message au demandeur (uniquement si compte portail) */}
+          {application.user_id && (
+            <StaffMessageForm
+              ticketType="adoption"
+              ticketId={application.id}
+            />
+          )}
+
+          {/* Timeline d'événements */}
+          <TicketTimeline ticketType="adoption" ticketId={application.id} />
 
           {/* Refusal reason — visible only if declined */}
           {application.status === 'declined' && application.refusal_reason && (

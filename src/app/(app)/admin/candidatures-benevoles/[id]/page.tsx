@@ -28,6 +28,9 @@ import {
   VOLUNTEER_PHYSICAL_LABELS,
 } from '@/lib/actions/volunteer-applications'
 import { ResolveActions } from '@/components/volunteer-applications/resolve-actions'
+import { PortalAccountCard } from '@/components/portal-ticket/portal-account-card'
+import { TicketTimeline } from '@/components/portal-ticket/ticket-timeline'
+import { StaffMessageForm } from '@/components/portal-ticket/staff-message-form'
 
 export const dynamic = 'force-dynamic'
 
@@ -91,9 +94,13 @@ export default async function CandidatureBenevoleDetailPage({ params }: PageProp
 
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
             <HandHeart className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-bold">{fullName}</h1>
+            <h1 className="text-2xl font-bold font-mono">
+              {application.ticket_number}
+            </h1>
+            <span className="text-lg text-muted">·</span>
+            <h2 className="text-xl font-semibold">{fullName}</h2>
           </div>
           <p className="text-sm text-muted">
             Candidature reçue le{' '}
@@ -112,6 +119,14 @@ export default async function CandidatureBenevoleDetailPage({ params }: PageProp
           {VOLUNTEER_STATUS_LABELS[application.status]}
         </span>
       </div>
+
+      <PortalAccountCard
+        userId={application.user_id}
+        ticketNumber={application.ticket_number}
+        createdAt={application.created_at}
+        statusLabel={VOLUNTEER_STATUS_LABELS[application.status]}
+        statusClassName={VOLUNTEER_STATUS_CLASSES[application.status]}
+      />
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main column */}
@@ -308,6 +323,17 @@ export default async function CandidatureBenevoleDetailPage({ params }: PageProp
             currentStatus={application.status}
             currentNotes={application.admin_notes}
           />
+
+          {/* Message au demandeur (uniquement si compte portail) */}
+          {application.user_id && (
+            <StaffMessageForm
+              ticketType="volunteer"
+              ticketId={application.id}
+            />
+          )}
+
+          {/* Timeline d'événements */}
+          <TicketTimeline ticketType="volunteer" ticketId={application.id} />
 
           {/* Metadata */}
           <div className="bg-card rounded-xl border border-border p-5">

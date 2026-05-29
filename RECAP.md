@@ -1338,3 +1338,129 @@ Demande Clément suite à V1 : *"je veux une analyse IA qui connait notre activi
 - Bucket Supabase `audit-reports` créé (privé, 10 Mo, PDF only)
 - Pas de breaking change — les comptes pseudo / l'auth / les contrats existants continuent de fonctionner
 - Coût IA estimé : ~$3/an pour l'audit quotidien (Haiku 4.5 + prompt cache)
+
+
+---
+
+## Session 2026-05-29 — Contrats Documenso + Congés + Formulaires publics + Infra
+
+### 1. Contrats Documenso : alignement signatures + paraphage
+
+Corrige plusieurs problèmes structurels des 4 types de contrats électroniques
+(foster, adoption, abandonment, adoption-cancellation) :
+
+- **pageX corrigé** : foster/adoption/adoption-cancellation passaient
+  `pageX: 55` (colonne droite) mais l'encart du signataire (FA/adoptant) est
+  en colonne gauche → la signature tombait sur l'encart Refuge SDA. Corrigé
+  à `pageX: 8` (gauche). Abandonment était déjà à 10.
+- **Paraphes (INITIALS) sur chaque page** : activation du footer running
+  Puppeteer (`displayHeaderFooter: true` + `footerTemplate` avec encart
+  "Paraphes" en bas à droite + `margin.bottom: 16mm`). Documenso pose un
+  `INITIALS` à `pageY: 95.5` pile dans cet encart sur chaque page sauf la(les)
+  page(s) de signature finale. Standard juridique anti-substitution.
+- **Encart Refuge SDA pré-rempli** : cachet SVG dynamique généré depuis
+  les infos établissement (helper extrait `src/lib/pdf/cachet.ts`) + nom
+  du membre qui envoie le contrat (lookup RPC `get_users_info` à partir
+  du `userId` connecté, fallback "Le représentant").
+- **Adoption — 2 signatures** : le contrat d'adoption a 2 zones de signature
+  (contrat principal + annexe "Conditions d'adoption"). Refactor en
+  split-and-merge :
+  - Template accepte un param `part: 'full' | 'main' | 'annex'`
+  - Builder PDF avec option `splitForSignature: true` génère 2 PDFs séparés
+    (main + annex), les merge via pdf-lib
+  - Retourne `mainPageCount` en plus de `pageCount` total
+  - L'action signature place 2 SIGNATURE complètes + INITIALS partout ailleurs
+
+**Helper partagé** : `src/lib/pdf/cachet.ts` (extrait de `cerfa-template.ts`).
+
+**Commits** : `a0ff247`, `6206f9c`, `90040fb`
+
+### 2. Congés / Couverture : prise en compte des jours de repos hebdo
+
+La fonction `getCoverageRange` ne consultait pas `member_work_schedules`,
+donc un membre comme Matthieu (repos hebdo le lundi) était compté "présent"
+et "dispo" alors qu'il ne travaille pas ce jour.
+
+- `getCoverageRange` : fetch des schedules valides (`valid_until IS NULL`),
+  indexation `Map<member_id, Set<DayOfWeek>>`, calcul `members_on_rest_day`
+  par jour, exclusion du numérateur `available_salaried_count` /
+  `available_total_count` / `salariedWithPendingAvail`
+- `getCoverageImpactForRequest` adapté (recalcul local)
+- UI : nouveau bloc "Au repos hebdo" dans le détail jour (badge bleu, distinct
+  du rouge "absent congé"). Renommage "Présents" → "Présents (selon planning)"
+- Le ratio "X/Y" affiché dans la grille reflète maintenant l'effectif
+  réellement disponible (numérateur) sur l'effectif total sous contrat
+  (dénominateur RH historique inchangé)
+
+**Commits** : `61141eb` (ajout affichage), `eda8bb8` (exclusion repos du
+numérateur)
+
+### 3. Formulaires publics du site sda-nord.com (côté Optimus)
+
+3 nouvelles vues admin Optimus pour recevoir les soumissions des 3 formulaires
+globaux du site sda-website (qui partage la même base Supabase).
+
+**Migration** : extension `permission_groups` avec 3 booleans :
+- `manage_adoption_applications`
+- `manage_volunteer_applications`
+- `manage_abuse_reports`
+
+Helper SQL `user_has_permission()` étendu.
+
+**3 vues admin créées** (toutes calquées sur le pattern `contacts-entrants/`) :
+
+1. `/admin/candidatures-adoption` : liste les `adoption_inquiries` avec
+   `inquiry_type='pre_qualification'` (le formulaire global, sans animal
+   ciblé). Détail = rendering structuré FR du questionnaire JSONB. Badge
+   "Liste noire" si `possible_blacklist_match`.
+2. `/admin/candidatures-benevoles` : liste les `volunteer_applications`.
+   Détail = motivation, matrice dispo 7×3, compétences badges, aptitudes,
+   expérience. Pattern qualified_at/by auto-set sur transition.
+3. `/admin/signalements-maltraitance` : liste les `abuse_reports`. Tri par
+   défaut urgent en haut. Badge urgent rouge clignotant. Détail avec
+   bandeau alerte si urgent, grille photos signed URLs 60s (bucket privé
+   `abuse-report-photos`), gestion anonymat signalant.
+
+**Fichiers principaux** :
+- `src/lib/actions/{adoption,volunteer}-applications.ts` + `abuse-reports.ts`
+- `src/app/(app)/admin/{candidatures-adoption,candidatures-benevoles,signalements-maltraitance}/page.tsx + [id]/page.tsx`
+- `src/components/{adoption,volunteer}-applications/resolve-actions.tsx` + `abuse-reports/resolve-actions.tsx`
+- `src/lib/types/database.ts` : ajout types `AdoptionInquiry`, `VolunteerApplication`, `AbuseReport`, `AbuseReportPhoto` + extension `PermissionGroup` et `Permissions`
+- `src/lib/establishment/context.ts` : `buildPermissions()` étendu
+- `src/components/layout/nav-config.ts` : 3 entrées sidebar dans section "Communication"
+
+**Commit** : `8296c56`
+
+### 4. Migration Supabase associée
+
+Migration `public_forms_volunteer_abuse_reports` appliquée sur
+`zzevrtrgtgnlxxuwbnge` :
+- `permission_groups` : ajout 3 colonnes
+- `adoption_inquiries` : `animal_id` rendu NULLABLE + colonne `inquiry_type`
+  CHECK IN ('specific_animal', 'pre_qualification')
+- Nouvelles tables `volunteer_applications`, `abuse_reports`,
+  `abuse_report_photos`
+- Bucket Storage privé `abuse-report-photos` (5 Mo max, jpeg/png/webp/heic)
+- RLS + policies sur permissions + triggers updated_at
+
+### 5. Infra Scaleway + Coolify (pour le site sda-website)
+
+VPS Scaleway DEV1-L provisionné à `51.159.128.221` (Paris fr-par-2), Coolify
+v4.1.1 installé, sda-website déployé et accessible via 4 sous-domaines
+(`nouveau`, `adoption`, `benevole`, `signalement` `.sda-nord.com`).
+
+**Le DNS apex sda-nord.com a été basculé puis rollback à la demande du user
+le même jour.** Le site continue de tourner sur Infomaniak. Le nouveau VPS
+reste prêt pour quand on voudra migrer.
+
+Voir document détaillé : `~/Projets/SDA/docs/SESSION-2026-05-29.md` (procédures
+de bascule/rollback, credentials, configuration Coolify).
+
+### Méta
+
+- 6 commits poussés sur `main`
+- 1 migration Supabase + 1 bucket Storage
+- Pas de breaking change — toutes les permissions par défaut sont à false,
+  les nouveaux booleans n'affectent personne tant qu'on ne les active pas
+- Documentation : `~/Projets/SDA/docs/SESSION-2026-05-29.md` (vue d'ensemble
+  complète incluant l'infra Scaleway et les procédures de bascule)

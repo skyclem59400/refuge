@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ChevronRight, HandHeart, Search } from 'lucide-react'
+import { ChevronRight, HandHeart, Search, UserCheck, UserX } from 'lucide-react'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import {
   listVolunteerApplications,
@@ -19,7 +19,11 @@ import type {
 export const dynamic = 'force-dynamic'
 
 interface PageProps {
-  searchParams: Promise<{ status?: VolunteerApplicationStatus; q?: string }>
+  searchParams: Promise<{
+    status?: VolunteerApplicationStatus
+    q?: string
+    has_account?: string
+  }>
 }
 
 export default async function CandidaturesBenevolesPage({ searchParams }: PageProps) {
@@ -44,9 +48,16 @@ export default async function CandidaturesBenevolesPage({ searchParams }: PagePr
   }
 
   const params = await searchParams
+  const hasAccount =
+    params.has_account === 'true'
+      ? true
+      : params.has_account === 'false'
+        ? false
+        : null
   const filters = {
     status: params.status || null,
     search: params.q || null,
+    hasAccount,
   }
 
   const [{ data: applications }, stats] = await Promise.all([
@@ -105,6 +116,21 @@ export default async function CandidaturesBenevolesPage({ searchParams }: PagePr
             )}
           </select>
         </div>
+        <div>
+          <label htmlFor="has_account" className="block text-xs font-medium text-muted mb-1">
+            Compte portail
+          </label>
+          <select
+            id="has_account"
+            name="has_account"
+            defaultValue={params.has_account || ''}
+            className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
+          >
+            <option value="">Tous</option>
+            <option value="true">Avec compte</option>
+            <option value="false">Sans compte</option>
+          </select>
+        </div>
         <button
           type="submit"
           className="px-4 py-2 rounded-lg gradient-primary text-white text-sm font-semibold hover:opacity-90"
@@ -124,6 +150,7 @@ export default async function CandidaturesBenevolesPage({ searchParams }: PagePr
           <table className="w-full">
             <thead className="bg-muted-bg text-xs uppercase tracking-wider text-muted border-b border-border">
               <tr>
+                <th className="text-left px-4 py-3 font-medium">Ticket</th>
                 <th className="text-left px-4 py-3 font-medium">Date</th>
                 <th className="text-left px-4 py-3 font-medium">Candidat</th>
                 <th className="text-left px-4 py-3 font-medium">Compétences</th>
@@ -135,6 +162,20 @@ export default async function CandidaturesBenevolesPage({ searchParams }: PagePr
             <tbody>
               {applications.map((app) => (
                 <tr key={app.id} className="border-b border-border hover:bg-muted-bg/50 transition-colors">
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="font-mono text-xs font-bold">{app.ticket_number}</div>
+                    <div className="mt-1">
+                      {app.user_id ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                          <UserCheck className="w-3 h-3" /> Compte
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-500/15 text-slate-600 dark:text-slate-300">
+                          <UserX className="w-3 h-3" /> Direct
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-xs text-muted whitespace-nowrap">
                     {new Date(app.created_at).toLocaleDateString('fr-FR', {
                       day: '2-digit',

@@ -1995,6 +1995,9 @@ export interface AdoptionInquiry {
   user_agent: string | null
   created_at: string
   updated_at: string
+  // Portal Sprint 1 — comptes utilisateurs + tickets unifiés
+  user_id: string | null
+  ticket_number: string
 }
 
 // --- Volunteer applications ---
@@ -2054,6 +2057,9 @@ export interface VolunteerApplication {
   user_agent: string | null
   created_at: string
   updated_at: string
+  // Portal Sprint 1 — comptes utilisateurs + tickets unifiés
+  user_id: string | null
+  ticket_number: string
 }
 
 // --- Abuse reports (signalements maltraitance) ---
@@ -2115,6 +2121,9 @@ export interface AbuseReport {
   user_agent: string | null
   created_at: string
   updated_at: string
+  // Portal Sprint 1 — comptes utilisateurs + tickets unifiés
+  user_id: string | null
+  ticket_number: string
 }
 
 export interface AbuseReportPhoto {
@@ -2125,4 +2134,55 @@ export interface AbuseReportPhoto {
   size_bytes: number | null
   mime_type: string | null
   uploaded_at: string
+}
+
+// =========================================================================
+// Portal Sprint 1 — comptes utilisateurs et tickets unifiés
+// Voir migration : supabase/migrations/20260529a_portal_sprint1_accounts_and_tickets.sql
+// =========================================================================
+
+export interface PortalProfile {
+  user_id: string
+  first_name: string
+  last_name: string
+  phone: string | null
+  address: string | null
+  postal_code: string | null
+  city: string | null
+  consent_marketing: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** Profil portal enrichi avec l'email récupéré côté admin via supabaseAdmin. */
+export interface PortalProfileWithEmail extends PortalProfile {
+  email: string | null
+}
+
+export type PortalTicketType = 'adoption' | 'volunteer' | 'abuse_report'
+
+export type PortalTicketEventType =
+  | 'created'
+  | 'status_change'
+  | 'comment_user'
+  | 'message_staff'
+  | 'attachment_added'
+
+export type PortalTicketEventRole = 'user' | 'staff' | 'system'
+
+export interface PortalTicketEvent {
+  id: string
+  ticket_type: PortalTicketType
+  ticket_id: string
+  event_type: PortalTicketEventType
+  payload: Record<string, unknown>
+  performed_by: string | null
+  performed_by_role: PortalTicketEventRole
+  created_at: string
+}
+
+/** Event enrichi avec le nom de l'auteur pour l'affichage admin. */
+export interface PortalTicketEventWithActor extends PortalTicketEvent {
+  actor_name: string | null
+  actor_email: string | null
 }

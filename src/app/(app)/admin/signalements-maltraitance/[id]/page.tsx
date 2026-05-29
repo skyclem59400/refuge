@@ -29,6 +29,9 @@ import {
   ANIMAL_TYPE_LABELS,
 } from '@/lib/actions/abuse-reports'
 import { ResolveActions } from '@/components/abuse-reports/resolve-actions'
+import { PortalAccountCard } from '@/components/portal-ticket/portal-account-card'
+import { TicketTimeline } from '@/components/portal-ticket/ticket-timeline'
+import { StaffMessageForm } from '@/components/portal-ticket/staff-message-form'
 import type {
   AnimalCondition,
   AbuseReportStatus,
@@ -115,7 +118,6 @@ export default async function AbuseReportDetailPage({ params }: PageProps) {
   const { report, photos } = await getAbuseReport(id)
   if (!report) notFound()
 
-  const shortId = report.id.slice(0, 8)
   const fullAddress = [
     report.location_address,
     report.location_postal_code,
@@ -160,9 +162,13 @@ export default async function AbuseReportDetailPage({ params }: PageProps) {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
             <AlertTriangle className="w-6 h-6 text-red-600" />
-            <h1 className="text-2xl font-bold">Signalement #{shortId}</h1>
+            <h1 className="text-2xl font-bold font-mono">
+              {report.ticket_number}
+            </h1>
+            <span className="text-lg text-muted">·</span>
+            <h2 className="text-xl font-semibold">Signalement</h2>
           </div>
           <p className="text-sm text-muted">
             Reçu le {fmtDateTime(report.created_at)}
@@ -176,6 +182,14 @@ export default async function AbuseReportDetailPage({ params }: PageProps) {
           </span>
         </div>
       </div>
+
+      <PortalAccountCard
+        userId={report.user_id}
+        ticketNumber={report.ticket_number}
+        createdAt={report.created_at}
+        statusLabel={STATUS_LABELS[report.status]}
+        statusClassName={STATUS_BADGE[report.status]}
+      />
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Colonne gauche */}
@@ -445,6 +459,14 @@ export default async function AbuseReportDetailPage({ params }: PageProps) {
               </div>
             )}
           </Card>
+
+          {/* Message au demandeur (uniquement si compte portail) */}
+          {report.user_id && (
+            <StaffMessageForm ticketType="abuse_report" ticketId={report.id} />
+          )}
+
+          {/* Timeline d'événements */}
+          <TicketTimeline ticketType="abuse_report" ticketId={report.id} />
 
           {/* Metadata */}
           <Card icon={<Info className="w-4 h-4 text-muted" />} title="Metadata">

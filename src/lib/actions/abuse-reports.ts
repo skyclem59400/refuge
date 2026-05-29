@@ -109,6 +109,8 @@ interface ListFilters {
   status?: AbuseReportStatus | null
   severity?: AbuseSeverity | null
   search?: string | null
+  /** true = uniquement avec user_id, false = uniquement sans user_id, null = tous */
+  hasAccount?: boolean | null
   limit?: number
 }
 
@@ -116,6 +118,7 @@ export async function listAbuseReports({
   status,
   severity,
   search,
+  hasAccount,
   limit = 200,
 }: ListFilters = {}): Promise<{ data: AbuseReport[]; error?: string }> {
   const ctx = await getEstablishmentContext()
@@ -134,10 +137,15 @@ export async function listAbuseReports({
 
   if (status) q = q.eq('status', status)
   if (severity) q = q.eq('severity', severity)
+  if (hasAccount === true) {
+    q = q.not('user_id', 'is', null)
+  } else if (hasAccount === false) {
+    q = q.is('user_id', null)
+  }
   if (search?.trim()) {
     const s = `%${search.trim()}%`
     q = q.or(
-      `reporter_email.ilike.${s},reporter_first_name.ilike.${s},reporter_last_name.ilike.${s},location_city.ilike.${s},location_postal_code.ilike.${s},description.ilike.${s}`
+      `reporter_email.ilike.${s},reporter_first_name.ilike.${s},reporter_last_name.ilike.${s},location_city.ilike.${s},location_postal_code.ilike.${s},description.ilike.${s},ticket_number.ilike.${s}`
     )
   }
 
