@@ -5,18 +5,21 @@
 //
 // Les actions CRUD individuelles (créer, mettre à jour, terminer un
 // parrainage) restent dans ./sponsorships.ts.
+//
+// IMPORTANT : ce fichier 'use server' ne peut exporter QUE des async
+// functions sous Next.js 16 / Turbopack. Les types associés vivent dans
+// ./sponsorships-admin-types.ts — ne pas y remettre d'export type.
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import type {
-  Sponsorship,
   SponsorshipStatus,
   SponsorshipKind,
-  SponsorshipWithAnimal,
-  SponsorshipWithClient,
-  Animal,
-  Client,
 } from '@/lib/types/database'
+import type {
+  SponsorshipWithBoth,
+  SponsorshipStats,
+} from './sponsorships-admin-types'
 
 interface AdminListFilters {
   status?: SponsorshipStatus | null
@@ -25,12 +28,6 @@ interface AdminListFilters {
   /** Inclut les parrainages terminés dans la sortie. Défaut : false. */
   includeEnded?: boolean
   limit?: number
-}
-
-export interface SponsorshipWithBoth extends Sponsorship {
-  animal: Pick<Animal, 'id' | 'name' | 'species' | 'status' | 'photo_url'> | null
-  client: Pick<Client, 'id' | 'kind' | 'name' | 'first_name' | 'email' | 'phone' | 'city'> | null
-  total_donated?: number
 }
 
 /**
@@ -104,23 +101,6 @@ export async function listSponsorshipsForAdmin(
   return { data: filtered }
 }
 
-export interface SponsorshipStats {
-  /** Nombre de parrainages actifs (statut = active) */
-  activeCount: number
-  /** Nombre de parrains distincts ayant au moins un parrainage actif */
-  distinctActiveSponsors: number
-  /** Somme des monthly_amount des parrainages actifs */
-  mrr: number
-  /** Cumul des dons fléchés (donations.sponsorship_id NOT NULL) sur l'année courante */
-  ytdRevenue: number
-  /** Moyenne mensuelle par parrain actif */
-  avgMonthlyPerSponsor: number
-  /** Nombre total de versements liés à des parrainages (toutes années) */
-  totalPayments: number
-  /** Cumul total versé via parrainages (toutes années) */
-  lifetimeRevenue: number
-}
-
 export async function getSponsorshipsStats(): Promise<SponsorshipStats> {
   const empty: SponsorshipStats = {
     activeCount: 0,
@@ -178,11 +158,4 @@ export async function getSponsorshipsStats(): Promise<SponsorshipStats> {
     totalPayments: donationRows.length,
     lifetimeRevenue,
   }
-}
-
-// Empty re-exports to keep callers stable if they import from this module
-export type {
-  Sponsorship,
-  SponsorshipWithAnimal,
-  SponsorshipWithClient,
 }

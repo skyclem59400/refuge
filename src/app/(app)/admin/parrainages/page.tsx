@@ -12,8 +12,8 @@ import { getEstablishmentContext } from '@/lib/establishment/context'
 import {
   listSponsorshipsForAdmin,
   getSponsorshipsStats,
-  type SponsorshipWithBoth,
 } from '@/lib/actions/sponsorships-admin'
+import type { SponsorshipWithBoth } from '@/lib/actions/sponsorships-admin-types'
 import {
   SPONSORSHIP_KIND_LABELS,
   SPONSORSHIP_STATUS_LABELS,
