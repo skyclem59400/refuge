@@ -36,6 +36,13 @@ const ACTOR_USER_ID = '76bbfc56-0d9f-4ca2-ae2c-b8c1e0b11aad'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // Puppeteer + 5 PDFs ≈ ~30s, marge confortable
 
+// Bump pour détecter quel build est live. v3 = bypass auth via serviceEstablishmentId.
+const ENDPOINT_VERSION = 'v3-service-bypass'
+
+export async function GET() {
+  return Response.json({ version: ENDPOINT_VERSION })
+}
+
 export async function POST(req: NextRequest) {
   const auth = req.headers.get('authorization')
   const expected = process.env.CRON_SECRET
