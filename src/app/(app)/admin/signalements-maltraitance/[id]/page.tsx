@@ -21,13 +21,13 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { getEstablishmentContext } from '@/lib/establishment/context'
+import { getAbuseReport } from '@/lib/actions/abuse-reports'
 import {
-  getAbuseReport,
   ABUSE_TYPE_LABELS,
   SEVERITY_LABELS,
   STATUS_LABELS,
   ANIMAL_TYPE_LABELS,
-} from '@/lib/actions/abuse-reports'
+} from '@/lib/actions/abuse-reports-constants'
 import { ResolveActions } from '@/components/abuse-reports/resolve-actions'
 import { PortalAccountCard } from '@/components/portal-ticket/portal-account-card'
 import { TicketTimeline } from '@/components/portal-ticket/ticket-timeline'

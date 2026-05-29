@@ -5,10 +5,12 @@ import { getEstablishmentContext } from '@/lib/establishment/context'
 import {
   listAbuseReports,
   getAbuseReportStats,
+} from '@/lib/actions/abuse-reports'
+import {
   SEVERITY_LABELS,
   STATUS_LABELS,
   ANIMAL_TYPE_LABELS,
-} from '@/lib/actions/abuse-reports'
+} from '@/lib/actions/abuse-reports-constants'
 import type {
   AbuseSeverity,
   AbuseReportStatus,

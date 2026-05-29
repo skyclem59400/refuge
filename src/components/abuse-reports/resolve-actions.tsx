@@ -4,10 +4,8 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Save } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  updateAbuseReportStatus,
-  STATUS_LABELS,
-} from '@/lib/actions/abuse-reports'
+import { updateAbuseReportStatus } from '@/lib/actions/abuse-reports'
+import { STATUS_LABELS } from '@/lib/actions/abuse-reports-constants'
 import type { AbuseReportStatus } from '@/lib/types/database'
 
 interface Props {
