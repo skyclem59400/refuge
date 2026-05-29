@@ -97,6 +97,7 @@ const shelterSections: NavSection[] = [
       { href: '/documents', label: 'Documents', Icon: FileText, permission: 'canManageDocuments' },
       { href: '/reglements', label: 'Règlements', Icon: Wallet, permission: 'canManageDocuments' },
       { href: '/donations', label: 'Dons', Icon: Heart, permission: 'canManageDonations' },
+      { href: '/admin/parrainages', label: 'Parrainages', Icon: HeartHandshake, permission: 'canManageDonations' },
     ],
   },
   {
