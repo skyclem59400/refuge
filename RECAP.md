@@ -233,6 +233,7 @@
 | `/api/public/adoption/slots` | Créneaux RDV disponibles (portail public) |
 | `/api/public/adoption/inquiry` | Création demande adoption (portail public, CORS + Turnstile) |
 | `/api/public/adoption/my-inquiries` | Mes demandes (Bearer Supabase, portail public) |
+| `/api/cron/cra-resend` | **Admin one-shot** : renvoyer les CRA `sent` d'un mois au comptable avec CC, ou en mode preview à une adresse override. Bearer `CRON_SECRET`. Body : `{establishment_id, year, month, cc?, preview_to?}` |
 
 ## Base de données — tables principales
 
@@ -1464,3 +1465,100 @@ de bascule/rollback, credentials, configuration Coolify).
   les nouveaux booleans n'affectent personne tant qu'on ne les active pas
 - Documentation : `~/Projets/SDA/docs/SESSION-2026-05-29.md` (vue d'ensemble
   complète incluant l'infra Scaleway et les procédures de bascule)
+
+---
+
+## Session 2026-05-29 (soir) — Renvoi CRA FITECO + PDF 1 page
+
+Suite à un signalement de la responsable administrative (Céline) : le
+comptable FITECO (`g.arciuolo@fiteco.com`) n'avait pas reçu les CRA salariés
+de mai 2026 validés ce matin (entre 11:43 et 11:44).
+
+### Investigation
+
+- ✅ Conf email comptable correcte en base : `establishments.accountant_email`
+  = `g.arciuolo@fiteco.com`
+- ✅ 5 CRA salariés (Carole, Franck, Marina, Mary, Yann) en statut `sent`,
+  envoyés ce matin
+- ✅ Code de [`cra-send.ts`](src/lib/actions/cra-send.ts) propre, status `sent`
+  ne passe que si Brevo SMTP a accepté
+- ⚠️ Eric (salarié actif) n'apparaît pas dans la liste — à investiguer
+  séparément
+- → Problème probable en aval : spam FITECO ou whitelist Brevo
+
+### Décision : ajouter une route admin one-shot
+
+Renvoi forcé avec `clement.scailteux@gmail.com` + `m.fremaux@sda-nord.com`
+en copie, via une route admin `/api/cron/cra-resend` plutôt que de modifier
+l'UI ou de scripter en local (chemin le plus propre, traceable, réutilisable).
+
+### Bugs déterrés en chaîne
+
+1. **`'use server'` + `export const X = {…}`** : 3 fichiers (`volunteer-applications.ts`,
+   `abuse-reports.ts`, `portal-ticket-events.ts`) cassaient le build prod
+   Next 16.1.6 / Turbopack avec "A 'use server' file can only export async
+   functions, found object". Régression silencieuse du commit `8296c56`
+   (probablement build dev moins strict que build Docker).
+
+   **Fix** : extraire les constantes UI vers `*-constants.ts` siblings
+   (volunteer + abuse), ou les passer en private vars locaux (portal,
+   inutilisés ailleurs).
+
+2. **`getMonthlySaisie` exige une session** alors que mon endpoint CRON-auth
+   n'en a pas → "Non authentifié".
+
+   **Fix** : ajout du paramètre optionnel `serviceEstablishmentId` qui
+   bypass `requireEstablishment()` quand fourni. Propagé dans
+   `buildCraSaisiePdf` également. Rétrocompatible (signature non breaking).
+
+3. **Brevo SMTP : "525 5.7.1 Unauthorized IP address"**. L'IP du VPS Optimus
+   avait été retirée de la whitelist Brevo lors d'une autre modif de la
+   journée (probablement liée au setup Scaleway sda-website). Le user a
+   ré-autorisé l'IP manuellement dans le dashboard Brevo.
+
+### Patterns implémentés
+
+- **Service-mode bypass** sur Server Actions : ajouter un paramètre optionnel
+  `serviceEstablishmentId` qui, quand fourni, saute l'auth. À n'utiliser que
+  depuis un endpoint protégé par secret (Bearer `CRON_SECRET`).
+- **Version probe** sur endpoint POST CRON : exposer un GET qui retourne
+  `{version: 'vX-...'}` pour polling sans side-effect (détecter quand un
+  nouveau build est réellement live, distinguer "endpoint joignable" vs
+  "nouveau code actif").
+- **Mode preview** : paramètre body `preview_to` qui override le destinataire
+  réel et préfixe le subject `[PREVIEW]`. Aucun update DB / activity_log
+  en preview. Permet de tester la mise en page d'un PDF avant l'envoi
+  officiel sans spammer le destinataire final.
+
+### Résultat envoi final
+
+| Salarié | messageId Brevo (renvoi officiel CC) |
+|---------|---------------------------------------|
+| Franck  | `d6ab11bc-…@sda-nord.com` |
+| Marina  | `d4306b68-…@sda-nord.com` |
+| Mary    | `05f2dd4b-…@sda-nord.com` |
+| Carole  | `73652617-…@sda-nord.com` |
+| Yann    | `cede1ca5-…@sda-nord.com` |
+
+Tracé dans `activity_logs` avec `details.resend = true` + liste CC +
+message_id.
+
+### PDF CRA compacté pour tenir en 1 page A4 paysage
+
+Le PDF débordait sur 2 pages. Compactage de `cra-saisie-template.ts` :
+- `@page margin` : 12mm → 8mm
+- Cellules calendrier : 68px → 52px
+- Font-sizes globalement -1pt (corps 11→10, labels 9→8, valeurs 13→12)
+- Paddings / margins-top resserrés (~50%)
+
+Validé par preview à `clement.scailteux@gmail.com` puis confirmé OK
+par Clément. Tous les futurs CRA générés tiennent en 1 page.
+
+### Méta
+
+- 7 commits poussés sur `main` (les 3 push des fixes "use server" +
+  endpoint + bypass + version probe + preview-mode + compactage PDF)
+- 1 nouvel endpoint : `/api/cron/cra-resend` (admin, CRON_SECRET)
+- 3 nouveaux fichiers `*-constants.ts` (volunteer-applications,
+  abuse-reports — extraits depuis les `'use server'`)
+- Pas de migration DB
