@@ -4,13 +4,15 @@ import { getEstablishmentContext } from '@/lib/establishment/context'
 import {
   listVolunteerApplications,
   getVolunteerApplicationStats,
+} from '@/lib/actions/volunteer-applications'
+import {
   VOLUNTEER_STATUS_LABELS,
   VOLUNTEER_STATUS_CLASSES,
   VOLUNTEER_SKILL_LABELS,
   VOLUNTEER_DAY_LABELS,
   VOLUNTEER_SLOT_LABELS,
   VOLUNTEER_FREQUENCY_LABELS,
-} from '@/lib/actions/volunteer-applications'
+} from '@/lib/actions/volunteer-applications-constants'
 import type {
   VolunteerApplication,
   VolunteerApplicationStatus,

@@ -17,8 +17,8 @@ import {
   Info,
 } from 'lucide-react'
 import { getEstablishmentContext } from '@/lib/establishment/context'
+import { getVolunteerApplication } from '@/lib/actions/volunteer-applications'
 import {
-  getVolunteerApplication,
   VOLUNTEER_STATUS_LABELS,
   VOLUNTEER_STATUS_CLASSES,
   VOLUNTEER_SKILL_LABELS,
@@ -26,7 +26,7 @@ import {
   VOLUNTEER_SLOT_LABELS,
   VOLUNTEER_FREQUENCY_LABELS,
   VOLUNTEER_PHYSICAL_LABELS,
-} from '@/lib/actions/volunteer-applications'
+} from '@/lib/actions/volunteer-applications-constants'
 import { ResolveActions } from '@/components/volunteer-applications/resolve-actions'
 import { PortalAccountCard } from '@/components/portal-ticket/portal-account-card'
 import { TicketTimeline } from '@/components/portal-ticket/ticket-timeline'

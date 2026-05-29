@@ -5,26 +5,13 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import type {
   PortalTicketEvent,
-  PortalTicketEventType,
   PortalTicketEventWithActor,
   PortalTicketType,
 } from '@/lib/types/database'
 
-// ---------- Labels FR ----------
-
-export const PORTAL_TICKET_TYPE_LABELS: Record<PortalTicketType, string> = {
-  adoption: 'Candidature adoption',
-  volunteer: 'Candidature bénévole',
-  abuse_report: 'Signalement maltraitance',
-}
-
-export const PORTAL_EVENT_LABELS: Record<PortalTicketEventType, string> = {
-  created: 'Demande créée',
-  status_change: 'Changement de statut',
-  comment_user: 'Message du demandeur',
-  message_staff: 'Message équipe SDA',
-  attachment_added: 'Pièce jointe ajoutée',
-}
+// Note : les labels FR (PORTAL_TICKET_TYPE_LABELS, PORTAL_EVENT_LABELS)
+// ont été retirés d'ici, ils n'étaient consommés nulle part. Un fichier
+// 'use server' ne peut exporter que des async functions sous Next.js 16 / Turbopack.
 
 // ---------- Permission helpers ----------
 

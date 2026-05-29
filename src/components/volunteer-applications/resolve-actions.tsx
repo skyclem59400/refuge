@@ -4,10 +4,8 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Workflow } from 'lucide-react'
-import {
-  updateVolunteerApplicationStatus,
-  VOLUNTEER_STATUS_LABELS,
-} from '@/lib/actions/volunteer-applications'
+import { updateVolunteerApplicationStatus } from '@/lib/actions/volunteer-applications'
+import { VOLUNTEER_STATUS_LABELS } from '@/lib/actions/volunteer-applications-constants'
 import type { VolunteerApplicationStatus } from '@/lib/types/database'
 
 interface ResolveActionsProps {
