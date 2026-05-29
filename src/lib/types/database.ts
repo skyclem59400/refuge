@@ -176,6 +176,7 @@ export interface PermissionGroup {
   // Permissions site public (formulaires globaux)
   manage_adoption_applications: boolean
   manage_volunteer_applications: boolean
+  manage_foster_applications: boolean
   manage_abuse_reports: boolean
   created_at: string
   updated_at: string
@@ -243,6 +244,7 @@ export interface Permissions {
   canViewAnimalNews: boolean
   canManageAdoptionApplications: boolean
   canManageVolunteerApplications: boolean
+  canManageFosterApplications: boolean
   canManageAbuseReports: boolean
   isAdmin: boolean
   isOwner: boolean
@@ -2060,6 +2062,91 @@ export interface VolunteerApplication {
   // Portal Sprint 1 — comptes utilisateurs + tickets unifiés
   user_id: string | null
   ticket_number: string
+}
+
+// --- Foster applications (candidatures famille d'accueil) ---
+
+export type FosterApplicationStatus =
+  | 'pending'
+  | 'qualified'
+  | 'interview_scheduled'
+  | 'home_visit_scheduled'
+  | 'accepted'
+  | 'declined'
+  | 'archived'
+
+export type HousingType = 'house' | 'apartment' | 'other'
+
+export type FosterType =
+  | 'puppies'
+  | 'kittens'
+  | 'convalescents'
+  | 'timid'
+  | 'emergency'
+  | 'all'
+
+export interface FosterApplication {
+  id: string
+  establishment_id: string
+
+  // Identité
+  first_name: string
+  last_name: string
+  email: string
+  phone: string
+  birth_date: string | null
+  address: string | null
+  postal_code: string | null
+  city: string | null
+
+  // Logement
+  housing_type: HousingType | null
+  has_garden: boolean
+  garden_size_text: string | null
+  has_separate_room: boolean
+
+  // Foyer
+  household_size: number
+  has_children: boolean
+  children_ages_text: string | null
+  household_agreement: boolean
+
+  // Animaux personnels
+  has_pets: boolean
+  pets_details: string | null
+  pets_vaccinated: boolean | null
+
+  // Disponibilité
+  available_from: string | null
+  can_foster_types: FosterType[]
+  max_duration_weeks: number | null
+  transport_available: boolean
+
+  // Expérience
+  prior_foster_experience: boolean
+  prior_experience_details: string | null
+
+  // Motivation + engagement
+  motivation: string
+  clean_record_declared: boolean
+
+  // Workflow
+  status: FosterApplicationStatus
+  admin_notes: string | null
+  qualified_at: string | null
+  qualified_by: string | null
+
+  // Traçabilité
+  source: string
+  ip_address: string | null
+  user_agent: string | null
+
+  // Portal
+  user_id: string | null
+  ticket_number: string
+
+  created_at: string
+  updated_at: string
 }
 
 // --- Abuse reports (signalements maltraitance) ---

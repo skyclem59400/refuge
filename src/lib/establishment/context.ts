@@ -36,6 +36,7 @@ function buildPermissions(groups: PermissionGroup[], membership: EstablishmentMe
     canViewAnimalNews: has('view_animal_news'),
     canManageAdoptionApplications: has('manage_adoption_applications'),
     canManageVolunteerApplications: has('manage_volunteer_applications'),
+    canManageFosterApplications: has('manage_foster_applications'),
     canManageAbuseReports: has('manage_abuse_reports'),
   }
 }
