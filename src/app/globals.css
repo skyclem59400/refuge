@@ -1,15 +1,37 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------
+   Optimus — palette alignée sur la charte SDA (navy / teal / terracotta)
+   ------------------------------------------------------------------ */
+
 @theme {
-  --color-primary: #6366f1;
-  --color-primary-light: #818cf8;
-  --color-primary-dark: #4f46e5;
-  --color-secondary: #8b5cf6;
-  --color-accent: #ec4899;
+  /* Marque SDA */
+  --color-navy: #1e3a5f;
+  --color-navy-soft: #3d5a80;
+  --color-navy-deep: #14253d;
+  --color-teal: #5ba8a0;
+  --color-teal-soft: #8cc4be;
+  --color-teal-deep: #3d7a73;
+  --color-terracotta: #c96b3c;
+  --color-terracotta-soft: #e89668;
+  --color-paper: #ffffff;
+  --color-canvas: #f8fbfc;
+  --color-ink: #14253d;
+
+  /* Aliases historiques Optimus (utilisés dans tout le code existant) */
+  --color-primary: var(--color-navy);
+  --color-primary-light: var(--color-navy-soft);
+  --color-primary-dark: var(--color-navy-deep);
+  --color-secondary: var(--color-terracotta);
+  --color-accent: var(--color-teal);
+
+  /* États */
   --color-success: #10b981;
   --color-warning: #f59e0b;
-  --color-danger: #ef4444;
+  --color-danger: #dc2626;
   --color-info: #3b82f6;
+
+  /* Surfaces (re-mappées par .light / .dark plus bas) */
   --color-surface: #1e293b;
   --color-surface-dark: #0f172a;
   --color-surface-hover: #334155;
@@ -17,31 +39,34 @@
   --color-muted: #94a3b8;
   --color-text: #f1f5f9;
   --color-text-secondary: #cbd5e1;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Typographie */
+  --font-sans: var(--font-baloo), "Baloo 2", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), "Fraunces", Georgia, serif;
 }
 
-/* Dark mode */
+/* Dark mode — base navy deep + accents teal */
 html.dark {
   color-scheme: dark;
-  --color-surface: #1e293b;
-  --color-surface-dark: #0f172a;
-  --color-surface-hover: #334155;
-  --color-border: #334155;
-  --color-muted: #94a3b8;
+  --color-surface: #1e3a5f;
+  --color-surface-dark: #14253d;
+  --color-surface-hover: #3d5a80;
+  --color-border: #2a3f5c;
+  --color-muted: #8ea7b8;
   --color-text: #f1f5f9;
-  --color-text-secondary: #cbd5e1;
+  --color-text-secondary: #d9e6ed;
 }
 
-/* Light mode */
+/* Light mode — base paper/canvas, contraste navy deep */
 html.light {
   color-scheme: light;
   --color-surface: #ffffff;
-  --color-surface-dark: #f1f5f9;
-  --color-surface-hover: #e2e8f0;
-  --color-border: #e2e8f0;
-  --color-muted: #64748b;
-  --color-text: #0f172a;
-  --color-text-secondary: #334155;
+  --color-surface-dark: #f8fbfc;
+  --color-surface-hover: #eef4f7;
+  --color-border: #d9e6ed;
+  --color-muted: #51647a;
+  --color-text: #14253d;
+  --color-text-secondary: #3d5a80;
 }
 
 body {
@@ -68,38 +93,103 @@ body {
   background: var(--color-muted);
 }
 
-/* Focus ring */
+/* Focus ring — utilise le teal pour rester sur la marque */
 *:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-teal);
   outline-offset: 2px;
 }
 
-/* Gradient utilities */
+/* ------------------------------------------------------------------
+   Gradient & glow — alignés sur la nouvelle palette
+   gradient-primary garde son nom pour la rétrocompat (boutons, KPI) :
+   navy → teal devient le dégradé signature côté CRM.
+   ------------------------------------------------------------------ */
 .gradient-primary {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  background: linear-gradient(135deg, var(--color-navy), var(--color-teal));
+}
+.gradient-warm {
+  background: linear-gradient(135deg, var(--color-terracotta), var(--color-terracotta-soft));
 }
 .gradient-text {
-  background: linear-gradient(135deg, var(--color-primary-light), var(--color-accent));
+  background: linear-gradient(135deg, var(--color-teal), var(--color-terracotta));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 .glow {
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 0 20px rgba(30, 58, 95, 0.15);
 }
 .glow-lg {
-  box-shadow: 0 0 40px rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 40px rgba(30, 58, 95, 0.2);
 }
 
 /* Light mode specific overrides */
 html.light .glow {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(20, 37, 61, 0.08);
 }
 html.light .glow-lg {
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 40px rgba(20, 37, 61, 0.1);
 }
 
-/* Animation */
+/* ------------------------------------------------------------------
+   Composants signature inspirés du site SDA
+   ------------------------------------------------------------------ */
+
+/* Eyebrow : petit libellé en majuscules avant un titre */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--color-teal);
+  font-weight: 500;
+}
+
+/* Titre display utilisant Fraunces */
+.h-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--color-navy);
+}
+html.dark .h-display {
+  color: var(--color-text);
+}
+
+/* Badge pill chaud (terracotta) — pour "nouveau", "urgent", etc. */
+.badge-pill-warm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background: rgba(201, 107, 60, 0.12);
+  color: var(--color-terracotta);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* Container-edge : marge horizontale cohérente */
+.container-edge {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  max-width: 1280px;
+}
+@media (min-width: 768px) {
+  .container-edge {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+/* Animation fadeUp historique */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -124,7 +214,7 @@ html.light .glow-lg {
   animation: popover-out 0.12s ease-in;
 }
 
-/* Date and time inputs - ensure calendar picker is visible */
+/* Date and time inputs */
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
@@ -132,14 +222,14 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   opacity: 0.8;
   transition: opacity 0.2s ease;
 }
-
 input[type="date"]::-webkit-calendar-picker-indicator:hover,
 input[type="time"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
 }
-
-/* Light mode - darker icon */
 html.light input[type="date"]::-webkit-calendar-picker-indicator,
 html.light input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(0.2);
 }
+
+/* H1/H2/H3 par défaut : si pas d'override, on garde Baloo (sans).
+   Pour basculer en Fraunces, ajouter la classe .h-display. */

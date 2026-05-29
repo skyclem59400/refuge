@@ -1,12 +1,25 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Baloo_2, Fraunces } from 'next/font/google'
 import { Toaster } from 'sonner'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
-const inter = Inter({
+// Typographie alignée sur la charte SDA :
+//  - Baloo 2 pour le corps (sans serif chaleureux, lisible en dark mode)
+//  - Fraunces pour les titres .h-display (serif éditorial, sur la marque)
+const baloo = Baloo_2({
   subsets: ['latin'],
-  variable: '--font-sans',
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-baloo',
+  display: 'swap',
+})
+
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  style: ['normal', 'italic'],
+  variable: '--font-fraunces',
+  display: 'swap',
 })
 
 export const metadata: Metadata = {
@@ -42,7 +55,7 @@ export default function RootLayout({
           })();
         `}} />
       </head>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${baloo.variable} ${fraunces.variable} font-sans antialiased`}>
         <ThemeProvider>
           {children}
           <Toaster
