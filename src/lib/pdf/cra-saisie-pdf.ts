@@ -14,9 +14,11 @@ function safeFileName(s: string): string {
 export async function buildCraSaisiePdf(
   memberId: string,
   year: number,
-  month: number
+  month: number,
+  /** Bypass auth pour les contextes service (CRON). Voir `getMonthlySaisie`. */
+  serviceEstablishmentId?: string
 ): Promise<{ buffer: Buffer; filename: string; establishmentName: string }> {
-  const result = await getMonthlySaisie(memberId, year, month)
+  const result = await getMonthlySaisie(memberId, year, month, serviceEstablishmentId)
   if (result.error || !result.data) {
     throw new Error(result.error || 'Impossible de générer le CRA')
   }

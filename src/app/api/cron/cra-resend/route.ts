@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
     const memberName = (m.user_id && userNameMap.get(m.user_id)) || m.pseudo || 'Collaborateur'
 
     try {
-      const { buffer, filename } = await buildCraSaisiePdf(m.id, year, month)
+      const { buffer, filename } = await buildCraSaisiePdf(m.id, year, month, establishment_id)
 
       const subject = `CRA ${memberName} — ${monthLabel}`
       const html = `<p>Bonjour${est.accountant_name ? ' ' + est.accountant_name : ''},</p>

@@ -65,10 +65,19 @@ function emptyDay(date: string, weekday: DayOfWeek, source: CraDaySource): CraDa
 export async function getMonthlySaisie(
   memberId: string,
   year: number,
-  month: number
+  month: number,
+  /**
+   * Bypass de l'auth pour les contextes service (CRON, jobs admin).
+   * Quand `serviceEstablishmentId` est fourni, on saute `requireEstablishment()`
+   * et on prend l'ID transmis tel quel. À n'utiliser que depuis un endpoint
+   * lui-même authentifié par un secret (ex: Bearer CRON_SECRET).
+   */
+  serviceEstablishmentId?: string
 ): Promise<{ data?: CraMonthlyView; error?: string }> {
   try {
-    const { establishmentId } = await requireEstablishment()
+    const establishmentId = serviceEstablishmentId
+      ? serviceEstablishmentId
+      : (await requireEstablishment()).establishmentId
     const admin = createAdminClient()
 
     // 1. Membre + droits
