@@ -179,7 +179,7 @@ export function DonationList({ donations, canManage }: Readonly<DonationListProp
                 </td>
 
                 {/* Amount */}
-                <td className="px-4 py-3 text-right font-semibold text-primary">
+                <td className="px-4 py-3 text-right font-semibold text-success">
                   {formatCurrency(Number(donation.amount))}
                 </td>
 
