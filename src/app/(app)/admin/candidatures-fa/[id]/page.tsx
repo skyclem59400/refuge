@@ -343,6 +343,12 @@ export default async function CandidatureFADetailPage({ params }: PageProps) {
                   </span>
                 </div>
               )}
+              {application.profession && (
+                <div className="flex items-start gap-2">
+                  <span className="text-xs uppercase tracking-wider text-muted mt-0.5 shrink-0 w-12">Métier</span>
+                  <span className="font-medium">{application.profession}</span>
+                </div>
+              )}
               {(application.address || application.city || application.postal_code) && (
                 <div className="flex items-start gap-2">
                   <MapPin className="w-4 h-4 text-muted mt-0.5 shrink-0" />

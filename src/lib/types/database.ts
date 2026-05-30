@@ -2095,6 +2095,7 @@ export interface FosterApplication {
   email: string
   phone: string
   birth_date: string | null
+  profession: string | null
   address: string | null
   postal_code: string | null
   city: string | null
