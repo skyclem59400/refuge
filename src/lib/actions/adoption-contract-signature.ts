@@ -48,8 +48,8 @@ export async function sendAdoptionContractForSignature(contractId: string) {
       return { error: "L'adoptant n'a pas d'email enregistré. Ajoutez-le avant l'envoi." }
     }
 
-    if (contract.signature_status === 'pending' || contract.signature_status === 'signed') {
-      return { error: 'Ce contrat a déjà été envoyé pour signature' }
+    if (contract.signature_status === 'signed') {
+      return { error: 'Ce contrat a déjà été signé.' }
     }
 
     const { data: establishment } = await admin
@@ -57,6 +57,100 @@ export async function sendAdoptionContractForSignature(contractId: string) {
       .select('name, email, logo_url, website')
       .eq('id', establishmentId)
       .single()
+
+    // ─────────────────────────────────────────────────────────────────────
+    // RENVOI PUR (doc Documenso déjà créé) :
+    // Le contrat est déjà chez Documenso (`documenso_document_id` set),
+    // statut = 'pending' → on renvoie UNIQUEMENT l'email Brevo (signing
+    // URL rafraîchie). Cas réel : Brevo a échoué au premier coup, ou
+    // l'adoptant a perdu son mail, ou Céline veut juste retenter.
+    // ─────────────────────────────────────────────────────────────────────
+    if (contract.signature_status === 'pending' && contract.documenso_document_id) {
+      let signingUrl: string | null = contract.documenso_signing_url ?? null
+      try {
+        const refreshed = await getDocument(contract.documenso_document_id)
+        const r = (refreshed.recipients ?? refreshed.Recipient ?? [])[0]
+        if (r?.signingUrl) {
+          signingUrl = r.signingUrl
+        } else if (r?.token) {
+          const base = process.env.DOCUMENSO_BASE_URL || 'https://signature.optimus-services.fr'
+          signingUrl = `${base}/sign/${r.token}`
+        }
+      } catch (e) {
+        console.warn('[adoption-contract-signature] resend: refresh signing URL failed:', (e as Error).message)
+      }
+
+      if (!signingUrl) {
+        return { error: 'URL de signature introuvable côté Documenso. Annulez ce mouvement et recréez le contrat.' }
+      }
+
+      const animalName = contract.animal?.name ?? 'votre futur compagnon'
+      const adopterFirstName = contract.adopter.name.split(' ')[0]
+      const orgName = establishment?.name?.trim() || 'le refuge'
+      const breed = (contract.animal?.breed_cross || contract.animal?.breed || '').trim() || null
+
+      try {
+        const { subject, html } = buildContractSignatureEmail({
+          kind: 'adoption',
+          signingUrl,
+          recipientFirstName: adopterFirstName,
+          recipientName: contract.adopter.name,
+          animalName,
+          animalSpecies: contract.animal?.species || '',
+          animalBreed: breed,
+          animalPhotoUrl: contract.animal?.photo_url ?? null,
+          contractNumber: contract.contract_number,
+          establishmentName: orgName,
+          establishmentEmail: establishment?.email ?? null,
+          establishmentLogoUrl: establishment?.logo_url ?? null,
+          establishmentWebsite: establishment?.website ?? null,
+        })
+        await sendEmail({
+          to: contract.adopter.email,
+          toName: contract.adopter.name,
+          subject,
+          html,
+          fromName: orgName,
+          replyTo: establishment?.email ?? undefined,
+        })
+      } catch (e) {
+        return { error: `Échec du renvoi de l'email : ${(e as Error).message}` }
+      }
+
+      await supabase
+        .from('adoption_contracts')
+        .update({
+          documenso_signing_url: signingUrl,
+          signature_sent_at: new Date().toISOString(),
+        })
+        .eq('id', contractId)
+        .eq('establishment_id', establishmentId)
+
+      logActivity({
+        action: 'update',
+        entityType: 'adoption_contract_signature',
+        entityId: contract.id,
+        entityName: contract.contract_number,
+        parentType: 'animal',
+        parentId: contract.animal_id,
+        details: { resent: true, recipient_email: contract.adopter.email },
+      })
+
+      revalidatePath(`/animals/${contract.animal_id}`)
+      return {
+        data: {
+          documensoDocumentId: contract.documenso_document_id,
+          signingUrl,
+          resent: true,
+        },
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // PREMIER ENVOI (ou retry après échec sans doc Documenso créé) :
+    // signature_status est null/draft/not_sent OU pending sans doc (cas
+    // Capucine/Rafiki où le 1er envoi a planté avant Documenso).
+    // ─────────────────────────────────────────────────────────────────────
 
     // 1. Generate PDF en mode SPLIT (2 PDFs séparés mergés) pour connaître
     // précisément la page de fin du contrat principal. L'adoptant doit signer

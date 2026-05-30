@@ -63,8 +63,94 @@ export async function sendContractForSignature(contractId: string) {
       return { error: 'La famille d’accueil n’a pas d’email enregistre. Ajoutez-le avant l’envoi.' }
     }
 
-    if (contract.signature_status === 'pending' || contract.signature_status === 'signed') {
-      return { error: 'Ce contrat a deja ete envoye pour signature' }
+    if (contract.signature_status === 'signed') {
+      return { error: 'Ce contrat a déjà été signé.' }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // RENVOI PUR (doc Documenso déjà créé) :
+    // Le contrat est déjà chez Documenso, statut = 'pending' → on renvoie
+    // UNIQUEMENT l'email Brevo (signing URL rafraîchie).
+    // ─────────────────────────────────────────────────────────────────────
+    if (contract.signature_status === 'pending' && contract.documenso_document_id) {
+      let signingUrl: string | null = contract.documenso_signing_url ?? null
+      try {
+        const refreshed = await getDocument(contract.documenso_document_id)
+        const r = (refreshed.recipients ?? refreshed.Recipient ?? [])[0]
+        if (r?.signingUrl) {
+          signingUrl = r.signingUrl
+        } else if (r?.token) {
+          const base = process.env.DOCUMENSO_BASE_URL || 'https://signature.optimus-services.fr'
+          signingUrl = `${base}/sign/${r.token}`
+        }
+      } catch (e) {
+        console.warn('[foster-contract-signature] resend: refresh signing URL failed:', (e as Error).message)
+      }
+
+      if (!signingUrl) {
+        return { error: 'URL de signature introuvable côté Documenso. Annulez ce mouvement et recréez le contrat.' }
+      }
+
+      const animalName = contract.animal?.name ?? 'votre futur protégé'
+      const fosterFirstName = contract.foster.name.split(' ')[0]
+      const orgName = establishment?.name?.trim() || 'le refuge'
+      const breed = (contract.animal?.breed_cross || contract.animal?.breed || '').trim() || null
+
+      try {
+        const { subject, html } = buildContractSignatureEmail({
+          kind: 'foster',
+          signingUrl,
+          recipientFirstName: fosterFirstName,
+          recipientName: contract.foster.name,
+          animalName,
+          animalSpecies: contract.animal?.species || '',
+          animalBreed: breed,
+          animalPhotoUrl: contract.animal?.photo_url ?? null,
+          contractNumber: contract.contract_number,
+          establishmentName: orgName,
+          establishmentEmail: establishment?.email ?? null,
+          establishmentLogoUrl: establishment?.logo_url ?? null,
+          establishmentWebsite: establishment?.website ?? null,
+        })
+        await sendEmail({
+          to: contract.foster.email,
+          toName: contract.foster.name,
+          subject,
+          html,
+          fromName: orgName,
+          replyTo: establishment?.email ?? undefined,
+        })
+      } catch (e) {
+        return { error: `Échec du renvoi de l'email : ${(e as Error).message}` }
+      }
+
+      await supabase
+        .from('foster_contracts')
+        .update({
+          documenso_signing_url: signingUrl,
+          signature_sent_at: new Date().toISOString(),
+        })
+        .eq('id', contractId)
+        .eq('establishment_id', establishmentId)
+
+      logActivity({
+        action: 'update',
+        entityType: 'foster_contract_signature',
+        entityId: contract.id,
+        entityName: contract.contract_number,
+        parentType: 'animal',
+        parentId: contract.animal_id,
+        details: { resent: true, recipient_email: contract.foster.email },
+      })
+
+      revalidatePath(`/animals/${contract.animal_id}`)
+      return {
+        data: {
+          documensoDocumentId: contract.documenso_document_id,
+          signingUrl,
+          resent: true,
+        },
+      }
     }
 
     // 1. Generate the contract PDF (avec nom du membre qui envoie pré-rempli
