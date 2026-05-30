@@ -1742,6 +1742,35 @@ Verdict : une seule plume, très marquée et reproductible :
 Pas de modification UI nécessaire — le bouton "Générer avec l'IA" est
 déjà sous le textarea Description externe du formulaire animal.
 
+#### Raffinement v2 (commit `ad6f672`) — feedback Céline après test réel
+
+Premier passage en condition réelle par Céline : verdict positif global
+("gain de temps réel"), mais 3 corrections à intégrer au prompt :
+
+1. **Ordre des 7 rubriques imposé** (consigne Céline non-négociable) :
+   Présentation → Histoire → Caractère → Goûts → Ententes → Éducation
+   → Profil humain. Seule liberté tolérée : inverser Éducation et
+   Ententes. Le system prompt liste les 7 blocs avec leur scope précis
+   pour éviter qu'un trait migre d'une rubrique à l'autre.
+
+2. **Règle d'or anti-invention sur les ententes** — Céline avait
+   signalé "infos transformées sur les ententes". Table de conversion
+   stricte ajoutée : `oui` → "j'aime", `non` → "je ne supporte pas /
+   non négociable", `non évalué` → "je n'ai pas encore été testé(e)".
+   Interdit formellement d'extrapoler ou d'inventer des copains.
+
+3. **Règle d'or anti-redondance** : chaque trait n'apparaît qu'une
+   fois. Le Profil humain devient une SYNTHÈSE DÉDUCTIVE (ce que
+   cherchent les humains), pas une reprise du Caractère / Goûts /
+   Ententes.
+
+Le user prompt rappelle ces 3 règles à chaque appel (anti-dérive).
+
+**UX** : `rows={5}` → `rows={20}` + `font-serif leading-relaxed` sur
+le textarea Description externe. Céline retouche directement dans
+Optimus, c'est son gain de temps principal ("plus simple que je le
+fasse directement").
+
 ### 10. Vaccins primo / rappel mois / rappel annuel + rappels auto
 
 **Demande de Mary** : sur le tableau passage véto, le bouton "VACCIN"
