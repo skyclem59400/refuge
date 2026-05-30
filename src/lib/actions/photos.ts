@@ -245,24 +245,49 @@ export async function setPrimaryAnimalPhoto(photoId: string, animalId: string) {
     await requirePermission('manage_animals')
     const adminClient = createAdminClient()
 
-    // First, set all photos for this animal to is_primary: false
+    // 1. Récupère l'URL de la nouvelle photo principale — on en a besoin
+    //    pour synchroniser animals.photo_url (la vitrine publique du site
+    //    SDA lit photo_url directement pour la liste /animaux).
+    const { data: photo, error: fetchError } = await adminClient
+      .from('animal_photos')
+      .select('url, animal_id')
+      .eq('id', photoId)
+      .maybeSingle()
+
+    if (fetchError) return { error: fetchError.message }
+    if (!photo) return { error: 'Photo introuvable' }
+    if (photo.animal_id !== animalId) {
+      return { error: "Cette photo n'appartient pas à cet animal" }
+    }
+
+    // 2. Reset toutes les photos de l'animal à is_primary = false
     const { error: resetError } = await adminClient
       .from('animal_photos')
       .update({ is_primary: false })
       .eq('animal_id', animalId)
 
-    if (resetError) {
-      return { error: resetError.message }
-    }
+    if (resetError) return { error: resetError.message }
 
-    // Then set this photo to is_primary: true
+    // 3. Set la photo cible à is_primary = true
     const { error: setError } = await adminClient
       .from('animal_photos')
       .update({ is_primary: true })
       .eq('id', photoId)
 
-    if (setError) {
-      return { error: setError.message }
+    if (setError) return { error: setError.message }
+
+    // 4. Sync animals.photo_url — c'est ce qui rend la photo visible sur la
+    //    liste publique /animaux du site SDA (la fiche détail, elle, lit
+    //    déjà animal_photos.is_primary correctement).
+    const { error: animalUpdateError } = await adminClient
+      .from('animals')
+      .update({ photo_url: photo.url })
+      .eq('id', animalId)
+
+    if (animalUpdateError) {
+      console.error('[setPrimaryAnimalPhoto] failed to sync animals.photo_url', animalUpdateError)
+      // On ne renvoie pas une erreur bloquante : is_primary est déjà set
+      // côté animal_photos. Mais on log pour visibilité.
     }
 
     await logActivity({
