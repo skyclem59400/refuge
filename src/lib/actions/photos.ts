@@ -142,17 +142,25 @@ export async function uploadAnimalPhoto(animalId: string, formData: FormData) {
       .from('animal-photos')
       .getPublicUrl(path)
 
-    // Check if this is the first photo (to set as primary)
+    // Règle : tant qu'il existe au moins une photo, EXACTEMENT UNE doit être
+    // primary. Donc on auto-marque la nouvelle comme primary si AUCUNE des
+    // photos existantes ne l'est. Avant (length===0) on ratait le cas où
+    // l'animal avait déjà des photos mais aucune marquée (cas Sally
+    // post-migration Hunimalis) → photo_url vitrine restait null → animal
+    // filtré du site public alors qu'Optimus affichait bien une vignette.
     const { data: existingPhotos, error: countError } = await adminClient
       .from('animal_photos')
-      .select('id')
+      .select('id, is_primary')
       .eq('animal_id', animalId)
 
     if (countError) {
       return { error: countError.message }
     }
 
-    const isFirst = !existingPhotos || existingPhotos.length === 0
+    const shouldBePrimary =
+      !existingPhotos ||
+      existingPhotos.length === 0 ||
+      !existingPhotos.some((p) => p.is_primary)
 
     // Insert into animal_photos table (use adminClient to bypass RLS — permission already checked)
     const { data: photo, error: insertError } = await adminClient
@@ -160,7 +168,7 @@ export async function uploadAnimalPhoto(animalId: string, formData: FormData) {
       .insert({
         animal_id: animalId,
         url: publicUrl,
-        is_primary: isFirst,
+        is_primary: shouldBePrimary,
       })
       .select()
       .single()
@@ -171,6 +179,18 @@ export async function uploadAnimalPhoto(animalId: string, formData: FormData) {
       return { error: insertError.message }
     }
 
+    // Sync animals.photo_url quand on devient la nouvelle primary — sinon
+    // la vitrine publique ne voit pas l'animal (filtre photo_url NOT NULL).
+    if (shouldBePrimary) {
+      const { error: syncErr } = await adminClient
+        .from('animals')
+        .update({ photo_url: publicUrl })
+        .eq('id', animalId)
+      if (syncErr) {
+        console.error('[uploadAnimalPhoto] failed to sync animals.photo_url', syncErr)
+      }
+    }
+
     await logActivity({
       action: 'create',
       entityType: 'photo',
@@ -178,7 +198,7 @@ export async function uploadAnimalPhoto(animalId: string, formData: FormData) {
       entityName: `Photo de l'animal`,
       parentType: 'animal',
       parentId: animalId,
-      details: { is_primary: isFirst, file_name: file.name },
+      details: { is_primary: shouldBePrimary, file_name: file.name },
     })
 
     revalidatePath(`/animals/${animalId}`)
@@ -222,6 +242,36 @@ export async function deleteAnimalPhoto(photoId: string) {
       return { error: deleteError.message }
     }
 
+    // Si on vient de supprimer LA photo principale : promouvoir la plus
+    // ancienne photo restante au rôle de principale, et sync animals.photo_url.
+    // Si plus aucune photo : remettre animals.photo_url à null. C'est ce qui
+    // garantit l'invariant "exactement une primary tant qu'il existe ≥1 photo".
+    if (photo.is_primary) {
+      const { data: remaining } = await adminClient
+        .from('animal_photos')
+        .select('id, url, created_at')
+        .eq('animal_id', photo.animal_id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+
+      const next = remaining?.[0]
+      if (next) {
+        await adminClient
+          .from('animal_photos')
+          .update({ is_primary: true })
+          .eq('id', next.id)
+        await adminClient
+          .from('animals')
+          .update({ photo_url: next.url })
+          .eq('id', photo.animal_id)
+      } else {
+        await adminClient
+          .from('animals')
+          .update({ photo_url: null })
+          .eq('id', photo.animal_id)
+      }
+    }
+
     await logActivity({
       action: 'delete',
       entityType: 'photo',
@@ -229,7 +279,7 @@ export async function deleteAnimalPhoto(photoId: string) {
       entityName: `Photo de l'animal`,
       parentType: 'animal',
       parentId: photo.animal_id,
-      details: { url: photo.url },
+      details: { url: photo.url, was_primary: photo.is_primary },
     })
 
     revalidatePath(`/animals/${photo.animal_id}`)
