@@ -32,9 +32,16 @@ interface BuildOptions {
 
 /** Helper interne : génère un PDF depuis un HTML via Puppeteer, avec le footer
  * running paraphes activé. Réutilisé pour le mode normal ET pour les 2 PDFs
- * du mode split. */
+ * du mode split.
+ *
+ * IMPORTANT : `--user-data-dir` est UNIQUE par appel (timestamp + random).
+ * Avant : `/tmp/chrome-data` fixe → quand le mode split lance 2 Puppeteer
+ * en parallèle (Promise.all), les 2 essaient de locker le MÊME dir → l'un
+ * des 2 plante avec "ProfileInUse". Découvert sur Capucine + Rafiki en prod
+ * le 30/05/2026. */
 async function htmlToPdfBuffer(html: string): Promise<Buffer> {
   const puppeteer = await import('puppeteer')
+  const userDataDir = `/tmp/chrome-data-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const browser = await puppeteer.default.launch({
     headless: true,
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
@@ -43,7 +50,7 @@ async function htmlToPdfBuffer(html: string): Promise<Buffer> {
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--user-data-dir=/tmp/chrome-data',
+      `--user-data-dir=${userDataDir}`,
     ],
   })
 
@@ -192,10 +199,10 @@ export async function buildAdoptionContractPdf(contractId: string, options: Buil
   const htmlMain = buildAdoptionContractHtml(contract, contract.animals, contract.adopter, companyInfo, logoBase64, animalPhotoBase64, createdByName, 'main')
   const htmlAnnex = buildAdoptionContractHtml(contract, contract.animals, contract.adopter, companyInfo, logoBase64, animalPhotoBase64, createdByName, 'annex')
 
-  const [bufMain, bufAnnex] = await Promise.all([
-    htmlToPdfBuffer(htmlMain),
-    htmlToPdfBuffer(htmlAnnex),
-  ])
+  // Séquentiel (et non Promise.all) pour économiser la RAM sur le VPS
+  // DEV1-L (3 GB) — 2 Puppeteer simultanés OOMaient l'app.
+  const bufMain = await htmlToPdfBuffer(htmlMain)
+  const bufAnnex = await htmlToPdfBuffer(htmlAnnex)
   const mainPageCount = await countPages(bufMain)
   const annexPageCount = await countPages(bufAnnex)
 
