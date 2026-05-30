@@ -1562,3 +1562,268 @@ par Clément. Tous les futurs CRA générés tiennent en 1 page.
 - 3 nouveaux fichiers `*-constants.ts` (volunteer-applications,
   abuse-reports — extraits depuis les `'use server'`)
 - Pas de migration DB
+
+---
+
+## Session 2026-05-30 — FA + Parrainage + Refonte design + IA Céline + Vaccins
+
+Grosse session multi-chantiers. Tout poussé sur `main`, builds locaux validés
+avant chaque push (sauf une régression `'use server'` corrigée immédiatement).
+
+### 1. Candidatures Famille d'Accueil (nouveau workflow complet)
+
+**Côté site SDA** :
+- `/famille-accueil` (page éditoriale) : suppression du CTA chatbot mort,
+  remplacement par un `InfoCta` vers `/espace/nouveau/famille-accueil`.
+- Nouveau formulaire authentifié `/espace/nouveau/famille-accueil` —
+  8 sections : Logement, Foyer, Animaux personnels, Disponibilité d'accueil,
+  Expérience préalable, Motivation, Engagement RGPD, profil read-only depuis
+  le compte. Indicateur de progression sticky.
+- Endpoint `POST /api/portal/foster/submit` (auth requise, bloque les comptes
+  staff via RLS `portal_foster_self_insert`).
+- Endpoint public anonyme `/api/foster-application` en fallback (Turnstile).
+- Ajout du lien "Famille d'accueil" dans `newRequestNav` du PortalShell.
+
+**Côté Optimus** :
+- Migration `foster_applications_phase2` : table `foster_applications`
+  (logement, foyer, animaux, dispo, motivation), séquence `foster_ticket_seq`,
+  trigger `assign_foster_ticket_number` (préfixe `FA-YYYY-XXXX`), RLS staff
+  + `portal_foster_self_*`, nouvelle perm `manage_foster_applications`
+  ajoutée à `permission_groups` + `user_has_permission`.
+- Nouvelle page `/admin/candidatures-fa` (liste) + `[id]` (détail).
+  Mêmes stats / filtres / workflow que `/admin/candidatures-benevoles`.
+- Server actions `listFosterApplications`, `getFosterApplication`,
+  `getFosterApplicationStats`, `updateFosterApplicationStatus`.
+- Composant `FosterResolveActions` (changement statut + notes).
+- Nav : nouvelle entrée "Candidatures FA" sous Communication.
+
+**Champs obligatoires demandés ensuite** : tous les champs du formulaire
+sont passés en obligatoires (date naissance, profession, disponibilité,
+durée max, vaccins des animaux si has_pets, espace extérieur si has_garden,
+expérience si déclarée). Validations Zod côté front + endpoint + refines.
+
+**Nouveau champ `profession`** : drop-down 23 options (CSP large)
+ajoutées en section 1 — Étudiant·e, Sans emploi, Au foyer, Retraité·e,
+Cadre, Profession libérale, Métier de l'animal, etc. Migration
+`foster_applications_add_profession` (colonne text nullable).
+Affichage de la profession dans le bloc Contact de la fiche admin.
+
+### 2. Espace parrainage côté site SDA
+
+**Existant constaté** : la page `/espace/parrainages` existait déjà avec
+liste des parrainages actifs + 3 dernières nouvelles par animal. Manque :
+une page détail montrant TOUTE l'histoire et TOUS les versements.
+
+**Ajouts** :
+- Nouvelle page `/espace/parrainages/[id]` : photo HD de l'animal, fiche
+  complète (race, âge, sexe, description externe = son histoire), KPI
+  parrainage (montant mensuel, total versé, nb versements), toutes les
+  nouvelles publiées, tableau historique des versements (date, montant,
+  mode, n° Cerfa).
+- Lien "Voir toute son histoire" depuis la liste vers la page détail.
+- Nouveaux fetchers `optimus-client-queries.ts` :
+  - `getSponsorshipById(sponsorshipId, clientId)` — vérifie l'appartenance
+  - `getSponsorshipPayments(sponsorshipId)`
+  - `getAnimalNewsForAnimal(animalId)`
+- Nouveaux types `OptimusAnimalExtended`, `SponsorshipDetailRow`.
+
+### 3. Page gestion parrains côté Optimus
+
+Nouvelle vue `/admin/parrainages` (perm `manage_donations`) :
+- **4 KPI en tête** : Parrains actifs (distincts), Revenu mensuel récurrent
+  (MRR = somme `monthly_amount` actifs), Encaissé année en cours (donations
+  fléchées via `sponsorship_id`), Moyenne mensuelle par parrain.
+- **Tableau** : Parrain · Animal · Type · Mensuel · Total versé · Depuis ·
+  Statut, avec lien vers la fiche client.
+- **Filtres** : recherche libre, statut, type, toggle "inclure terminés".
+- Server actions dans `sponsorships-admin.ts` + types dans
+  `sponsorships-admin-types.ts` (séparation obligatoire, cf. gotcha
+  Next 16 `'use server'`).
+- Nav : entrée "Parrainages" sous Finances.
+
+### 4. Coup de fraîcheur design Optimus
+
+Alignement de l'app sur la charte du site sda-nord.com :
+- **Palette** : indigo/violet/pink → navy `#1e3a5f` + teal `#5ba8a0` +
+  terracotta `#c96b3c`. Aliases `--color-primary/accent` conservés pour
+  rétrocompat (pas de refactor des pages).
+- **Typo** : Inter → Baloo 2 (corps) + Fraunces (titres `.h-display`).
+  Variables `--font-baloo`, `--font-fraunces` chargées via `next/font`.
+- **Dark mode conservé** mais sur base navy deep `#14253d` au lieu de
+  slate. Light mode : paper/canvas blanc cassé.
+- **Classes signature** ajoutées :
+  - `.eyebrow` (mini-label uppercase teal, tracking 0.22em)
+  - `.h-display` (titre Fraunces navy)
+  - `.badge-pill-warm` (pill terracotta)
+  - `.container-edge` (padding horizontal + max-width 1280px)
+  - `.gradient-warm` (terracotta clair pour CTA chauds)
+
+### 5. Photo principale animal (sync vitrine)
+
+**Bug constaté** : `setPrimaryAnimalPhoto` mettait à jour
+`animal_photos.is_primary` mais pas `animals.photo_url`. Conséquence :
+la liste publique `/animaux` du site SDA continuait d'afficher l'ancienne
+photo sur les cartes (la galerie détail elle, lisait `is_primary` et
+fonctionnait déjà).
+
+**Fix** : la server action récupère désormais l'URL de la photo cible et
+synchronise `animals.photo_url`. Check d'intégrité ajouté (la photo doit
+appartenir à l'animal demandé).
+
+### 6. Wording adoption — "équipe" vs "bénévoles"
+
+Sur le tunnel d'adoption, le wording laissait croire que les bénévoles
+pilotaient les candidatures. Correction sur 3 endroits (`/processus-adoption`
++ `/adopter`) : la voix devient "notre équipe salariée" qui répond aux
+questions et fait les visites à domicile. Les bénévoles restent mentionnés
+sur les pages bénévolat / FA (terrains : promenades, soins, événements).
+
+### 7. CTA fiche animal — formulaire au lieu d'appeler
+
+Sur `/animaux/[id]`, suppression du bouton "Appeler le refuge"
+(`tel:+33327786256`) qui créait deux chemins concurrents. Le seul CTA
+mis en avant est désormais "Je veux adopter X" → ancre vers le formulaire
+de pré-qualification plus bas sur la page. Cohérent desktop + sticky mobile.
+
+### 8. Page admin Comptes portail (potentiels adoptants)
+
+Nouvelle vue `/admin/comptes-portail` (perm `manage_clients`) qui liste
+les comptes créés par les visiteurs du site sda-nord.com (table
+`portal_profiles` synchronisée depuis le projet `sda-portail`).
+
+Pour chaque compte :
+- Nom (depuis `portal_profiles`) + email (depuis `auth.users` via RPC
+  `get_users_info`) + téléphone
+- Localisation
+- **Badges de candidatures** : ❤ adoption (`adoption_inquiries.user_id`)
+  · 🤝 bénévole (`volunteer_applications.user_id`) · 🏠 FA
+  (`foster_applications.user_id`), avec compteur
+- Statut RGPD opt-in marketing
+- **Lien client** Optimus si déjà rattaché (`clients.portal_user_id`)
+- Date d'inscription
+
+KPI en tête (Total / Avec candidature / Liés / Non liés) + filtres
+(recherche libre, statut de liaison). Server actions dans
+`portal-accounts-admin.ts` + types dans `portal-accounts-admin-types.ts`.
+
+### 9. Générateur descriptif animal style Céline (vision + few-shot)
+
+**Constat** : la route `/api/ai/generate-description` existait déjà mais
+produisait un texte générique 150-250 mots, sans personnalité ni vision,
+sans aucun lien avec le style des ~32 fiches actuelles écrites par Céline
+(Secrétaire générale).
+
+**Analyse stylistique** déléguée à un agent qui a lu les 32 fiches.
+Verdict : une seule plume, très marquée et reproductible :
+- Narrateur = l'animal qui parle (jamais "le refuge")
+- 2 500–3 500 caractères, 10 blocs (salut → présentation → histoire →
+  caractère → éducation → ententes → profil → CTA 🐶 x3 → "À bientôt" →
+  signature + mention légale verbatim)
+- Lexique signature : "loulou/louloute/nénette", "tata Mary / tonton
+  Franck", "bien dans ma tête et dans mes pattes", "X de mon état"
+- 15-25 emojis par fiche (❤️‍🩹 en signature, 🐶 sur les 3 puces CTA,
+  🐈‍⬛ x3 pour les chats détestés)
+- Mention légale finale **verbatim** sur 32/32
+
+**Refonte de la route** :
+- Modèle : `claude-haiku-4-5` → `claude-sonnet-4-6` (vision + tenue
+  stylistique long format)
+- **Vision** : récupère `animal_photos.is_primary` (fallback
+  `animal.photo_url`), passe la photo en `type: 'image'` (source URL)
+- **Few-shot** : 2 messages avec exemples production (Amaya 1.6k car +
+  Tupac 3.2k car) avant la cible
+- **System prompt** structuré : style guide complet de Céline + lexique
+  + emojis + anti-patterns + règle absolue narrateur
+- **Facts block** envoyé : nom, espèce, race, sexe, âge calculé, couleur,
+  poids, date arrivée, ententes chats/mâles/femelles, score comportement,
+  notes internes (`description`) avec consigne explicite "ne pas recopier
+  brutalement, omettre médical sensible + n° de puce"
+
+Pas de modification UI nécessaire — le bouton "Générer avec l'IA" est
+déjà sous le textarea Description externe du formulaire animal.
+
+### 10. Vaccins primo / rappel mois / rappel annuel + rappels auto
+
+**Demande de Mary** : sur le tableau passage véto, le bouton "VACCIN"
+ne distingue pas primo / rappel mois / rappel annuel → pas de calcul du
+prochain rappel, pas d'alerte pour Caroline.
+
+**Charte appliquée** (tableau Mary du 18/05/2026) :
+- Chien — Primo CHPPI+Lepto+toux       → rappel +4 semaines
+- Chien — Rappel mois CHPPI            → rappel +365 jours
+- Chien — Rappel annuel CHPPI+Lepto+toux → rappel +365 jours
+- Chat — Primo RCP                     → rappel +4 semaines
+- Chat — Rappel mois RCP               → rappel +365 jours
+- Chat — Rappel annuel RCP             → rappel +365 jours
+
+**Implémentation** :
+- Nouveau helper `lib/health/vaccine-schedule.ts` : 6 sous-types,
+  compositions, délais, `computeNextDueDate(actKey, visitDate)`,
+  `isVaccineActKey()`, `getReminderStatus(date)` (overdue / due_soon /
+  upcoming).
+- `VetVisitActKey` étendu de 6 clés. Les anciens `vaccin_chien` /
+  `vaccin_chat` restent acceptés en lecture (rétrocompat anciens
+  passages) mais ne déclenchent plus de calcul.
+- Tableau passage véto : remplacement des 2 cases simples par
+  6 colonnes distinctes, code couleur fidèle au tableau Mary
+  (jaune primo chien, orange rappel mois, violet rappel annuel,
+  lime/emerald/green pour les chats).
+- `validateVetVisitLine` : chaque acte vaccin reconnu crée un
+  `animal_health_record` avec `next_due_date` calculé automatiquement.
+- `ACT_TO_HEALTH_TYPE` + `ACT_LABELS` étendus dans
+  `vet-visits.ts` ET `vet-visit-recap-template.ts` (PDF récap véto).
+- Nouveau composant `VaccineRemindersBanner` affiché en haut de la fiche
+  animal :
+  - 🔴 rouge si rappel overdue
+  - 🟠 orange si rappel ≤ 30j
+  - 🟢 vert discret si vaccins à jour (prochain rappel > 30j)
+  - rien si aucun vaccin enregistré
+  - filtrage des rappels déjà couverts par un vaccin plus récent
+
+**Pas de backfill** : décision conjointe avec Mary, les anciens vaccins
+restent tels quels, le prochain passage véto remettra tout d'équerre.
+
+### 11. Articles home — images cassées
+
+Le composant `components/home/articles-section.tsx` hardcodait 3 articles
+pointant vers `/images/articles/*.svg` qui n'existaient plus (SVG
+placeholders supprimés dans une session précédente quand j'avais réparé
+les `featuredImage` des fichiers `.md` du blog, en oubliant ce composant).
+
+Remappés vers les vraies photos stock :
+- "Adopter : ce que personne ne vous dit" → `/images/stock/cat-portrait.jpg`
+- "Stérilisation : la décision la plus utile" → `/images/stock/hands.jpg`
+- "Bilan portes ouvertes : 12 adoptions" → `/images/site-original/hero-2.jpg`
+
+### Méta — commits poussés (refuge/main)
+
+| Commit | Sujet |
+|--------|-------|
+| `4ed8111` | feat(admin): candidatures famille d'accueil |
+| `7b6f7e6` | feat(admin): page parrainages avec KPI financiers |
+| `ec10fc5` | feat(theme): coup de fraîcheur palette SDA + typo |
+| `e28799e` | fix(parrainages): extract types out of 'use server' module |
+| `a0fee02` | feat(candidatures-fa): afficher la profession du candidat |
+| `2f2846b` | fix(photos): sync animals.photo_url quand on change la photo principale |
+| `caf4ec2` | feat(admin): page Comptes portail (potentiels adoptants/parrains/bénévoles) |
+| `9db360f` | feat(ai): générateur descriptif animal façon Céline (vision + few-shot) |
+| `b7dee09` | feat(sante): vaccins primo/rappel mois/rappel annuel + rappels auto |
+
+### Méta — migrations DB appliquées (CRM Refuge)
+
+| Migration | Objet |
+|-----------|-------|
+| `foster_applications_phase2` | Table `foster_applications` + perm + RLS + trigger ticket_number |
+| `foster_applications_add_profession` | Colonne `profession` text nullable |
+
+### Gotchas confirmés cette session
+
+- **Re-validation du gotcha `'use server'` Next 16** : les exports
+  `type` / `interface` plantent AUSSI le build prod (pas seulement les
+  `const`). Cassé sur `sponsorships-admin.ts` avec `export interface
+  SponsorshipWithBoth` + `export type { Sponsorship, ... }`. Le typecheck
+  `tsc --noEmit` est OK, c'est le bundling Turbopack qui échoue parce
+  qu'il essaie de hash chaque export en server action. Fix : extraction
+  vers `sponsorships-admin-types.ts`. Mémoire raffinée
+  (`gotcha_next16_use_server_exports`) — règle absolue : un fichier
+  `'use server'` ne contient QUE `export async function ...`.
