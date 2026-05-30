@@ -35,6 +35,7 @@ import {
   AlertTriangle,
   ClipboardCheck,
   Home as HomeIcon,
+  UserPlus,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -89,6 +90,7 @@ const shelterSections: NavSection[] = [
       { href: '/admin/candidatures-benevoles', label: 'Candidatures bénévoles', Icon: HandHeart, permission: 'canManageVolunteerApplications' },
       { href: '/admin/candidatures-fa', label: "Candidatures FA", Icon: HomeIcon, permission: 'canManageFosterApplications' },
       { href: '/admin/signalements-maltraitance', label: 'Signalements', Icon: AlertTriangle, permission: 'canManageAbuseReports' },
+      { href: '/admin/comptes-portail', label: 'Comptes portail', Icon: UserPlus, permission: 'canManageClients' },
     ],
   },
   {
