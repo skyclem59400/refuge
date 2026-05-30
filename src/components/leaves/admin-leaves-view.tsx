@@ -233,7 +233,7 @@ export function AdminLeavesView({
                           <button
                             onClick={() => setReviewingRequest(request)}
                             className="px-3 py-1.5 rounded-lg text-xs font-semibold
-                              bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
+                              bg-warning/20 text-warning hover:bg-warning/30 transition-colors"
                           >
                             Traiter
                           </button>
