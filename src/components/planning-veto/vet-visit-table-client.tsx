@@ -22,18 +22,28 @@ import type {
   Animal,
 } from '@/lib/types/database'
 
+// Colonnes des actes affichés dans le tableau passage véto.
+// Les anciens 'vaccin_chien' / 'vaccin_chat' sont remplacés par 6 sous-types
+// distinguant primo / rappel mois / rappel annuel (cf. tableau Mary du
+// 18/05/2026 + lib/health/vaccine-schedule.ts). À la sauvegarde d'une ligne,
+// chaque case cochée crée automatiquement un animal_health_record avec
+// next_due_date calculé (+4 sem pour primo, +365j pour rappels).
 const ACT_COLUMNS: { key: VetVisitActKey; label: string; color: string }[] = [
-  { key: 'puce',          label: 'PUCE',         color: 'bg-cyan-200/30 text-cyan-700' },
-  { key: 'cession',       label: 'CESSION',      color: 'bg-red-200/40 text-red-700' },
-  { key: 'vaccin_chien',  label: 'VACCIN CHIEN', color: 'bg-yellow-200/40 text-yellow-700' },
-  { key: 'visite_divers', label: 'VISITE DIVERS',color: 'bg-orange-200/40 text-orange-700' },
-  { key: 'importation',   label: 'IMPORTATION',  color: 'bg-purple-200/30 text-purple-700' },
-  { key: 'vaccin_chat',   label: 'VACCIN CHAT',  color: 'bg-blue-200/30 text-blue-700' },
-  { key: 'test_leucose',  label: 'TEST LEUCOSE', color: 'bg-green-200/40 text-green-700' },
-  { key: 'consultation',  label: 'CONSULTATION', color: 'bg-pink-200/30 text-pink-700' },
-  { key: 'sterilization', label: 'STÉRILISATION',color: 'bg-indigo-200/30 text-indigo-700' },
-  { key: 'antiparasitic', label: 'ANTIPARAS.',   color: 'bg-teal-200/30 text-teal-700' },
-  { key: 'radio',         label: 'RADIO',        color: 'bg-amber-200/30 text-amber-700' },
+  { key: 'puce',                          label: 'PUCE',                color: 'bg-cyan-200/30 text-cyan-700' },
+  { key: 'cession',                       label: 'CESSION',             color: 'bg-red-200/40 text-red-700' },
+  { key: 'vaccin_chien_primo',            label: 'CHIEN PRIMO',         color: 'bg-yellow-200/50 text-yellow-800' },
+  { key: 'vaccin_chien_rappel_mois',      label: 'CHIEN RAPPEL MOIS',   color: 'bg-orange-200/50 text-orange-800' },
+  { key: 'vaccin_chien_rappel_annuel',    label: 'CHIEN RAPPEL ANNUEL', color: 'bg-purple-200/40 text-purple-800' },
+  { key: 'vaccin_chat_primo',             label: 'CHAT PRIMO',          color: 'bg-lime-200/40 text-lime-800' },
+  { key: 'vaccin_chat_rappel_mois',       label: 'CHAT RAPPEL MOIS',    color: 'bg-emerald-200/50 text-emerald-800' },
+  { key: 'vaccin_chat_rappel_annuel',     label: 'CHAT RAPPEL ANNUEL',  color: 'bg-green-200/50 text-green-800' },
+  { key: 'test_leucose',                  label: 'TEST LEUCOSE',        color: 'bg-green-200/40 text-green-700' },
+  { key: 'visite_divers',                 label: 'VISITE DIVERS',       color: 'bg-orange-200/40 text-orange-700' },
+  { key: 'importation',                   label: 'IMPORTATION',         color: 'bg-purple-200/30 text-purple-700' },
+  { key: 'consultation',                  label: 'CONSULTATION',        color: 'bg-pink-200/30 text-pink-700' },
+  { key: 'sterilization',                 label: 'STÉRILISATION',       color: 'bg-indigo-200/30 text-indigo-700' },
+  { key: 'antiparasitic',                 label: 'ANTIPARAS.',          color: 'bg-teal-200/30 text-teal-700' },
+  { key: 'radio',                         label: 'RADIO',               color: 'bg-amber-200/30 text-amber-700' },
 ]
 
 type AnimalLite = Pick<Animal, 'id' | 'name' | 'medal_number' | 'species' | 'box_id' | 'breed' | 'breed_cross' | 'color' | 'chip_number'>

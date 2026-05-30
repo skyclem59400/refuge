@@ -5,6 +5,7 @@ import { getEstablishmentContext } from '@/lib/establishment/context'
 import { AnimalDetailTabs } from '@/components/animals/animal-detail-tabs'
 import { AnimalStatusBadge, SpeciesBadge } from '@/components/animals/animal-status-badge'
 import { AnimalStatusChanger } from '@/components/animals/animal-status-changer'
+import { VaccineRemindersBanner } from '@/components/health/vaccine-reminders-banner'
 import { getSexIcon, calculateAge, getOriginLabel } from '@/lib/sda-utils'
 import type { Animal, AnimalPhoto, AnimalMovement, AnimalHealthRecord, AnimalTreatment, Box, SocialPost, IcadDeclaration, ActivityLog } from '@/lib/types/database'
 import { getTreatments } from '@/lib/actions/treatments'
@@ -222,6 +223,11 @@ export default async function AnimalDetailPage({ params }: { params: Promise<{ i
           </div>
         </div>
       </div>
+
+      {/* Rappels vaccin imminents / en retard, basés sur next_due_date
+          des animal_health_records (auto-remplis par validateVetVisitLine
+          quand un sous-type vaccin est coché). */}
+      <VaccineRemindersBanner records={data.healthRecords} />
 
       {/* Pré-réservation / Certificat d'engagement (loi 30/11/2021) */}
       <PreReservationBanner

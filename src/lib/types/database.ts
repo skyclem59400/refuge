@@ -1459,8 +1459,17 @@ export function npsBucketOf(score: number | null): NpsBucket | null {
 export type VetVisitActKey =
   | 'puce'           // identification
   | 'cession'        // cession véto
+  // Vaccins (anciens : conservés en lecture, ne déclenchent plus de rappel auto)
   | 'vaccin_chien'
   | 'vaccin_chat'
+  // Vaccins (nouveaux : 3 sous-types par espèce, auto-calcul du prochain rappel
+  // via lib/health/vaccine-schedule.ts)
+  | 'vaccin_chien_primo'
+  | 'vaccin_chien_rappel_mois'
+  | 'vaccin_chien_rappel_annuel'
+  | 'vaccin_chat_primo'
+  | 'vaccin_chat_rappel_mois'
+  | 'vaccin_chat_rappel_annuel'
   | 'visite_divers' // = consultation
   | 'importation'
   | 'test_leucose'  // = blood_test

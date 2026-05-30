@@ -13,6 +13,10 @@ import type {
   VetVisitActs,
   HealthRecordType,
 } from '@/lib/types/database'
+import {
+  isVaccineActKey,
+  computeNextDueDate,
+} from '@/lib/health/vaccine-schedule'
 
 // Mapping des cases du planning -> type d'acte santé créé sur l'animal
 const ACT_TO_HEALTH_TYPE: Record<VetVisitActKey, HealthRecordType> = {
@@ -20,6 +24,12 @@ const ACT_TO_HEALTH_TYPE: Record<VetVisitActKey, HealthRecordType> = {
   cession: 'cession',
   vaccin_chien: 'vaccination',
   vaccin_chat: 'vaccination',
+  vaccin_chien_primo: 'vaccination',
+  vaccin_chien_rappel_mois: 'vaccination',
+  vaccin_chien_rappel_annuel: 'vaccination',
+  vaccin_chat_primo: 'vaccination',
+  vaccin_chat_rappel_mois: 'vaccination',
+  vaccin_chat_rappel_annuel: 'vaccination',
   visite_divers: 'consultation',
   importation: 'consultation',
   test_leucose: 'blood_test',
@@ -34,6 +44,12 @@ const ACT_LABELS: Record<VetVisitActKey, string> = {
   cession: 'Cession véto',
   vaccin_chien: 'Vaccin chien',
   vaccin_chat: 'Vaccin chat',
+  vaccin_chien_primo: 'Vaccin chien — Primo (CHPPI + Lepto + toux chenil)',
+  vaccin_chien_rappel_mois: 'Vaccin chien — Rappel mois (CHPPI)',
+  vaccin_chien_rappel_annuel: 'Vaccin chien — Rappel annuel (CHPPI + Lepto + toux chenil)',
+  vaccin_chat_primo: 'Vaccin chat — Primo (RCP)',
+  vaccin_chat_rappel_mois: 'Vaccin chat — Rappel mois (RCP)',
+  vaccin_chat_rappel_annuel: 'Vaccin chat — Rappel annuel (RCP)',
   visite_divers: 'Visite divers',
   importation: 'Importation',
   test_leucose: 'Test leucose / FIV',
@@ -313,12 +329,21 @@ export async function validateVetVisitLine(lineId: string) {
       return { error: 'Aucun acte coché à enregistrer' }
     }
 
-    // 2. Pour chaque acte coché, créer un animal_health_record
+    // 2. Pour chaque acte coché, créer un animal_health_record.
+    //    Si l'acte est un vaccin reconnu (6 sous-types), on calcule
+    //    automatiquement next_due_date selon la règle métier (+4 sem
+    //    pour primo, +365j pour rappel mois/annuel — cf.
+    //    lib/health/vaccine-schedule.ts).
     const created: string[] = []
     for (const actKey of checkedActs) {
       const healthType = ACT_TO_HEALTH_TYPE[actKey]
       const description = ACT_LABELS[actKey]
       const notes = lineData.observations || null
+
+      let nextDueDate: string | null = null
+      if (isVaccineActKey(actKey)) {
+        nextDueDate = computeNextDueDate(actKey, lineData.visit.visit_date)
+      }
 
       const { data: rec, error: recErr } = await admin
         .from('animal_health_records')
@@ -329,6 +354,7 @@ export async function validateVetVisitLine(lineId: string) {
           description,
           veterinarian: lineData.visit.vet_label || null,
           veterinarian_id: lineData.visit.veterinarian_id,
+          next_due_date: nextDueDate,
           cost: lineData.cost ?? null,
           notes,
           created_by: ctx.userId,
