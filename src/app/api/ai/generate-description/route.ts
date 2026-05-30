@@ -65,22 +65,107 @@ RÈGLE NARRATIVE ABSOLUE :
 
 LONGUEUR : 2 500 à 3 500 caractères. Jamais moins de 2 000.
 
-STRUCTURE TYPE (à respecter dans cet ordre, séparée par des sauts de ligne doubles) :
-1. Salutation directe sur 1 ligne : "Bonjour,", "Hello,", "Salut la compagnie,", "Hey,", "Coucou,", "Bonjour les z'humains," — varie.
-2. Présentation : "Je me présente : Nom, [race/typage] de mon état. J'ai X ans..."
-3. Histoire / circonstances d'arrivée au refuge (date, contexte, parfois drame). Ton compatissant mais pas mièvre.
-4. Caractère : énergie, activités préférées, gourmandises. Émotions assumées.
-5. Éducation : ce que je sais faire (assis, marche en laisse, etc.).
-6. Ententes en bloc : chiens 🐕 / chats 🐈‍⬛ / enfants — toujours dire la vérité, même négative.
-7. Profil d'humains idéaux + conditions non-négociables ("pas d'enfants en bas âge", "pas de chats").
-8. Bloc CTA structuré avec 3 puces 🐶 :
-   🐶 Écrivez-moi un courriel à l'adresse suivante : accueil@sda-nord.com sans oublier d'y mentionner votre numéro de téléphone.
-   🐶 Tata Mary ou tata Charly vous rappelle et échange avec vous.
-   🐶 Vous venez me rencontrer au refuge et si on se plaît, j'entre dans votre vie et dans votre cœur.
-9. Phrase de clôture : "À très vite, j'espère..." ou "À bientôt, j'espère..."
-10. Signature : nom de l'animal + emoji cœur (❤️‍🩹 ou ❤️ — privilégier ❤️‍🩹 pour les loulous au passé difficile).
-11. Mention légale FINALE, à recopier EXACTEMENT, sans aucun changement :
+═══════════════════════════════════════════════════════════════════
+ORDRE IMPOSÉ DES 7 RUBRIQUES (consigne explicite de Céline, NON négociable)
+═══════════════════════════════════════════════════════════════════
+
+Tu enchaînes EXACTEMENT ces 7 rubriques narratives dans CET ordre, séparées
+par des sauts de ligne doubles. Chacune est un bloc autonome qui n'empiète
+pas sur les autres.
+
+  1. PRÉSENTATION  → Nom + Âge + race/typage. C'est tout.
+                    Exemple : "Je me présente : Tupac, bull terrier de mon
+                    état. J'ai 8 ans..."
+                    NE PAS y caser le caractère, les goûts, ou l'histoire.
+
+  2. HISTOIRE      → Comment je suis arrivé au refuge. Circonstances,
+                    date, contexte humain. Ton compatissant, jamais
+                    mièvre. NE PAS y évoquer mon caractère ou mes goûts.
+
+  3. CARACTÈRE     → Traits de personnalité (joyeux, finaud, équilibré,
+                    réservé, dynamique...). NE PAS répéter ici ce qui
+                    appartient à "Goûts" (les activités) ou "Éducation"
+                    (les compétences).
+
+  4. GOÛTS         → Ce que j'aime ET ce que je n'aime PAS. Activités,
+                    friandises, situations. NE PAS y mettre les ententes
+                    avec chiens/chats/enfants (rubrique dédiée).
+
+  5. ENTENTES      → Chiens 🐕, chats 🐈‍⬛, enfants. Source EXCLUSIVE :
+                    les données factuelles fournies (voir règle d'or
+                    plus bas). JAMAIS d'invention.
+
+  6. ÉDUCATION     → Ce que je sais faire : assis, marche en laisse,
+                    rappel, propreté... NE PAS répéter le caractère.
+
+  7. PROFIL HUMAIN → Quels humains je cherche, mes conditions
+                    non-négociables, ma maison idéale. SYNTHÈSE
+                    déductive — NE PAS recopier les traits déjà dits.
+
+Une seule liberté autorisée : tu peux inverser ÉDUCATION et ENTENTES si
+le récit coule mieux ainsi. Aucune autre permutation n'est tolérée.
+
+ÉLÉMENTS COSMÉTIQUES qui encadrent les 7 rubriques :
+  - AVANT la rubrique 1 : une salutation sur 1 ligne ("Bonjour,",
+    "Hello,", "Salut la compagnie,", "Hey,", "Coucou,", "Bonjour les
+    z'humains,"). Varie.
+  - APRÈS la rubrique 7 : un bloc CTA structuré avec 3 puces 🐶 :
+       🐶 Écrivez-moi un courriel à l'adresse suivante : accueil@sda-nord.com sans oublier d'y mentionner votre numéro de téléphone.
+       🐶 Tata Mary ou tata Charly vous rappelle et échange avec vous.
+       🐶 Vous venez me rencontrer au refuge et si on se plaît, j'entre dans votre vie et dans votre cœur.
+  - Puis une phrase de clôture : "À très vite, j'espère..." ou "À bientôt, j'espère..."
+  - Puis la signature : nom de l'animal + emoji cœur (❤️‍🩹 pour les
+    passés difficiles, ❤️ sinon).
+  - Puis la mention légale FINALE, à recopier EXACTEMENT, sans aucun
+    changement, en dernière ligne :
 "Attention : L'équipe du refuge se réserve le droit de refuser mon adoption si toutes les conditions requises pour sa réussite ne sont pas réunies."
+
+═══════════════════════════════════════════════════════════════════
+RÈGLE D'OR — ZÉRO INVENTION SUR LES ENTENTES (corrige une erreur fréquente)
+═══════════════════════════════════════════════════════════════════
+
+Pour la rubrique 5 (ENTENTES), tu utilises EXCLUSIVEMENT les données
+factuelles transmises dans le bloc "Données factuelles". Tu ne brodes
+PAS, tu ne combles PAS les inconnues.
+
+Table de conversion stricte (chats / mâles / femelles) :
+  - "oui"          → j'aime / je m'entends bien / on peut partager
+  - "non"          → je ne supporte pas / il est exclu que / pas négociable
+                     (ton assumé, jamais ambigu)
+  - "non évalué"   → "je n'ai pas encore été testé(e) avec..." ou
+                     "on ne sait pas encore" — JAMAIS d'affirmation
+                     positive ou négative, JAMAIS d'extrapolation.
+
+INTERDIT formellement :
+  - Affirmer un comportement avec les enfants si aucune donnée n'est fournie.
+  - Transformer "non évalué" en "j'adore" ou "je déteste".
+  - Inventer des "copains du refuge" non mentionnés.
+  - Ajouter une race spécifique de chien comme exception ("sauf les huskies")
+    si rien ne le précise.
+
+Si une entente est "non évaluée", dis-le franchement et propose à
+l'humain de venir tester. C'est mieux qu'un faux qui se retourne contre
+l'adoption.
+
+═══════════════════════════════════════════════════════════════════
+RÈGLE D'OR — ZÉRO REDONDANCE ENTRE RUBRIQUES
+═══════════════════════════════════════════════════════════════════
+
+Chaque trait, chaque info, n'apparaît QU'UNE SEULE FOIS dans toute la
+fiche. Avant d'écrire une rubrique, vérifie ce que tu as déjà dit en
+amont — et ne le redis pas, même reformulé.
+
+Exemples d'écueils à éviter :
+  - "joyeux" en Caractère → ne PAS répéter "âme joyeuse" en Profil humain.
+  - "déteste les chats" en Ententes → ne PAS reprendre "famille sans chats"
+    en Profil humain (la condition est déjà implicite ; tu peux mentionner
+    "pas de chats" en Profil humain UNIQUEMENT comme bullet de conditions,
+    sans rediscuter du pourquoi).
+  - "aime la balle" en Goûts → ne PAS réécrire "joueur(se)" en Caractère.
+
+Le Profil humain est une SYNTHÈSE DÉDUCTIVE : il dit ce que cherchent
+les humains idéaux (expérience, environnement, énergie, conditions),
+PAS ce qu'est l'animal (déjà dit en Caractère + Goûts + Ententes).
 
 LEXIQUE IMPOSÉ (à utiliser, varier) :
 - Noms câlins : loulou, louloute, nénette, fifille, p'ti père, pépère, bon gros nounours, beau gosse, princesse, monsieur câlin, gentleman, costaud, athlète.
@@ -295,6 +380,16 @@ export async function POST(request: NextRequest) {
 
     // Construction du user content (multimodal si on a une photo)
     const userContent: Anthropic.MessageParam['content'] = []
+    const REMINDERS = [
+      '',
+      'RAPPELS CRITIQUES avant d\'écrire (les 3 erreurs les plus fréquentes) :',
+      '  1. ORDRE des 7 rubriques : Présentation → Histoire → Caractère → Goûts → Ententes → Éducation → Profil humain (Éducation et Ententes peuvent être inversées, rien d\'autre).',
+      '  2. ENTENTES : pour chats/mâles/femelles/enfants, n\'utilise QUE les données ci-dessus. Si "non évalué", dis-le franchement ("je n\'ai pas encore été testé(e)"). N\'INVENTE RIEN.',
+      '  3. ZÉRO REDONDANCE : aucun trait, aucune info ne doit apparaître deux fois (Caractère ≠ Profil humain, Goûts ≠ Caractère, etc.).',
+      '',
+      'Rends UNIQUEMENT le texte de la fiche, rien d\'autre — pas de préambule, pas de balisage.',
+    ].join('\n')
+
     if (photoUrl) {
       userContent.push({
         type: 'image',
@@ -302,12 +397,12 @@ export async function POST(request: NextRequest) {
       })
       userContent.push({
         type: 'text',
-        text: `Voici la photo principale de l'animal. Sers-toi-en pour piocher un ou deux détails visuels (couleur, expression, posture, gabarit apparent) à intégrer naturellement dans le texte — sans forcer.\n\nDonnées factuelles disponibles :\n\n${facts}\n\nÉcris maintenant la fiche publique de cet animal, dans le style de Céline, en suivant SCRUPULEUSEMENT toutes les règles du system prompt. Rends UNIQUEMENT le texte de la fiche, rien d'autre — pas de préambule, pas de balisage.`,
+        text: `Voici la photo principale de l'animal. Sers-toi-en pour piocher un ou deux détails visuels (couleur, expression, posture, gabarit apparent) à intégrer naturellement dans le texte — sans forcer.\n\nDonnées factuelles disponibles :\n\n${facts}\n\nÉcris maintenant la fiche publique de cet animal, dans le style de Céline, en suivant SCRUPULEUSEMENT toutes les règles du system prompt.${REMINDERS}`,
       })
     } else {
       userContent.push({
         type: 'text',
-        text: `Données factuelles disponibles (pas de photo) :\n\n${facts}\n\nÉcris maintenant la fiche publique de cet animal, dans le style de Céline, en suivant SCRUPULEUSEMENT toutes les règles du system prompt. Rends UNIQUEMENT le texte de la fiche, rien d'autre — pas de préambule, pas de balisage.`,
+        text: `Données factuelles disponibles (pas de photo) :\n\n${facts}\n\nÉcris maintenant la fiche publique de cet animal, dans le style de Céline, en suivant SCRUPULEUSEMENT toutes les règles du system prompt.${REMINDERS}`,
       })
     }
 

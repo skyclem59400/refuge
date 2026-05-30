@@ -560,8 +560,8 @@ export function AnimalForm({ animal, boxes = [], judicialOwner = null }: Readonl
             value={descriptionExternal}
             onChange={(e) => setDescriptionExternal(e.target.value)}
             placeholder={animal?.id ? "Cliquez sur 'Generer avec l'IA' ou redigez manuellement..." : "Enregistrez l'animal d'abord pour generer avec l'IA"}
-            rows={5}
-            className={`${inputClass} resize-y`}
+            rows={20}
+            className={`${inputClass} resize-y font-serif leading-relaxed`}
           />
         </div>
       </div>
