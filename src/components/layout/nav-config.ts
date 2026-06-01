@@ -122,6 +122,7 @@ const shelterSections: NavSection[] = [
     items: [
       { href: '/astreinte/tickets', label: 'Tickets', Icon: Inbox, permission: 'canManageEstablishment' },
       { href: '/astreinte/communes', label: 'Communes', Icon: MapPin, permission: 'canManageEstablishment' },
+      { href: '/admin/conventions', label: 'Conventions fourrière', Icon: FileSignature, permission: 'canManageEstablishment' },
       { href: '/astreinte/acces', label: 'Accès portail', Icon: KeyRound, permission: 'canManageEstablishment' },
     ],
   },
