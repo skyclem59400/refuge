@@ -268,6 +268,91 @@ Tupac❤️‍🩹
 
 Attention : L'équipe du refuge se réserve le droit de refuser mon adoption si toutes les conditions requises pour sa réussite ne sont pas réunies.`
 
+// Addendum injecté UNIQUEMENT pour les chats : le prompt de base et les
+// few-shot par défaut sont canins (Amaya/Tupac). Sans ce garde-fou, le
+// modèle plaque promenade/laisse/🐶 sur un chat → fiche inexploitable.
+const CAT_GUIDANCE = `
+
+═══════════════════════════════════════════════════════════════════
+CET ANIMAL EST UN CHAT — ces consignes priment sur tout automatisme "chien"
+═══════════════════════════════════════════════════════════════════
+- Puces du bloc CTA : utilise 😺 ou 🐱 (JAMAIS 🐶).
+- Vocabulaire FÉLIN uniquement : ronronner, faire sa toilette, se lover, pétrir, observer perché (arbre à chat), coussins et plaids douillets, litière, "rominette", "matou", "minois". BANNIS le vocabulaire chien : promenade, laisse, rappel, "sniffer les odeurs", gambader, cabrioler.
+- Émojis animaux : 🐱 😺 😸 😻 🐈 🐈‍⬛ (souvent triplés).
+- Ententes (rubrique 5) : pour un chat, ce qui compte est la cohabitation avec les AUTRES CHATS 🐈 et avec les CHIENS 🐶. Reste STRICTEMENT sur les données factuelles fournies (champ entente chats notamment) — zéro invention.
+- Éducation : un chat n'a pas de "assis/marche en laisse/rappel". Parle plutôt propreté/litière acquise, usage du griffoir, sociabilité — ou allège franchement cette rubrique si rien à dire.
+- Profil humain / maison idéale : pense intérieur (avec ou sans accès extérieur sécurisé), foyer calme et zen, présence ou non d'autres animaux — PAS de jardin pour courir ni de balades.
+- Noms câlins adaptés : loulou, louloute, nénette, mamie/pépère (chats âgés), beau matou, princesse, monsieur câlin.`
+
+// Few-shot félins — vraies fiches de production de Céline (chats déjà publiés
+// sur sda-nord.com). Email CTA normalisé sur accueil@sda-nord.com (certaines
+// fiches historiques utilisaient sda-estourmel@outlook.com).
+const FEW_SHOT_VIRGIL = `Adoption SOS
+
+Salut,
+
+J'm présente : Virgil. Je porte le nom du monsieur qui m'a trouvé et ramassé sur une route où je me trouvais seul, perdu, complètement désorienté, déshydraté et maigre à faire peur. 🥹🥹🥹
+
+A mon arrivée au refuge, j'ai dû être hospitalisé, mon pronostic vital était engagé mais grâce aux bons soins qui m'ont été prodigués et à ma coopération, j'ai survécu. 🐱
+
+J'ai repris du poids et suis devenu beau. Il s'avère que je suis épileptique. J'ai un traitement adapté et tout va bien. 😺
+
+J'ai environ 8 ans et je l'espère de belles années devant moi.
+
+Mon désir le plus cher est de passer le reste de ma vie dans un foyer tranquille auprès d'une famille aimante qui prendra bien soin de moi.
+
+Ma famille ne manquera pas d'amour, je suis un chat très câlin, j'adore me lover dans les bras des tatas et partager avec elles de tendres moments.🥰
+
+Je suis calme, observateur, curieux, expressif. Et depuis peu, je me montre joueur.
+
+Je suis soigneux de ma personne et je passe beaucoup de temps à faire consciencieusement ma toilette.😺
+
+J'aime mon confort et j'apprécie les coussins moelleux et les plaids polaires. Ce sera important pour moi d'avoir un petit nid rien qu'à moi où je pourrai me sentir en sécurité et me reposer bien tranquillement.
+
+Je ne suis pas fan des autres chats,🐈🐈‍⬛🐈 je ne me montre pas agressif avec eux, j'évite leur contact et je fuis lorsque l'un d'eux m'approche d'un peu trop près.
+
+Juste une dernière petite chose : je suis très gourmand. Comme tous ceux qui ont souffert de la faim, je me rattrape.😁
+
+Vous voudriez devenir ma famille d'amour ? Vous pourrez vous engager à effectuer mon suivi vétérinaire pour mon épilepsie ?
+
+🐱 Écrivez-moi un courriel à l'adresse suivante : accueil@sda-nord.com sans oublier d'y indiquer votre numéro de téléphone.
+🐱 L'une de mes tatas vous contactera afin d'échanger et d'organiser notre rencontre.
+🐱 Nous ferons connaissance au refuge lors d'un moment privilégié et si vous et moi, nous tombons en amour, notre histoire commune pourra débuter quelques jours après.
+
+Virgil💔
+
+Attention : L'équipe du refuge se réserve le droit de refuser mon adoption si toutes les conditions requises pour sa réussite ne sont pas réunies.`
+
+const FEW_SHOT_AYESHA = `Salut amis des chats,
+
+Moi c'est Ayesha.
+
+J'ai pas tout à fait deux ans et je suis arrivée au refuge à la mi-juin dernier. J'étais complètement déshydratée et en piteux état.😿
+
+Aujourd'hui, je vais très bien même si je reste fluette et peux encore reprendre un peu de poids.
+
+Je suis la concierge du Cavalcat.
+
+Pourquoi la concierge ? Ben parce que je suis quasiment toujours postée à l'entrée, je surveille et je veille, rien ne m'échappe. Je filtre les entrées enfin j'essaie... Les chiens j'ai beau leur signifier qu'ils sont personnas non gratas dans mon domaine ils continuent à venir nous visiter pour leur fichu test chat et moi ça me plaît pas. 🐱
+Les chiens 🐶🐶🐶 je les aime pas. J'avoue, j'ai le coup de patte facile avec eux. Bon on peut pas dire non plus que j'aime beaucoup les autres chats🐱🐱🐱 mais bon s'ils me collent pas je les tolère.
+
+Autant vous dire que j'aimerais bien intégrer un univers sans chiens et moins peuplé en chats que le Cavalcat.
+
+Je voudrais bien ma famille et mon foyer à moi quoi.
+
+J'ai du caractère cependant je suis gentille avec vous les humains, j'apprécie votre compagnie et les caresses. Je suis du genre très calme et très tranquille.
+
+Vous l'avez compris l'agitation c'est pas pour moi. Je rêve d'une vie rangée... où j'aurai l'exclusivité. Et pour être honnête je pense que le mieux pour moi serait de devenir la compagne de vie d'une personne seule et tranquille comme moi. Une maison ou un appartement avec des coins douillets pour moi, une petite assiette bien garnie, et une ambiance zen feraient mon bonheur.
+
+Vous pensez qu'entre vous et moi ça pourrait le faire ? Vous respecterez ma personnalité ? Et êtes en mesure de m'offrir un cocon tout doux ? Alors...
+🐱 Écrivez-moi un mail à l'adresse suivante : accueil@sda-nord.com sans oublier de mentionner votre numéro de téléphone.
+🐱 L'une de mes tatas vous appellera afin d'échanger et de convenir d'un moment pour qu'on fasse connaissance.
+🐱 Si on s'aime je viendrai vite m'installer chez vous...
+
+Ayesha 💔
+
+Attention : L'équipe du refuge se réserve le droit de refuser mon adoption si toutes les conditions requises pour sa réussite ne sont pas réunies.`
+
 // ---------- Construction des messages ----------
 
 interface AnimalRow {
@@ -410,28 +495,47 @@ export async function POST(request: NextRequest) {
       apiKey: process.env.ANTHROPIC_API_KEY,
     })
 
+    const isCat = animal.species === 'cat'
+
+    // Few-shot adapté à l'espèce. Avant, seuls Amaya + Tupac (chiens) étaient
+    // donnés en exemple : pour un chat le modèle plaquait le registre canin et
+    // produisait une fiche inexploitable (= Céline "bloquée pour les chats").
+    // Les chats reçoivent désormais 2 vraies fiches félines de production.
+    const fewShotMessages: Anthropic.MessageParam[] = isCat
+      ? [
+          {
+            role: 'user',
+            content:
+              'Exemple n°1 (CHAT) — Données factuelles :\n\nNom : VIRGIL\nEspèce : Chat\nSexe : Mâle\nÂge : ~8 ans\nStérilisé : oui\nArrivée au refuge : trouvé errant sur une route, déshydraté et très maigre (SOS, pronostic vital engagé à l\'arrivée)\nSanté : épileptique, traitement adapté à vie\nEntente chats : non (les évite, fuit le contact, pas agressif)\n\nNotes internes : Très câlin, calme, observateur, curieux, expressif, joueur depuis peu. Soigneux, fait beaucoup sa toilette. Aime le confort (coussins, plaids), a besoin d\'un nid sécurisant. Très gourmand (a connu la faim). Cherche un foyer tranquille et aimant prêt à assurer le suivi vétérinaire de son épilepsie.\n\nÉcris la fiche dans le style Céline.',
+          },
+          { role: 'assistant', content: FEW_SHOT_VIRGIL },
+          {
+            role: 'user',
+            content:
+              'Exemple n°2 (CHAT) — Données factuelles :\n\nNom : AYESHA\nEspèce : Chat\nSexe : Femelle\nÂge : presque 2 ans\nStérilisée : oui\nArrivée au refuge : mi-juin, déshydratée et en piteux état\nEntente chiens : non (coup de patte facile, veut un foyer sans chiens)\nEntente chats : tolère les autres chats s\'ils ne sont pas envahissants (préfère peu de chats)\n\nNotes internes : Du caractère, "concierge" du Cavalcat (surveille l\'entrée). Gentille avec les humains, aime les caresses et la compagnie. Très calme et tranquille, déteste l\'agitation. Rêve d\'une vie rangée avec l\'exclusivité, idéalement compagne d\'une personne seule et tranquille, dans un foyer zen.\n\nÉcris la fiche dans le style Céline.',
+          },
+          { role: 'assistant', content: FEW_SHOT_AYESHA },
+        ]
+      : [
+          {
+            role: 'user',
+            content:
+              'Exemple n°1 (court) — Données factuelles :\n\nNom : AMAYA\nEspèce : Chien\nRace : Amstaff (typée, déclassée)\nSexe : Femelle\nÂge : 3 ans et quelques mois\nStérilisée : oui\nArrivée au refuge : mi-janvier (trouvée à la rue avec son copain Kenzo)\nEntente chats : non\nEntente chiens : oui (sous conditions)\n\nNotes internes : Joyeuse, finaude, sociable et câline avec les humains de son entourage, un peu méfiante avec les inconnus. Beaucoup d\'énergie. Aime courir et jouer à la balle. Gourmande, raffole des pattes de poulet séchées. Bonnes bases d\'éducation, coopérative. Pas de chats, chiens cools et non dominants uniquement.\n\nÉcris la fiche dans le style Céline.',
+          },
+          { role: 'assistant', content: FEW_SHOT_AMAYA },
+          {
+            role: 'user',
+            content:
+              'Exemple n°2 (long) — Données factuelles :\n\nNom : TUPAC\nEspèce : Chien\nRace : Bull terrier\nSexe : Mâle\nÂge : 8 ans\nStérilisé : oui\nArrivée au refuge : début février (passé par plusieurs propriétaires peu fiables)\nEntente chats : non\nEntente chiens : oui (non dominants, bien codés)\nEntente enfants : possible si pas trop "pot de colle"\n\nNotes internes : Gentil, dynamique sans excès, joyeux, équilibré. Sociable avec les humains. Aime courir, sniffer les odeurs, se rouler dans l\'herbe. Pas intéressé par les balles. Intelligent, sait ouvrir les portes. Sage au bureau avec Charly. Très gourmand (morfalou comme tous les bulls). Bon en éducation : assis, marche en laisse, à l\'écoute.\n\nÉcris la fiche dans le style Céline.',
+          },
+          { role: 'assistant', content: FEW_SHOT_TUPAC },
+        ]
+
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
-      system: CELINE_SYSTEM_PROMPT,
-      messages: [
-        // Few-shot 1 (court) — Amaya
-        {
-          role: 'user',
-          content:
-            'Exemple n°1 — Données factuelles :\n\nNom : AMAYA\nEspèce : Chien\nRace : Amstaff (typée, déclassée)\nSexe : Femelle\nÂge : 3 ans et quelques mois\nStérilisée : oui\nArrivée au refuge : mi-janvier (trouvée à la rue avec son copain Kenzo)\nEntente chats : non\nEntente chiens : oui (sous conditions)\n\nNotes internes : Joyeuse, finaude, sociable et câline avec les humains de son entourage, un peu méfiante avec les inconnus. Beaucoup d\'énergie. Aime courir et jouer à la balle. Gourmande, raffole des pattes de poulet séchées. Bonnes bases d\'éducation, coopérative. Pas de chats, chiens cools et non dominants uniquement.\n\nÉcris la fiche dans le style Céline.',
-        },
-        { role: 'assistant', content: FEW_SHOT_AMAYA },
-        // Few-shot 2 (long) — Tupac
-        {
-          role: 'user',
-          content:
-            'Exemple n°2 — Données factuelles :\n\nNom : TUPAC\nEspèce : Chien\nRace : Bull terrier\nSexe : Mâle\nÂge : 8 ans\nStérilisé : oui\nArrivée au refuge : début février (passé par plusieurs propriétaires peu fiables)\nEntente chats : non\nEntente chiens : oui (non dominants, bien codés)\nEntente enfants : possible si pas trop "pot de colle"\n\nNotes internes : Gentil, dynamique sans excès, joyeux, équilibré. Sociable avec les humains. Aime courir, sniffer les odeurs, se rouler dans l\'herbe. Pas intéressé par les balles. Intelligent, sait ouvrir les portes. Sage au bureau avec Charly. Très gourmand (morfalou comme tous les bulls). Bon en éducation : assis, marche en laisse, à l\'écoute.\n\nÉcris la fiche dans le style Céline.',
-        },
-        { role: 'assistant', content: FEW_SHOT_TUPAC },
-        // Cible : l'animal en cours
-        { role: 'user', content: userContent },
-      ],
+      system: isCat ? CELINE_SYSTEM_PROMPT + CAT_GUIDANCE : CELINE_SYSTEM_PROMPT,
+      messages: [...fewShotMessages, { role: 'user', content: userContent }],
     })
 
     const rawText = message.content[0]?.type === 'text' ? message.content[0].text : ''
