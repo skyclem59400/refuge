@@ -401,6 +401,8 @@ export interface Animal {
   exit_date: string | null
   adoptable: boolean
   reserved: boolean
+  /** Mise en avant adoption SOS (badge rouge clignotant côté site, remontée en tête de liste). */
+  is_sos: boolean
   /** Adoptant pré-réservé (certificat d'engagement en cours). NULL si pas de pré-réservation. */
   pre_reservation_client_id: string | null
   retirement_basket: boolean

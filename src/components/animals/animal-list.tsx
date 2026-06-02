@@ -5,10 +5,10 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Heart, Bookmark, Home } from 'lucide-react'
+import { Heart, Bookmark, Home, Siren } from 'lucide-react'
 import { AnimalStatusBadge, SpeciesBadge } from './animal-status-badge'
 import { getSexIcon, calculateAge, getStatusLabel } from '@/lib/sda-utils'
-import { toggleAdoptable, toggleReserved, toggleRetirementBasket } from '@/lib/actions/animals'
+import { toggleAdoptable, toggleReserved, toggleRetirementBasket, toggleIsSos } from '@/lib/actions/animals'
 import { getSpeciesEmoji } from '@/lib/species'
 import type { Animal, AnimalPhoto, AnimalStatus } from '@/lib/types/database'
 
@@ -47,11 +47,12 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
   const [judicialFilter, setJudicialFilter] = useState<string>('all')
   const [isPending, startTransition] = useTransition()
   const [pendingAnimalId, setPendingAnimalId] = useState<string | null>(null)
-  const [pendingField, setPendingField] = useState<'adoptable' | 'reserved' | 'retirement_basket' | null>(null)
+  const [pendingField, setPendingField] = useState<'adoptable' | 'reserved' | 'retirement_basket' | 'is_sos' | null>(null)
   // Optimistic state
   const [optimisticAdoptable, setOptimisticAdoptable] = useState<Record<string, boolean>>({})
   const [optimisticReserved, setOptimisticReserved] = useState<Record<string, boolean>>({})
   const [optimisticRetirementBasket, setOptimisticRetirementBasket] = useState<Record<string, boolean>>({})
+  const [optimisticIsSos, setOptimisticIsSos] = useState<Record<string, boolean>>({})
 
   // Compteurs par onglet, indépendants des autres filtres (reste stable en cherchant)
   const presentCount = useMemo(
@@ -201,6 +202,25 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
     })
   }
 
+  function handleToggleIsSos(e: React.MouseEvent, animalId: string, currentValue: boolean) {
+    e.preventDefault()
+    e.stopPropagation()
+    const newValue = !currentValue
+    setPendingAnimalId(animalId)
+    setPendingField('is_sos')
+    setOptimisticIsSos(prev => ({ ...prev, [animalId]: newValue }))
+    startTransition(async () => {
+      const result = await toggleIsSos(animalId, newValue)
+      if (result.error) {
+        toast.error(result.error)
+        setOptimisticIsSos(prev => ({ ...prev, [animalId]: currentValue }))
+      }
+      setPendingAnimalId(null)
+      setPendingField(null)
+      router.refresh()
+    })
+  }
+
   function isAdoptable(animal: AnimalWithPhotos): boolean {
     if (animal.id in optimisticAdoptable) return optimisticAdoptable[animal.id]
     return animal.adoptable
@@ -214,6 +234,11 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
   function isRetirementBasket(animal: AnimalWithPhotos): boolean {
     if (animal.id in optimisticRetirementBasket) return optimisticRetirementBasket[animal.id]
     return animal.retirement_basket
+  }
+
+  function isSos(animal: AnimalWithPhotos): boolean {
+    if (animal.id in optimisticIsSos) return optimisticIsSos[animal.id]
+    return animal.is_sos
   }
 
   const adoptionFiltersActive = presenceTab === 'present' && (
@@ -363,6 +388,7 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
             const adoptable = isAdoptable(animal)
             const reserved = isReserved(animal)
             const retirementBasket = isRetirementBasket(animal)
+            const sos = isSos(animal)
             const exitDateFr = presenceTab === 'exited' ? formatExitDate(animal.exit_date) : null
             const isExited = presenceTab === 'exited'
             return (
@@ -394,6 +420,12 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
                   {/* Badges overlay top-left — uniquement pour les présents */}
                   {!isExited && (
                     <div className="absolute top-2 left-2 flex flex-col gap-1">
+                      {sos && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/95 text-white backdrop-blur-sm animate-pulse">
+                          <Siren className="w-3 h-3 fill-current" />
+                          SOS
+                        </span>
+                      )}
                       {adoptable && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-success/90 text-white backdrop-blur-sm">
                           <Heart className="w-3 h-3 fill-current" />
@@ -445,6 +477,20 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
                       <span>{calculateAge(animal.birth_date)}</span>
                       {canManageAdoptions && (
                         <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleIsSos(e, animal.id, sos)}
+                            disabled={isPending && pendingAnimalId === animal.id && pendingField === 'is_sos'}
+                            title={sos ? 'Retirer du SOS' : 'Marquer SOS'}
+                            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors
+                              ${sos
+                                ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
+                                : 'bg-border/50 text-muted hover:bg-border hover:text-text'
+                              }
+                              disabled:opacity-50`}
+                          >
+                            <Siren className={`w-3 h-3 ${sos ? 'fill-current' : ''}`} />
+                          </button>
                           <button
                             type="button"
                             onClick={(e) => handleToggleReserved(e, animal.id, reserved)}
