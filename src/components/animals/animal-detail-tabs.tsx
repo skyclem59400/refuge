@@ -307,6 +307,7 @@ export function AnimalDetailTabs({
             animal={animal}
             boxes={boxes}
             canManageAnimals={canManageAnimals}
+            isAdmin={isAdmin}
             judicialOwner={judicialOwner}
           />
         )}
@@ -531,11 +532,13 @@ function InfoTab({
   animal,
   boxes,
   canManageAnimals,
+  isAdmin = false,
   judicialOwner = null,
 }: Readonly<{
   animal: Animal
   boxes: BoxWithZone[]
   canManageAnimals: boolean
+  isAdmin?: boolean
   judicialOwner?: {
     client_id: string
     name: string
@@ -639,7 +642,12 @@ function InfoTab({
               Modifier l&apos;animal
             </summary>
             <div className="px-5 pb-5">
-              <AnimalForm animal={animal} boxes={boxes} judicialOwner={judicialOwner} />
+              <AnimalForm
+                animal={animal}
+                boxes={boxes}
+                judicialOwner={judicialOwner}
+                canApproveDescription={isAdmin}
+              />
             </div>
           </details>
         )}

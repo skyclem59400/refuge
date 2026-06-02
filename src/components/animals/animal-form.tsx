@@ -3,8 +3,8 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, Sparkles } from 'lucide-react'
-import { createAnimal, updateAnimal } from '@/lib/actions/animals'
+import { Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert } from 'lucide-react'
+import { createAnimal, updateAnimal, approveAnimalDescription, rejectAnimalDescription } from '@/lib/actions/animals'
 import { CommuneAutocomplete } from '@/components/ui/commune-autocomplete'
 import { AddressAutocomplete } from '@/components/ui/address-autocomplete'
 import { JudicialOwnerPicker } from '@/components/animals/judicial-owner-picker'
@@ -43,9 +43,12 @@ interface AnimalFormProps {
   boxes?: BoxWithZone[]
   /** Pré-rempli en mode édition si l'animal a un judicial_owner_client_id renseigné. */
   judicialOwner?: JudicialOwnerSnapshot | null
+  /** Si true, affiche le bouton "Approuver et publier" sur le bloc description externe.
+   * Workflow garde-fou : Carole/staff éditent le brouillon, seul l'admin peut publier. */
+  canApproveDescription?: boolean
 }
 
-export function AnimalForm({ animal, boxes = [], judicialOwner = null }: Readonly<AnimalFormProps>) {
+export function AnimalForm({ animal, boxes = [], judicialOwner = null, canApproveDescription = false }: Readonly<AnimalFormProps>) {
   const isEditing = !!animal
 
   // Identity fields
@@ -62,8 +65,14 @@ export function AnimalForm({ animal, boxes = [], judicialOwner = null }: Readonl
   const [behaviorScore, setBehaviorScore] = useState(animal?.behavior_score?.toString() || '')
   const [boxId, setBoxId] = useState(animal?.box_id || '')
   const [description, setDescription] = useState(animal?.description || '')
-  const [descriptionExternal, setDescriptionExternal] = useState(animal?.description_external || '')
+  /** Texte actuellement VISIBLE sur sda-nord.com. Read-only dans le form sauf via "Approuver et publier". */
+  const descriptionExternalPublished = animal?.description_external || ''
+  /** Brouillon en cours de rédaction (par Carole, l'IA, ou Clément). Visible nulle part tant que pas approuvé. */
+  const [descriptionExternalPending, setDescriptionExternalPending] = useState(
+    animal?.description_external_pending || ''
+  )
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isApproving, setIsApproving] = useState(false)
   const [okCats, setOkCats] = useState<boolean | null>(animal?.ok_cats ?? null)
   const [okMales, setOkMales] = useState<boolean | null>(animal?.ok_males ?? null)
   const [okFemales, setOkFemales] = useState<boolean | null>(animal?.ok_females ?? null)
@@ -148,7 +157,9 @@ export function AnimalForm({ animal, boxes = [], judicialOwner = null }: Readonl
         behavior_score: behaviorScore ? parseInt(behaviorScore) : null,
         box_id: boxId || null,
         description: description || null,
-        description_external: descriptionExternal || null,
+        // On NE touche PAS à description_external depuis le form : le seul moyen
+        // de le modifier est le bouton "Approuver et publier" (garde-fou).
+        description_external_pending: descriptionExternalPending || null,
         chip_number: chipNumber || null,
         tattoo_number: tattooNumber || null,
         tattoo_position: tattooPosition || null,
@@ -518,51 +529,146 @@ export function AnimalForm({ animal, boxes = [], judicialOwner = null }: Readonl
           />
         </div>
 
-        {/* Description externe (publique) - full width */}
-        <div className="mt-4">
-          <div className="flex items-center justify-between mb-1">
-            <label htmlFor="animal-description-external" className={labelClass}>Description externe (publique)</label>
-            <button
-              type="button"
-              disabled={isGenerating || !animal?.id}
-              onClick={async () => {
-                if (!animal?.id) return
-                setIsGenerating(true)
-                try {
-                  const res = await fetch('/api/ai/generate-description', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ animalId: animal.id }),
-                  })
-                  const data = await res.json()
-                  if (res.ok && data.content) {
-                    setDescriptionExternal(data.content)
-                  } else {
-                    alert(data.error || 'Erreur lors de la generation')
-                  }
-                } catch {
-                  alert('Erreur reseau')
-                } finally {
-                  setIsGenerating(false)
-                }
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-white hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isGenerating ? (
-                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generation...</>
-              ) : (
-                <><Sparkles className="w-3.5 h-3.5" /> Generer avec l&apos;IA</>
-              )}
-            </button>
+        {/* Description externe (publique) — workflow garde-fou avec brouillon
+            séparé du texte publié. Carole/staff éditent le brouillon, l'admin
+            valide via "Approuver et publier". */}
+        <div className="mt-4 space-y-4 p-4 rounded-xl border border-border bg-surface-dark/30">
+          <div className="flex items-start gap-2">
+            <ShieldAlert className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+            <p className="text-xs text-muted">
+              <strong className="text-text">Garde-fou éditorial</strong> — Le brouillon (en bas) est invisible côté site sda-nord.com tant qu&apos;un admin n&apos;a pas cliqué <em>Approuver et publier</em>. Carole / l&apos;IA / le staff travaillent sur le brouillon ; seul Clément peut publier.
+            </p>
           </div>
-          <textarea
-            id="animal-description-external"
-            value={descriptionExternal}
-            onChange={(e) => setDescriptionExternal(e.target.value)}
-            placeholder={animal?.id ? "Cliquez sur 'Generer avec l'IA' ou redigez manuellement..." : "Enregistrez l'animal d'abord pour generer avec l'IA"}
-            rows={20}
-            className={`${inputClass} resize-y font-serif leading-relaxed`}
-          />
+
+          {/* Texte publié (read-only) */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="animal-description-external-published" className={labelClass}>
+                Texte publié sur sda-nord.com
+              </label>
+              <span className="text-[11px] text-muted">
+                {descriptionExternalPublished
+                  ? `${descriptionExternalPublished.length} caractères`
+                  : 'Aucun texte publié'}
+              </span>
+            </div>
+            <textarea
+              id="animal-description-external-published"
+              value={descriptionExternalPublished}
+              readOnly
+              placeholder="Aucun texte publié sur le site pour cet animal. Rédigez un brouillon ci-dessous puis approuvez-le."
+              rows={6}
+              className={`${inputClass} resize-y font-serif leading-relaxed bg-surface/50 cursor-not-allowed opacity-80`}
+            />
+          </div>
+
+          {/* Brouillon (éditable) + bouton IA */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="animal-description-external-pending" className={labelClass}>
+                Brouillon (en attente d&apos;approbation)
+              </label>
+              <button
+                type="button"
+                disabled={isGenerating || !animal?.id}
+                onClick={async () => {
+                  if (!animal?.id) return
+                  setIsGenerating(true)
+                  try {
+                    const res = await fetch('/api/ai/generate-description', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ animalId: animal.id }),
+                    })
+                    const data = await res.json()
+                    if (res.ok && data.content) {
+                      setDescriptionExternalPending(data.content)
+                      toast.success('Brouillon généré. Relis-le puis clique "Approuver et publier".')
+                    } else {
+                      alert(data.error || 'Erreur lors de la génération')
+                    }
+                  } catch {
+                    alert('Erreur réseau')
+                  } finally {
+                    setIsGenerating(false)
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-white hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isGenerating ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Génération...</>
+                ) : (
+                  <><Sparkles className="w-3.5 h-3.5" /> Générer avec l&apos;IA</>
+                )}
+              </button>
+            </div>
+            <textarea
+              id="animal-description-external-pending"
+              value={descriptionExternalPending}
+              onChange={(e) => setDescriptionExternalPending(e.target.value)}
+              placeholder={animal?.id ? "Cliquez 'Générer avec l'IA' ou rédigez manuellement le brouillon..." : "Enregistrez l'animal d'abord pour générer avec l'IA"}
+              rows={20}
+              className={`${inputClass} resize-y font-serif leading-relaxed`}
+            />
+            <p className="text-[11px] text-muted mt-1">
+              {descriptionExternalPending.length} caractères · Le brouillon est sauvegardé avec le reste du formulaire (bouton Enregistrer en bas).
+            </p>
+          </div>
+
+          {/* Boutons admin (Approuver / Rejeter) */}
+          {canApproveDescription && descriptionExternalPending && animal?.id && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+              <button
+                type="button"
+                disabled={isApproving}
+                onClick={async () => {
+                  if (!animal?.id) return
+                  if (!confirm("Approuver ce brouillon ? Il remplacera immédiatement le texte publié sur sda-nord.com.")) return
+                  setIsApproving(true)
+                  try {
+                    const res = await approveAnimalDescription(animal.id)
+                    if (res.error) {
+                      toast.error(res.error)
+                    } else {
+                      toast.success('Brouillon approuvé et publié.')
+                      router.refresh()
+                    }
+                  } finally {
+                    setIsApproving(false)
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-success text-white hover:bg-success/90 disabled:opacity-50 transition-colors"
+              >
+                {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                Approuver et publier
+              </button>
+              <button
+                type="button"
+                disabled={isApproving}
+                onClick={async () => {
+                  if (!animal?.id) return
+                  const reason = prompt("Rejeter ce brouillon. Raison (optionnelle, affichée dans le log) :")
+                  if (reason === null) return
+                  setIsApproving(true)
+                  try {
+                    const res = await rejectAnimalDescription(animal.id, reason || undefined)
+                    if (res.error) {
+                      toast.error(res.error)
+                    } else {
+                      toast.success('Brouillon rejeté.')
+                      setDescriptionExternalPending('')
+                      router.refresh()
+                    }
+                  } finally {
+                    setIsApproving(false)
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-red-500/15 text-red-500 hover:bg-red-500/25 disabled:opacity-50 transition-colors"
+              >
+                <XCircle className="w-4 h-4" /> Rejeter
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

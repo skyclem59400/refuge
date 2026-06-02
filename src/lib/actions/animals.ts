@@ -157,6 +157,9 @@ export async function createAnimal(data: {
   behavior_score?: number | null
   description?: string | null
   description_external?: string | null
+  /** Brouillon non publié (rédigé par Carole/staff via générateur IA ou édition manuelle).
+   * N'apparaît PAS sur le site public tant que l'admin n'a pas cliqué "Approuver et publier". */
+  description_external_pending?: string | null
   capture_location?: string | null
   capture_circumstances?: string | null
   pickup_address_label?: string | null
@@ -309,6 +312,9 @@ export async function updateAnimal(id: string, data: {
   behavior_score?: number | null
   description?: string | null
   description_external?: string | null
+  /** Brouillon non publié (rédigé par Carole/staff via générateur IA ou édition manuelle).
+   * N'apparaît PAS sur le site public tant que l'admin n'a pas cliqué "Approuver et publier". */
+  description_external_pending?: string | null
   capture_location?: string | null
   capture_circumstances?: string | null
   pickup_address_label?: string | null
@@ -334,7 +340,7 @@ export async function updateAnimal(id: string, data: {
   judicial_lawyer_contact?: string | null
 }) {
   try {
-    const { establishmentId } = await requirePermission('manage_animals')
+    const { establishmentId, userId } = await requirePermission('manage_animals')
     const supabase = await createClient()
     const admin = createAdminClient()
 
@@ -346,9 +352,19 @@ export async function updateAnimal(id: string, data: {
       .eq('establishment_id', establishmentId)
       .single()
 
+    // Si le brouillon a changé, tracker auteur + timestamp pour le badge UI.
+    const updatePayload: Record<string, unknown> = { ...data }
+    if (
+      'description_external_pending' in data &&
+      data.description_external_pending !== currentAnimal?.description_external_pending
+    ) {
+      updatePayload.description_external_pending_updated_at = new Date().toISOString()
+      updatePayload.description_external_pending_updated_by = userId
+    }
+
     const { error } = await supabase
       .from('animals')
-      .update(data)
+      .update(updatePayload)
       .eq('id', id)
       .eq('establishment_id', establishmentId)
 
@@ -369,6 +385,112 @@ export async function updateAnimal(id: string, data: {
       entityId: id,
       entityName: data.name || currentAnimal?.name || undefined,
       details: changes,
+    })
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+/**
+ * Approuve le brouillon `description_external_pending` et le publie :
+ *  - copie pending -> description_external (visible côté site sda-nord.com)
+ *  - vide pending + reset metadata
+ * Réservé à `manage_establishment` (admin) : c'est le garde-fou qui empêche
+ * Carole / staff de publier sans relecture par Clément.
+ */
+export async function approveAnimalDescription(animalId: string) {
+  try {
+    const { establishmentId, userId } = await requirePermission('manage_establishment')
+    const supabase = await createClient()
+    const admin = createAdminClient()
+
+    const { data: current } = await admin
+      .from('animals')
+      .select('id, name, description_external, description_external_pending')
+      .eq('id', animalId)
+      .eq('establishment_id', establishmentId)
+      .single()
+
+    if (!current) return { error: 'Animal introuvable' }
+    if (!current.description_external_pending) {
+      return { error: 'Aucun brouillon à approuver pour cet animal.' }
+    }
+
+    const { error } = await supabase
+      .from('animals')
+      .update({
+        description_external: current.description_external_pending,
+        description_external_pending: null,
+        description_external_pending_updated_at: null,
+        description_external_pending_updated_by: null,
+      })
+      .eq('id', animalId)
+      .eq('establishment_id', establishmentId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/animals')
+    revalidatePath(`/animals/${animalId}`)
+    logActivity({
+      action: 'update',
+      entityType: 'animal',
+      entityId: animalId,
+      entityName: current.name,
+      details: {
+        approved_published_description: true,
+        approved_by_user_id: userId,
+        old_length: current.description_external?.length ?? 0,
+        new_length: current.description_external_pending.length,
+      },
+    })
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+/**
+ * Rejette le brouillon : vide pending sans toucher au texte publié.
+ * Idem perm admin uniquement.
+ */
+export async function rejectAnimalDescription(animalId: string, reason?: string) {
+  try {
+    const { establishmentId, userId } = await requirePermission('manage_establishment')
+    const supabase = await createClient()
+    const admin = createAdminClient()
+
+    const { data: current } = await admin
+      .from('animals')
+      .select('id, name, description_external_pending')
+      .eq('id', animalId)
+      .eq('establishment_id', establishmentId)
+      .single()
+
+    if (!current?.description_external_pending) {
+      return { error: 'Aucun brouillon à rejeter.' }
+    }
+
+    const { error } = await supabase
+      .from('animals')
+      .update({
+        description_external_pending: null,
+        description_external_pending_updated_at: null,
+        description_external_pending_updated_by: null,
+      })
+      .eq('id', animalId)
+      .eq('establishment_id', establishmentId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/animals')
+    revalidatePath(`/animals/${animalId}`)
+    logActivity({
+      action: 'update',
+      entityType: 'animal',
+      entityId: animalId,
+      entityName: current.name,
+      details: { rejected_description_draft: true, reason: reason ?? null, rejected_by_user_id: userId },
     })
     return { success: true }
   } catch (e) {

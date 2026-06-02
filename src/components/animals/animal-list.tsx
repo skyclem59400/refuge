@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Heart, Bookmark, Home, Siren } from 'lucide-react'
+import { Heart, Bookmark, Home, Siren, FileEdit } from 'lucide-react'
 import { AnimalStatusBadge, SpeciesBadge } from './animal-status-badge'
 import { getSexIcon, calculateAge, getStatusLabel } from '@/lib/sda-utils'
 import { toggleAdoptable, toggleReserved, toggleRetirementBasket, toggleIsSos } from '@/lib/actions/animals'
@@ -442,6 +442,12 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/90 text-white backdrop-blur-sm">
                           <Home className="w-3 h-3 fill-current" />
                           Panier retraite
+                        </span>
+                      )}
+                      {animal.description_external_pending && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/90 text-white backdrop-blur-sm" title="Brouillon en attente d'approbation">
+                          <FileEdit className="w-3 h-3" />
+                          BROUILLON
                         </span>
                       )}
                       {animal.judicial_procedure && (

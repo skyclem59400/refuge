@@ -403,6 +403,10 @@ export interface Animal {
   reserved: boolean
   /** Mise en avant adoption SOS (badge rouge clignotant côté site, remontée en tête de liste). */
   is_sos: boolean
+  /** Brouillon de description publique en attente de relecture/approbation. NULL = pas de brouillon. */
+  description_external_pending: string | null
+  description_external_pending_updated_at: string | null
+  description_external_pending_updated_by: string | null
   /** Adoptant pré-réservé (certificat d'engagement en cours). NULL si pas de pré-réservation. */
   pre_reservation_client_id: string | null
   retirement_basket: boolean
