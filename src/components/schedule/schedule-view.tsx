@@ -13,6 +13,9 @@ interface ScheduleViewProps {
   appointments?: Appointment[]
   userNames: Record<string, string>
   animalNames?: Record<string, string>
+  /** Capacitif : seuil minimum de personnel par jour (depuis establishments.min_daily_staff).
+   * Affiché dans le header de chaque colonne pour signaler les jours sous-staffés. */
+  minDailyStaff?: number
 }
 
 // Color palette for different users
@@ -38,7 +41,7 @@ type CalendarEvent =
   | { type: 'schedule'; data: StaffSchedule }
   | { type: 'appointment'; data: Appointment }
 
-export function ScheduleView({ schedules, appointments = [], userNames, animalNames = {} }: Readonly<ScheduleViewProps>) {
+export function ScheduleView({ schedules, appointments = [], userNames, animalNames = {}, minDailyStaff = 0 }: Readonly<ScheduleViewProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -331,6 +334,7 @@ export function ScheduleView({ schedules, appointments = [], userNames, animalNa
         today={today}
         isPending={isPending}
         deletingId={deletingId}
+        minDailyStaff={minDailyStaff}
         onDeleteSchedule={handleDelete}
         onDeleteAppointment={handleDeleteAppointment}
       />
@@ -370,6 +374,7 @@ interface WeeklyGridProps {
   today: Date
   isPending: boolean
   deletingId: string | null
+  minDailyStaff: number
   onDeleteSchedule: (id: string, name: string) => void
   onDeleteAppointment: (id: string, name: string) => void
 }
@@ -383,6 +388,7 @@ function WeeklyGrid({
   today,
   isPending,
   deletingId,
+  minDailyStaff,
   onDeleteSchedule,
   onDeleteAppointment,
 }: Readonly<WeeklyGridProps>) {
@@ -409,6 +415,23 @@ function WeeklyGrid({
         {weekDays.map((d) => {
           const dateStr = d.toISOString().split('T')[0]
           const isToday = dateStr === todayStr
+          const dayEvents = eventsByDate[dateStr] || []
+          // Capacitif : nombre d'utilisateurs distincts présents ce jour
+          const presentUsers = new Set(
+            dayEvents
+              .filter((e): e is { type: 'schedule'; data: StaffSchedule } => e.type === 'schedule')
+              .map((e) => e.data.user_id),
+          )
+          const present = presentUsers.size
+          const isUnderstaffed = minDailyStaff > 0 && present < minDailyStaff
+          const isExactlyOk = minDailyStaff > 0 && present === minDailyStaff
+          const badgeClass = isUnderstaffed
+            ? 'bg-red-500/20 text-red-500'
+            : isExactlyOk
+              ? 'bg-warning/20 text-warning'
+              : minDailyStaff > 0
+                ? 'bg-success/20 text-success'
+                : 'bg-surface text-muted'
           return (
             <div
               key={dateStr}
@@ -424,6 +447,15 @@ function WeeklyGrid({
               >
                 {d.getDate()}
               </div>
+              {minDailyStaff > 0 && (
+                <div
+                  className={`mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${badgeClass}`}
+                  title={`${present} collaborateur(s) présent(s) sur ${minDailyStaff} requis`}
+                >
+                  <Users className="w-2.5 h-2.5" />
+                  {present}/{minDailyStaff}
+                </div>
+              )}
             </div>
           )
         })}

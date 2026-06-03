@@ -6,8 +6,7 @@ import { getEstablishmentMembers } from '@/lib/actions/establishments'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSchedule } from '@/lib/actions/schedule'
 import { getAppointments } from '@/lib/actions/appointments'
-import { ScheduleForm } from '@/components/schedule/schedule-form'
-import { AppointmentForm } from '@/components/appointments/appointment-form'
+import { EventCreator } from '@/components/schedule/event-creator'
 import { ScheduleView } from '@/components/schedule/schedule-view'
 import { TimelineCalendarView } from '@/components/schedule/timeline-calendar-view'
 
@@ -172,23 +171,13 @@ export default async function PlanningPage(props: Readonly<{ searchParams: Promi
         </div>
       </div>
 
-      {/* Forms */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div>
-          <h3 className="text-sm font-semibold text-muted mb-3 flex items-center gap-2">
-            <CalendarDays className="w-4 h-4" />
-            Planning du personnel
-          </h3>
-          <ScheduleForm members={members} userNames={userNames} />
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold text-muted mb-3 flex items-center gap-2">
-            <Heart className="w-4 h-4 text-green-600" />
-            <Stethoscope className="w-4 h-4 text-orange-600" />
-            Rendez-vous
-          </h3>
-          <AppointmentForm animals={animalsForForm} members={members} userNames={userNames} />
-        </div>
+      {/* Formulaire unifié : présence + RDV adoption + RDV véto + autre */}
+      <div className="mb-6">
+        <EventCreator
+          members={members}
+          userNames={userNames}
+          animals={animalsForForm}
+        />
       </div>
 
       {/* View toggle */}
@@ -234,6 +223,7 @@ export default async function PlanningPage(props: Readonly<{ searchParams: Promi
           appointments={appointments}
           userNames={userNames}
           animalNames={animalNames}
+          minDailyStaff={ctx.establishment.min_daily_staff ?? 0}
         />
       )}
     </div>
