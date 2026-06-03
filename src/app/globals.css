@@ -22,6 +22,10 @@
   --color-primary: var(--color-navy);
   --color-primary-light: var(--color-navy-soft);
   --color-primary-dark: var(--color-navy-deep);
+  /* Texte posé sur un fond bg-primary (boutons pleins) : toujours blanc,
+     dans les deux thèmes. Sans ça, text-primary-foreground n'était pas défini
+     et les boutons héritaient du texte ambiant (navy foncé illisible en clair). */
+  --color-primary-foreground: #ffffff;
   --color-secondary: var(--color-terracotta);
   --color-accent: var(--color-teal);
 
@@ -56,6 +60,23 @@ html.dark {
   --color-text: #f1f5f9;
   --color-text-secondary: #d9e6ed;
 }
+
+/* ------------------------------------------------------------------
+   Dark mode — lisibilité du "primary"
+   En thème sombre, --color-primary (navy #1e3a5f) est quasi identique aux
+   surfaces navy : tout TEXTE/ICÔNE en text-primary devenait invisible.
+   On rebascule uniquement la COULEUR DE TEXTE "primary" vers le teal de marque
+   (l'accent prévu pour le dark mode). On ne touche ni aux fonds bg-primary
+   (boutons pleins, qui gardent le navy + texte blanc) ni aux bordures.
+   Couvre aussi les variantes hover/group-hover utilisées dans le code.
+   ------------------------------------------------------------------ */
+html.dark .text-primary { color: var(--color-teal); }
+html.dark .hover\:text-primary:hover { color: var(--color-teal); }
+html.dark .focus\:text-primary:focus { color: var(--color-teal); }
+html.dark .group:hover .group-hover\:text-primary { color: var(--color-teal); }
+html.dark .text-primary-light,
+html.dark .hover\:text-primary-light:hover { color: var(--color-teal-soft); }
+html.dark .hover\:text-primary-dark:hover { color: var(--color-teal-soft); }
 
 /* Light mode — base paper/canvas, contraste navy deep */
 html.light {

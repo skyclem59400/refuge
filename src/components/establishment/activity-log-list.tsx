@@ -327,7 +327,7 @@ export function ActivityLogList({ logs, userNames, userKinds, parentNames }: Act
     <div className="bg-surface rounded-xl border border-border">
       <div className="flex items-center justify-between p-5 border-b border-border">
         <div className="flex items-center gap-2">
-          <Activity className="w-5 h-5 text-accent" />
+          <Activity className="w-5 h-5 text-primary" />
           <h2 className="text-lg font-bold">Journal d&apos;activite</h2>
         </div>
         <span className="text-xs text-muted bg-surface-dark px-2 py-1 rounded-lg">
@@ -442,7 +442,7 @@ export function ActivityLogList({ logs, userNames, userKinds, parentNames }: Act
                           {sentence.entityLink ? (
                             <Link
                               href={sentence.entityLink}
-                              className="font-semibold text-accent hover:underline transition-colors"
+                              className="font-semibold text-primary hover:text-primary-light transition-colors"
                             >
                               {sentence.entityName}
                             </Link>
@@ -459,7 +459,7 @@ export function ActivityLogList({ logs, userNames, userKinds, parentNames }: Act
                           {parentLabel.link ? (
                             <Link
                               href={parentLabel.link}
-                              className="font-semibold text-accent hover:underline transition-colors"
+                              className="font-semibold text-primary hover:text-primary-light transition-colors"
                             >
                               {parentLabel.name}
                             </Link>
@@ -488,7 +488,7 @@ export function ActivityLogList({ logs, userNames, userKinds, parentNames }: Act
             <div className="p-4 text-center border-t border-border">
               <button
                 onClick={() => setVisibleCount((prev) => prev + 50)}
-                className="text-sm text-accent hover:underline transition-colors font-medium"
+                className="text-sm text-primary hover:text-primary-light transition-colors font-medium"
               >
                 Afficher plus ({filtered.length - visible.length} restants)
               </button>
