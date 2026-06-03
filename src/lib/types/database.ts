@@ -527,6 +527,7 @@ export interface StaffSchedule {
   created_by: string
   created_at: string
   updated_at: string
+  google_event_id?: string | null
 }
 
 // Common appointment types - but any string is allowed for custom types

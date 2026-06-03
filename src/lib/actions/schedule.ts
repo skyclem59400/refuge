@@ -5,6 +5,51 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/establishment/permissions'
 import { logActivity } from '@/lib/actions/activity-log'
+import {
+  isGoogleCalendarConfigured,
+  upsertCalendarEvent,
+  deleteCalendarEvent,
+  buildScheduleEventInput,
+} from '@/lib/google/calendar'
+
+// ===========================================================================
+// GOOGLE CALENDAR SYNC HELPERS (fail-soft)
+// ===========================================================================
+
+/** Fetch the establishment's Google Calendar id (empty string treated as null). */
+async function getCalendarId(establishmentId: string): Promise<string | null> {
+  try {
+    const admin = createAdminClient()
+    const { data } = await admin
+      .from('establishments')
+      .select('google_calendar_id')
+      .eq('id', establishmentId)
+      .single()
+    const id = data?.google_calendar_id
+    return id && id.trim() ? id : null
+  } catch (e) {
+    console.error('[schedule] getCalendarId failed', e)
+    return null
+  }
+}
+
+/** Resolve display names for the given user ids via get_users_info. */
+async function resolveMemberNames(userIds: string[]): Promise<Record<string, string>> {
+  const names: Record<string, string> = {}
+  if (userIds.length === 0) return names
+  try {
+    const admin = createAdminClient()
+    const { data } = await admin.rpc('get_users_info', { user_ids: userIds })
+    if (Array.isArray(data)) {
+      for (const u of data) {
+        names[u.id] = u.full_name || u.email || u.id
+      }
+    }
+  } catch (e) {
+    console.error('[schedule] resolveMemberNames failed', e)
+  }
+  return names
+}
 
 // ===========================================================================
 // READ OPERATIONS (use createAdminClient)
@@ -119,6 +164,33 @@ export async function createSchedule(data: {
       return { error: error.message }
     }
 
+    // Fail-soft Google Calendar sync
+    if (isGoogleCalendarConfigured()) {
+      try {
+        const calendarId = await getCalendarId(establishmentId)
+        if (calendarId) {
+          const names = await resolveMemberNames([data.user_id])
+          const eventId = await upsertCalendarEvent(
+            null,
+            buildScheduleEventInput({
+              calendarId,
+              memberName: names[data.user_id],
+              date: data.date,
+              start_time: data.start_time,
+              end_time: data.end_time,
+              notes: data.notes,
+            })
+          )
+          if (eventId) {
+            const admin = createAdminClient()
+            await admin.from('staff_schedule').update({ google_event_id: eventId }).eq('id', schedule.id)
+          }
+        }
+      } catch (e) {
+        console.error('[schedule] createSchedule calendar sync failed', e)
+      }
+    }
+
     revalidatePath('/planning')
     logActivity({
       action: 'create',
@@ -161,6 +233,41 @@ export async function updateSchedule(
 
     if (error) return { error: error.message }
 
+    // Fail-soft Google Calendar sync
+    if (isGoogleCalendarConfigured()) {
+      try {
+        const calendarId = await getCalendarId(establishmentId)
+        if (calendarId) {
+          const admin = createAdminClient()
+          const { data: row } = await admin
+            .from('staff_schedule')
+            .select('user_id, date, start_time, end_time, notes, google_event_id')
+            .eq('id', id)
+            .eq('establishment_id', establishmentId)
+            .single()
+          if (row) {
+            const names = await resolveMemberNames([row.user_id])
+            const newEventId = await upsertCalendarEvent(
+              row.google_event_id ?? null,
+              buildScheduleEventInput({
+                calendarId,
+                memberName: names[row.user_id],
+                date: row.date,
+                start_time: row.start_time,
+                end_time: row.end_time,
+                notes: row.notes,
+              })
+            )
+            if (newEventId && newEventId !== row.google_event_id) {
+              await admin.from('staff_schedule').update({ google_event_id: newEventId }).eq('id', id)
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[schedule] updateSchedule calendar sync failed', e)
+      }
+    }
+
     revalidatePath('/planning')
     logActivity({
       action: 'update',
@@ -183,6 +290,22 @@ export async function deleteSchedule(id: string) {
     const { establishmentId } = await requirePermission('manage_planning')
     const supabase = createAdminClient()
 
+    // Capture the Google event id before deletion (fail-soft)
+    let googleEventId: string | null = null
+    if (isGoogleCalendarConfigured()) {
+      try {
+        const { data: row } = await supabase
+          .from('staff_schedule')
+          .select('google_event_id')
+          .eq('id', id)
+          .eq('establishment_id', establishmentId)
+          .single()
+        googleEventId = row?.google_event_id ?? null
+      } catch (e) {
+        console.error('[schedule] deleteSchedule pre-fetch failed', e)
+      }
+    }
+
     const { error } = await supabase
       .from('staff_schedule')
       .delete()
@@ -190,6 +313,18 @@ export async function deleteSchedule(id: string) {
       .eq('establishment_id', establishmentId)
 
     if (error) return { error: error.message }
+
+    // Fail-soft Google Calendar delete
+    if (isGoogleCalendarConfigured() && googleEventId) {
+      try {
+        const calendarId = await getCalendarId(establishmentId)
+        if (calendarId) {
+          await deleteCalendarEvent(calendarId, googleEventId)
+        }
+      } catch (e) {
+        console.error('[schedule] deleteSchedule calendar sync failed', e)
+      }
+    }
 
     revalidatePath('/planning')
     logActivity({
@@ -258,6 +393,38 @@ export async function duplicateWeek(weekStartDate: string) {
         return { error: 'Certaines planifications existent deja pour la semaine suivante' }
       }
       return { error: insertError.message }
+    }
+
+    // Fail-soft Google Calendar sync for every newly inserted schedule
+    if (isGoogleCalendarConfigured() && data && data.length > 0) {
+      try {
+        const calendarId = await getCalendarId(establishmentId)
+        if (calendarId) {
+          const userIds = [...new Set(data.map((s) => s.user_id))]
+          const names = await resolveMemberNames(userIds)
+          for (const schedule of data) {
+            const eventId = await upsertCalendarEvent(
+              null,
+              buildScheduleEventInput({
+                calendarId,
+                memberName: names[schedule.user_id],
+                date: schedule.date,
+                start_time: schedule.start_time,
+                end_time: schedule.end_time,
+                notes: schedule.notes,
+              })
+            )
+            if (eventId) {
+              await adminClient
+                .from('staff_schedule')
+                .update({ google_event_id: eventId })
+                .eq('id', schedule.id)
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[schedule] duplicateWeek calendar sync failed', e)
+      }
     }
 
     revalidatePath('/planning')
