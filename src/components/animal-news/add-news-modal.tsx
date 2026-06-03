@@ -5,11 +5,11 @@ import Image from 'next/image'
 import { toast } from 'sonner'
 import { X, Upload, Loader2, Trash2, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { addAnimalNews } from '@/lib/actions/animal-news'
+import { addAnimalNews, updateAnimalNews } from '@/lib/actions/animal-news'
 import { SPECIES_LABELS } from '@/lib/species'
 import { getStatusLabel } from '@/lib/sda-utils'
 import { DatePicker } from '@/components/ui/date-picker'
-import type { AnimalNewsPhoto } from '@/lib/types/database'
+import type { AnimalNewsPhoto, AnimalNewsWithAnimal } from '@/lib/types/database'
 
 interface EligibleAnimal {
   id: string
@@ -27,6 +27,8 @@ interface AddNewsModalProps {
   category?: 'sheltered' | 'alumni'
   eligibleAnimals: EligibleAnimal[]
   establishmentId: string
+  /** Si fourni, le modal passe en mode édition de cette nouvelle. */
+  editingNews?: AnimalNewsWithAnimal
   onClose: () => void
   onSuccess: () => void
 }
@@ -40,11 +42,21 @@ export function AddNewsModal({
   category = 'alumni',
   eligibleAnimals,
   establishmentId,
+  editingNews,
   onClose,
   onSuccess,
 }: Readonly<AddNewsModalProps>) {
-  const copy =
-    category === 'sheltered'
+  const isEditing = !!editingNews
+  const copy = isEditing
+    ? {
+        title: 'Modifier la nouvelle',
+        subtitle: 'Mettre à jour le texte, l’auteur, la date ou les photos',
+        receivedFromLabel:
+          category === 'sheltered'
+            ? 'Auteur (bénévole ou photographe)'
+            : 'De qui (adoptant, famille d’accueil)',
+      }
+    : category === 'sheltered'
       ? {
           title: 'Nouvelle d’un protégé',
           subtitle: 'Photo + anecdote d’un animal encore au refuge',
@@ -55,17 +67,25 @@ export function AddNewsModal({
           subtitle: 'Photo + récit envoyé par l’adoptant ou la famille d’accueil',
           receivedFromLabel: 'De qui (adoptant, famille d’accueil)',
         }
-  const [animalId, setAnimalId] = useState<string>('')
+  const [animalId, setAnimalId] = useState<string>(editingNews?.animal_id ?? '')
   const [animalSearch, setAnimalSearch] = useState('')
-  const [photos, setPhotos] = useState<UploadedPhoto[]>([])
-  const [text, setText] = useState('')
-  const [receivedFrom, setReceivedFrom] = useState('')
-  const [receivedAt, setReceivedAt] = useState(() => new Date().toISOString().split('T')[0])
+  const [photos, setPhotos] = useState<UploadedPhoto[]>(
+    () => (editingNews?.photos ?? []).map((p) => ({ ...p, previewUrl: p.url })),
+  )
+  const [text, setText] = useState(editingNews?.text ?? '')
+  const [receivedFrom, setReceivedFrom] = useState(editingNews?.received_from ?? '')
+  const [receivedAt, setReceivedAt] = useState(
+    editingNews?.received_at ?? new Date().toISOString().split('T')[0],
+  )
   const [uploading, setUploading] = useState(false)
   const [isPending, startTransition] = useTransition()
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const selectedAnimal = eligibleAnimals.find((a) => a.id === animalId)
+  // En édition, l'animal peut ne plus figurer dans la liste éligible (statut changé) :
+  // on retombe alors sur l'animal embarqué dans la nouvelle.
+  const selectedAnimal =
+    eligibleAnimals.find((a) => a.id === animalId) ??
+    (editingNews && editingNews.animal_id === animalId ? editingNews.animal : undefined)
 
   const filteredAnimals = animalSearch.trim()
     ? eligibleAnimals.filter((a) =>
@@ -213,18 +233,26 @@ export function AddNewsModal({
     }
 
     startTransition(async () => {
-      const result = await addAnimalNews({
-        animal_id: animalId,
-        photos: photos.map((p) => ({ url: p.url, path: p.path })),
-        text: text.trim() || null,
-        received_from: receivedFrom.trim() || null,
-        received_at: receivedAt,
-      })
+      const result = isEditing
+        ? await updateAnimalNews({
+            id: editingNews!.id,
+            photos: photos.map((p) => ({ url: p.url, path: p.path })),
+            text: text.trim() || null,
+            received_from: receivedFrom.trim() || null,
+            received_at: receivedAt,
+          })
+        : await addAnimalNews({
+            animal_id: animalId,
+            photos: photos.map((p) => ({ url: p.url, path: p.path })),
+            text: text.trim() || null,
+            received_from: receivedFrom.trim() || null,
+            received_at: receivedAt,
+          })
 
       if (result.error) {
         toast.error(result.error)
       } else {
-        toast.success('Nouvelle ajoutée')
+        toast.success(isEditing ? 'Nouvelle modifiée' : 'Nouvelle ajoutée')
         onSuccess()
       }
     })
@@ -272,13 +300,15 @@ export function AddNewsModal({
                     · {getStatusLabel(selectedAnimal.status)}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setAnimalId('')}
-                  className="text-xs text-muted hover:text-text"
-                >
-                  Changer
-                </button>
+                {!isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => setAnimalId('')}
+                    className="text-xs text-muted hover:text-text"
+                  >
+                    Changer
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
@@ -453,6 +483,8 @@ export function AddNewsModal({
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Enregistrement...
               </span>
+            ) : isEditing ? (
+              'Enregistrer les modifications'
             ) : (
               'Enregistrer'
             )}
