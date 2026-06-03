@@ -209,6 +209,100 @@ export async function addAnimalNews(input: AddNewsInput) {
   }
 }
 
+interface UpdateNewsInput {
+  id: string
+  photos: AnimalNewsPhoto[]
+  text: string | null
+  received_from: string | null
+  received_at: string // YYYY-MM-DD
+}
+
+/**
+ * Modifie une nouvelle existante (texte, auteur, date, photos).
+ * Réservé aux personnes ayant la permission view_animal_news (les admins l'ont
+ * toujours). Resynchronise les photos vers animal_photos : les photos retirées
+ * sont supprimées du storage et de animal_photos, les nouvelles y sont ajoutées.
+ * L'animal rattaché à la nouvelle n'est pas modifiable ici.
+ */
+export async function updateAnimalNews(input: UpdateNewsInput) {
+  try {
+    const ctx = await requirePermission('view_animal_news')
+    const admin = createAdminClient()
+
+    const { data: existing } = await admin
+      .from('animal_news')
+      .select('*, animal:animals(name)')
+      .eq('id', input.id)
+      .eq('establishment_id', ctx.establishmentId)
+      .single()
+
+    if (!existing) return { error: 'Nouvelle introuvable' }
+    const current = existing as AnimalNews & { animal: { name: string } | null }
+
+    for (const p of input.photos) {
+      if (!p.path.startsWith(`${ctx.establishmentId}/news/`)) {
+        return { error: 'Chemin de stockage invalide pour cet établissement' }
+      }
+    }
+
+    const oldPaths = new Set((current.photos || []).map((p) => p.path))
+    const newPaths = new Set(input.photos.map((p) => p.path))
+    const removed = (current.photos || []).filter((p) => !newPaths.has(p.path))
+    const added = input.photos.filter((p) => !oldPaths.has(p.path))
+
+    const { error } = await admin
+      .from('animal_news')
+      .update({
+        photos: input.photos,
+        text: input.text,
+        received_from: input.received_from,
+        received_at: input.received_at,
+      })
+      .eq('id', input.id)
+      .eq('establishment_id', ctx.establishmentId)
+
+    if (error) return { error: error.message }
+
+    // Resynchronisation des photos vers animal_photos
+    if (removed.length > 0) {
+      const removedUrls = removed.map((p) => p.url)
+      await admin
+        .from('animal_photos')
+        .delete()
+        .eq('source_news_id', input.id)
+        .in('url', removedUrls)
+      await admin.storage.from('animal-photos').remove(removed.map((p) => p.path))
+    }
+    if (added.length > 0) {
+      const photoRows = added.map((p) => ({
+        animal_id: current.animal_id,
+        url: p.url,
+        is_primary: false,
+        source_news_id: input.id,
+      }))
+      const { error: photoErr } = await admin.from('animal_photos').insert(photoRows)
+      if (photoErr) {
+        console.error('Failed to sync updated news photos to animal_photos:', photoErr.message)
+      }
+    }
+
+    logActivity({
+      action: 'update',
+      entityType: 'animal_news',
+      entityId: input.id,
+      entityName: current.animal ? `Nouvelle de ${current.animal.name}` : undefined,
+      parentType: 'animal',
+      parentId: current.animal_id,
+    })
+
+    revalidatePath('/nouvelles')
+    revalidatePath(`/animals/${current.animal_id}`)
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
 export async function deleteAnimalNews(id: string) {
   try {
     const ctx = await requirePermission('view_animal_news')

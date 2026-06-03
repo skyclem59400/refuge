@@ -9,6 +9,7 @@ import {
   PawPrint,
   Heart,
   Trash2,
+  Pencil,
   ImageIcon,
   ExternalLink,
   Search,
@@ -75,6 +76,7 @@ export function AnimalNewsClient({
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editingNews, setEditingNews] = useState<AnimalNewsWithAnimal | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -257,6 +259,7 @@ export function AnimalNewsClient({
             <NewsCard
               key={news.id}
               news={news}
+              onEdit={() => setEditingNews(news)}
               onDelete={() => handleDelete(news.id)}
               isPending={isPending}
             />
@@ -295,6 +298,21 @@ export function AnimalNewsClient({
           }}
         />
       )}
+
+      {/* Modal d'édition */}
+      {editingNews && (
+        <AddNewsModal
+          category={activeTab}
+          eligibleAnimals={animalsList}
+          establishmentId={establishmentId}
+          editingNews={editingNews}
+          onClose={() => setEditingNews(null)}
+          onSuccess={() => {
+            setEditingNews(null)
+            router.refresh()
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -305,10 +323,12 @@ export function AnimalNewsClient({
 
 function NewsCard({
   news,
+  onEdit,
   onDelete,
   isPending,
 }: {
   news: AnimalNewsWithAnimal
+  onEdit: () => void
   onDelete: () => void
   isPending: boolean
 }) {
@@ -359,6 +379,15 @@ function NewsCard({
             >
               <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
             </a>
+            <button
+              type="button"
+              onClick={onEdit}
+              disabled={isPending}
+              title="Modifier"
+              className="inline-flex items-center justify-center w-7 h-7 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors disabled:opacity-40"
+            >
+              <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
             <button
               type="button"
               onClick={onDelete}
