@@ -142,7 +142,7 @@ export function OutingStats({
                   <div className="w-full flex-1 flex items-end">
                     <div
                       className={`w-full rounded-lg transition-all ${
-                        point.count > 0 ? 'bg-primary' : 'bg-border/40'
+                        point.count > 0 ? 'bg-teal' : 'bg-border/40'
                       }`}
                       style={{ height: point.count > 0 ? `${pct}%` : '3px' }}
                     />
@@ -188,7 +188,7 @@ export function OutingStats({
                     </div>
                     <div className="h-2 bg-border rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-primary rounded-full transition-all"
+                        className="h-full bg-teal rounded-full transition-all"
                         style={{ width: `${(person.count / maxPersonCount) * 100}%` }}
                       />
                     </div>
