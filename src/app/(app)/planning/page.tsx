@@ -104,6 +104,40 @@ export default async function PlanningPage(props: Readonly<{ searchParams: Promi
 
   const { animalsForForm, animalNames } = buildAnimalMaps(allAnimals)
 
+  // Semaines-types des salariés : pour pré-remplir la grille avec les présences
+  // récurrentes (sans avoir besoin de créer un staff_schedule chaque semaine).
+  // Affichées en "shadow events" (rayures + opacité 65%) — ne masquent pas les
+  // schedules explicites qui prennent toujours le dessus.
+  const { data: workSchedulesRaw } = await admin
+    .from('member_work_schedules')
+    .select('day_of_week, is_rest_day, start_am, end_am, start_pm, end_pm, establishment_members!inner(user_id)')
+    .eq('establishment_id', ctx.establishment.id)
+    .is('valid_until', null)
+
+  type StandardDay = {
+    user_id: string
+    day_of_week: number
+    is_rest_day: boolean
+    start_am: string | null
+    end_am: string | null
+    start_pm: string | null
+    end_pm: string | null
+  }
+  const standardSchedules: StandardDay[] = (workSchedulesRaw || [])
+    .map((w: { day_of_week: number; is_rest_day: boolean; start_am: string | null; end_am: string | null; start_pm: string | null; end_pm: string | null; establishment_members: { user_id: string } | { user_id: string }[] }) => {
+      const em = Array.isArray(w.establishment_members) ? w.establishment_members[0] : w.establishment_members
+      return {
+        user_id: em?.user_id || '',
+        day_of_week: w.day_of_week,
+        is_rest_day: w.is_rest_day,
+        start_am: w.start_am,
+        end_am: w.end_am,
+        start_pm: w.start_pm,
+        end_pm: w.end_pm,
+      }
+    })
+    .filter((s: StandardDay) => s.user_id)
+
   const viewMode = (searchParams.view === 'cards' ? 'cards' : 'timeline') as 'cards' | 'timeline'
 
   return (
@@ -224,6 +258,7 @@ export default async function PlanningPage(props: Readonly<{ searchParams: Promi
           userNames={userNames}
           animalNames={animalNames}
           minDailyStaff={ctx.establishment.min_daily_staff ?? 0}
+          standardSchedules={standardSchedules}
         />
       )}
     </div>

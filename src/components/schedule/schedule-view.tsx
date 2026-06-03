@@ -8,6 +8,17 @@ import { deleteSchedule, duplicateWeek } from '@/lib/actions/schedule'
 import { deleteAppointment } from '@/lib/actions/appointments'
 import type { StaffSchedule, Appointment } from '@/lib/types/database'
 
+/** Semaine-type d'un salarié — base récurrente pré-affichée dans la grille. */
+export interface StandardScheduleDay {
+  user_id: string
+  day_of_week: number // 0=dim, 6=sam
+  is_rest_day: boolean
+  start_am: string | null
+  end_am: string | null
+  start_pm: string | null
+  end_pm: string | null
+}
+
 interface ScheduleViewProps {
   schedules: StaffSchedule[]
   appointments?: Appointment[]
@@ -16,6 +27,10 @@ interface ScheduleViewProps {
   /** Capacitif : seuil minimum de personnel par jour (depuis establishments.min_daily_staff).
    * Affiché dans le header de chaque colonne pour signaler les jours sous-staffés. */
   minDailyStaff?: number
+  /** Semaines-types des salariés : présences récurrentes à pré-afficher en "shadow events"
+   * (rayures + opacité 65%). Masquées sur un jour donné si un staff_schedule explicite
+   * existe pour ce même user_id à cette date. */
+  standardSchedules?: StandardScheduleDay[]
 }
 
 // Color palette for different users
@@ -41,7 +56,7 @@ type CalendarEvent =
   | { type: 'schedule'; data: StaffSchedule }
   | { type: 'appointment'; data: Appointment }
 
-export function ScheduleView({ schedules, appointments = [], userNames, animalNames = {}, minDailyStaff = 0 }: Readonly<ScheduleViewProps>) {
+export function ScheduleView({ schedules, appointments = [], userNames, animalNames = {}, minDailyStaff = 0, standardSchedules = [] }: Readonly<ScheduleViewProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -335,6 +350,8 @@ export function ScheduleView({ schedules, appointments = [], userNames, animalNa
         isPending={isPending}
         deletingId={deletingId}
         minDailyStaff={minDailyStaff}
+        standardSchedules={standardSchedules}
+        selectedUsers={selectedUsers}
         onDeleteSchedule={handleDelete}
         onDeleteAppointment={handleDeleteAppointment}
       />
@@ -375,8 +392,17 @@ interface WeeklyGridProps {
   isPending: boolean
   deletingId: string | null
   minDailyStaff: number
+  standardSchedules: StandardScheduleDay[]
+  selectedUsers: Set<string>
   onDeleteSchedule: (id: string, name: string) => void
   onDeleteAppointment: (id: string, name: string) => void
+}
+
+/** Bloc shadow event (présence récurrente issue de member_work_schedules). */
+interface ShadowBlock {
+  user_id: string
+  start_time: string
+  end_time: string
 }
 
 function WeeklyGrid({
@@ -389,9 +415,40 @@ function WeeklyGrid({
   isPending,
   deletingId,
   minDailyStaff,
+  standardSchedules,
+  selectedUsers,
   onDeleteSchedule,
   onDeleteAppointment,
 }: Readonly<WeeklyGridProps>) {
+  // Pour chaque jour de la semaine, on calcule les "shadow blocks" issus
+  // des semaines-types des salariés. Un user qui a un staff_schedule
+  // explicite ce jour-là voit ses shadow blocks supprimés (l'explicite gagne).
+  const shadowsByDate: Record<string, ShadowBlock[]> = {}
+  for (const day of weekDays) {
+    const dateStr = day.toISOString().split('T')[0]
+    const dow = day.getDay()
+    const dayEvents = eventsByDate[dateStr] || []
+    const usersWithExplicitSchedule = new Set(
+      dayEvents
+        .filter((e): e is { type: 'schedule'; data: StaffSchedule } => e.type === 'schedule')
+        .map((e) => e.data.user_id),
+    )
+
+    const blocks: ShadowBlock[] = []
+    for (const std of standardSchedules) {
+      if (std.day_of_week !== dow) continue
+      if (std.is_rest_day) continue
+      if (usersWithExplicitSchedule.has(std.user_id)) continue
+      if (selectedUsers.size > 0 && !selectedUsers.has(std.user_id)) continue
+      if (std.start_am && std.end_am) {
+        blocks.push({ user_id: std.user_id, start_time: std.start_am, end_time: std.end_am })
+      }
+      if (std.start_pm && std.end_pm) {
+        blocks.push({ user_id: std.user_id, start_time: std.start_pm, end_time: std.end_pm })
+      }
+    }
+    if (blocks.length > 0) shadowsByDate[dateStr] = blocks
+  }
   const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i)
   const todayStr = today.toISOString().split('T')[0]
   const dayShort = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
@@ -416,12 +473,15 @@ function WeeklyGrid({
           const dateStr = d.toISOString().split('T')[0]
           const isToday = dateStr === todayStr
           const dayEvents = eventsByDate[dateStr] || []
-          // Capacitif : nombre d'utilisateurs distincts présents ce jour
-          const presentUsers = new Set(
+          // Capacitif : on compte les utilisateurs distincts présents ce jour,
+          // que ce soit via un staff_schedule explicite OU via leur semaine-type.
+          const explicitUsers = new Set(
             dayEvents
               .filter((e): e is { type: 'schedule'; data: StaffSchedule } => e.type === 'schedule')
               .map((e) => e.data.user_id),
           )
+          const shadowUsers = new Set((shadowsByDate[dateStr] || []).map((b) => b.user_id))
+          const presentUsers = new Set([...explicitUsers, ...shadowUsers])
           const present = presentUsers.size
           const isUnderstaffed = minDailyStaff > 0 && present < minDailyStaff
           const isExactlyOk = minDailyStaff > 0 && present === minDailyStaff
@@ -481,6 +541,7 @@ function WeeklyGrid({
           {weekDays.map((d, dayIdx) => {
             const dateStr = d.toISOString().split('T')[0]
             const dayEvents = eventsByDate[dateStr] || []
+            const dayShadows = shadowsByDate[dateStr] || []
             const isToday = dateStr === todayStr
             return (
               <div
@@ -495,6 +556,43 @@ function WeeklyGrid({
                     style={{ top: (h - HOUR_START) * HOUR_HEIGHT_PX }}
                   />
                 ))}
+
+                {/* Shadow events (présences récurrentes depuis semaine-type) — rendus
+                    EN PREMIER pour passer sous les events explicites. Style : rayures
+                    diagonales subtiles + bordure pointillée + opacité 65% + hover plein. */}
+                {dayShadows.map((shadow, idx) => {
+                  const userName = userNames[shadow.user_id] || 'Inconnu'
+                  const colorClass = getUserColor(shadow.user_id)
+                  const top = topPxForTime(shadow.start_time)
+                  const height = heightPxForDuration(shadow.start_time, shadow.end_time)
+                  // Extrait la couleur seule (border-X-500/30) pour les rayures
+                  const borderColorMatch = colorClass.match(/border-([a-z]+)-(\d+)/)
+                  const stripeColorVar = borderColorMatch
+                    ? `rgba(0,0,0,0.04)`
+                    : 'rgba(0,0,0,0.04)'
+                  return (
+                    <div
+                      key={`shadow-${dateStr}-${idx}`}
+                      className={`absolute left-1 right-1 rounded-md px-2 py-1 overflow-hidden text-[11px] leading-tight ${colorClass} opacity-60 hover:opacity-95 transition-opacity group`}
+                      style={{
+                        top,
+                        height,
+                        borderStyle: 'dashed',
+                        borderWidth: '1px',
+                        backgroundImage: `repeating-linear-gradient(135deg, transparent, transparent 6px, ${stripeColorVar} 6px, ${stripeColorVar} 7px)`,
+                      }}
+                      title={`Présence récurrente : ${userName} (${shadow.start_time.slice(0, 5)} – ${shadow.end_time.slice(0, 5)})`}
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <div className="italic truncate flex-1">{userName}</div>
+                        <span className="opacity-50 text-[9px] uppercase tracking-wider shrink-0">Récurrent</span>
+                      </div>
+                      <div className="text-[10px] opacity-70">
+                        {shadow.start_time.slice(0, 5)} – {shadow.end_time.slice(0, 5)}
+                      </div>
+                    </div>
+                  )
+                })}
 
                 {/* Ligne "maintenant" */}
                 {nowTopPx && nowTopPx.col === dayIdx && (
