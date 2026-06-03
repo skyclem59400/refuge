@@ -319,141 +319,254 @@ export function ScheduleView({ schedules, appointments = [], userNames, animalNa
         </button>
       </div>
 
-      {/* Calendar grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-        {weekDays.map((day) => {
-          const dateStr = day.toISOString().split('T')[0]
-          const dayEvents = eventsByDate[dateStr] || []
-          const isToday = dateStr === today.toISOString().split('T')[0]
-          const isPast = day < today && !isToday
+      {/* Calendrier hebdomadaire — grille type Google Calendar (jours en colonnes,
+          heures en lignes). Plage horaire 7h → 21h ; events positionnés en absolute
+          dans la colonne du jour avec top/height proportionnels à l'horaire. */}
+      <WeeklyGrid
+        weekDays={weekDays}
+        eventsByDate={eventsByDate}
+        userNames={userNames}
+        animalNames={animalNames}
+        getUserColor={getUserColor}
+        today={today}
+        isPending={isPending}
+        deletingId={deletingId}
+        onDeleteSchedule={handleDelete}
+        onDeleteAppointment={handleDeleteAppointment}
+      />
+    </div>
+  )
+}
 
+// ============================================================
+// WeeklyGrid — composant interne, grille hebdo type Google Calendar
+// ============================================================
+
+const HOUR_START = 7  // 07h00 — début de la grille
+const HOUR_END = 21   // 21h00 — fin
+const HOUR_HEIGHT_PX = 56  // hauteur d'une ligne d'1h (assez large pour caler texte)
+
+function parseTime(t: string): number {
+  // "08:30:00" ou "08:30" -> 8.5 (heures décimales depuis minuit)
+  const [hStr, mStr] = t.split(':')
+  return parseInt(hStr) + (parseInt(mStr) / 60)
+}
+
+function topPxForTime(t: string): number {
+  return (parseTime(t) - HOUR_START) * HOUR_HEIGHT_PX
+}
+
+function heightPxForDuration(start: string, end: string): number {
+  const dur = parseTime(end) - parseTime(start)
+  return Math.max(28, dur * HOUR_HEIGHT_PX)  // min 28px pour rester lisible
+}
+
+interface WeeklyGridProps {
+  weekDays: Date[]
+  eventsByDate: Record<string, CalendarEvent[]>
+  userNames: Record<string, string>
+  animalNames: Record<string, string>
+  getUserColor: (id: string) => string
+  today: Date
+  isPending: boolean
+  deletingId: string | null
+  onDeleteSchedule: (id: string, name: string) => void
+  onDeleteAppointment: (id: string, name: string) => void
+}
+
+function WeeklyGrid({
+  weekDays,
+  eventsByDate,
+  userNames,
+  animalNames,
+  getUserColor,
+  today,
+  isPending,
+  deletingId,
+  onDeleteSchedule,
+  onDeleteAppointment,
+}: Readonly<WeeklyGridProps>) {
+  const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i)
+  const todayStr = today.toISOString().split('T')[0]
+  const dayShort = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+
+  // Position de la ligne "now" si la semaine affichée contient aujourd'hui
+  const nowTopPx = (() => {
+    const idx = weekDays.findIndex((d) => d.toISOString().split('T')[0] === todayStr)
+    if (idx === -1) return null
+    const now = today.getHours() + today.getMinutes() / 60
+    if (now < HOUR_START || now > HOUR_END) return null
+    return { col: idx, top: (now - HOUR_START) * HOUR_HEIGHT_PX }
+  })()
+
+  const gridHeight = (HOUR_END - HOUR_START) * HOUR_HEIGHT_PX
+
+  return (
+    <div className="rounded-xl border border-border bg-surface overflow-hidden">
+      {/* Header jours */}
+      <div className="grid sticky top-0 z-10 bg-surface-dark border-b border-border" style={{ gridTemplateColumns: '64px repeat(7, 1fr)' }}>
+        <div className="px-2 py-3 border-r border-border" />
+        {weekDays.map((d) => {
+          const dateStr = d.toISOString().split('T')[0]
+          const isToday = dateStr === todayStr
           return (
             <div
               key={dateStr}
-              className={`bg-surface rounded-xl border p-3 ${
-                isToday ? 'border-primary ring-1 ring-primary/20' : 'border-border'
-              } ${isPast ? 'opacity-60' : ''}`}
+              className={`px-2 py-3 text-center border-r border-border last:border-r-0 ${
+                isToday ? 'bg-accent/10' : ''
+              }`}
             >
-              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
-                <Calendar className="w-4 h-4 text-primary" />
-                <div>
-                  <p className={`text-sm font-semibold ${isToday ? 'text-primary' : ''}`}>
-                    {formatDate(day)}
-                  </p>
-                  {isToday && <p className="text-xs text-primary">Aujourd&apos;hui</p>}
-                </div>
+              <div className="text-[11px] uppercase tracking-wide text-muted font-medium">{dayShort[d.getDay()]}</div>
+              <div
+                className={`mt-1 inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${
+                  isToday ? 'bg-accent text-white' : 'text-text'
+                }`}
+              >
+                {d.getDate()}
               </div>
-
-              {dayEvents.length === 0 ? (
-                <p className="text-xs text-muted text-center py-4">Aucun événement</p>
-              ) : (
-                <div className="space-y-2">
-                  {dayEvents.map((event) => {
-                    if (event.type === 'schedule') {
-                      const schedule = event.data
-                      const userName = userNames[schedule.user_id] || 'Inconnu'
-                      const colorClass = getUserColor(schedule.user_id)
-                      const duration =
-                        (new Date(`2000-01-01T${schedule.end_time}`).getTime() -
-                          new Date(`2000-01-01T${schedule.start_time}`).getTime()) /
-                        (1000 * 60 * 60)
-
-                      return (
-                        <div
-                          key={`schedule-${schedule.id}`}
-                          className={`rounded-lg p-2 border ${colorClass}`}
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <p className="text-sm font-semibold truncate">{userName}</p>
-                            <button
-                              onClick={() => handleDelete(schedule.id, userName)}
-                              disabled={isPending && deletingId === schedule.id}
-                              className="text-error hover:text-error/80 transition-colors disabled:opacity-50 shrink-0"
-                              title="Supprimer"
-                            >
-                              {isPending && deletingId === schedule.id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                          </div>
-                          <div className="flex items-center gap-1 text-xs opacity-80">
-                            <Clock className="w-3 h-3" />
-                            <span>
-                              {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
-                            </span>
-                            <span className="text-[10px]">({duration.toFixed(1)}h)</span>
-                          </div>
-                          {schedule.notes && (
-                            <p className="text-xs mt-1 italic line-clamp-2 opacity-70">{schedule.notes}</p>
-                          )}
-                        </div>
-                      )
-                    } else {
-                      const appointment = event.data
-                      const colorClass = APPOINTMENT_COLORS[appointment.type as keyof typeof APPOINTMENT_COLORS] || 'bg-gray-600/15 border-gray-600/40 text-gray-800'
-                      const icon = appointment.type === 'adoption' ? Heart : Stethoscope
-                      const Icon = icon
-                      const duration =
-                        (new Date(`2000-01-01T${appointment.end_time}`).getTime() -
-                          new Date(`2000-01-01T${appointment.start_time}`).getTime()) /
-                        (1000 * 60 * 60)
-                      const animalName = appointment.animal_id ? animalNames[appointment.animal_id] : null
-
-                      return (
-                        <div
-                          key={`appointment-${appointment.id}`}
-                          className={`rounded-lg p-2 border ${colorClass}`}
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                              <Icon className="w-3.5 h-3.5 shrink-0" />
-                              <p className="text-sm font-semibold truncate">{appointment.client_name}</p>
-                            </div>
-                            <button
-                              onClick={() => handleDeleteAppointment(appointment.id, appointment.client_name || 'Client inconnu')}
-                              disabled={isPending && deletingId === appointment.id}
-                              className="text-error hover:text-error/80 transition-colors disabled:opacity-50 shrink-0"
-                              title="Supprimer"
-                            >
-                              {isPending && deletingId === appointment.id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                          </div>
-                          {animalName && (
-                            <p className="text-xs font-medium opacity-75 mb-0.5">🐾 {animalName}</p>
-                          )}
-                          <div className="flex items-center gap-1 text-xs opacity-80">
-                            <Clock className="w-3 h-3" />
-                            <span>
-                              {formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}
-                            </span>
-                            <span className="text-[10px]">({duration.toFixed(1)}h)</span>
-                          </div>
-                          <div className="flex items-center gap-1 text-[10px] opacity-70 mt-0.5">
-                            <span className="px-1.5 py-0.5 rounded bg-black/10">
-                              {appointment.status === 'scheduled' && 'Planifié'}
-                              {appointment.status === 'confirmed' && 'Confirmé'}
-                              {appointment.status === 'completed' && 'Terminé'}
-                              {appointment.status === 'cancelled' && 'Annulé'}
-                            </span>
-                          </div>
-                          {appointment.notes && (
-                            <p className="text-xs mt-1 italic line-clamp-2 opacity-70">{appointment.notes}</p>
-                          )}
-                        </div>
-                      )
-                    }
-                  })}
-                </div>
-              )}
             </div>
           )
         })}
+      </div>
+
+      {/* Corps grille + events */}
+      <div className="overflow-x-auto">
+        <div className="relative grid min-w-[800px]" style={{ gridTemplateColumns: '64px repeat(7, 1fr)', height: gridHeight }}>
+          {/* Colonne heures */}
+          <div className="relative border-r border-border">
+            {hours.map((h) => (
+              <div
+                key={h}
+                className="absolute left-0 right-0 px-2 text-[11px] text-muted text-right pr-2"
+                style={{ top: (h - HOUR_START) * HOUR_HEIGHT_PX - 6 }}
+              >
+                {String(h).padStart(2, '0')}:00
+              </div>
+            ))}
+          </div>
+
+          {/* Colonnes jours */}
+          {weekDays.map((d, dayIdx) => {
+            const dateStr = d.toISOString().split('T')[0]
+            const dayEvents = eventsByDate[dateStr] || []
+            const isToday = dateStr === todayStr
+            return (
+              <div
+                key={dateStr}
+                className={`relative border-r border-border last:border-r-0 ${isToday ? 'bg-accent/5' : ''}`}
+              >
+                {/* Lignes horaires */}
+                {hours.map((h) => (
+                  <div
+                    key={h}
+                    className="absolute left-0 right-0 border-t border-border/40"
+                    style={{ top: (h - HOUR_START) * HOUR_HEIGHT_PX }}
+                  />
+                ))}
+
+                {/* Ligne "maintenant" */}
+                {nowTopPx && nowTopPx.col === dayIdx && (
+                  <>
+                    <div
+                      className="absolute left-0 right-0 h-px bg-red-500 z-20"
+                      style={{ top: nowTopPx.top }}
+                    />
+                    <div
+                      className="absolute w-2 h-2 rounded-full bg-red-500 -translate-x-1/2 -translate-y-1/2 z-20"
+                      style={{ top: nowTopPx.top, left: 0 }}
+                    />
+                  </>
+                )}
+
+                {/* Events */}
+                {dayEvents.map((event) => {
+                  if (event.type === 'schedule') {
+                    const schedule = event.data
+                    const userName = userNames[schedule.user_id] || 'Inconnu'
+                    const colorClass = getUserColor(schedule.user_id)
+                    const top = topPxForTime(schedule.start_time)
+                    const height = heightPxForDuration(schedule.start_time, schedule.end_time)
+                    return (
+                      <div
+                        key={`schedule-${schedule.id}`}
+                        className={`absolute left-1 right-1 rounded-md border px-2 py-1 overflow-hidden text-[11px] leading-tight ${colorClass} group`}
+                        style={{ top, height }}
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="font-semibold truncate flex-1">{userName}</div>
+                          <button
+                            onClick={() => onDeleteSchedule(schedule.id, userName)}
+                            disabled={isPending && deletingId === schedule.id}
+                            className="opacity-0 group-hover:opacity-100 shrink-0 text-error hover:text-error/80 disabled:opacity-30 transition-opacity"
+                            title="Supprimer"
+                          >
+                            {isPending && deletingId === schedule.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
+                        <div className="text-[10px] opacity-70">
+                          {schedule.start_time.slice(0, 5)} – {schedule.end_time.slice(0, 5)}
+                        </div>
+                        {schedule.notes && height >= HOUR_HEIGHT_PX * 1.5 && (
+                          <div className="text-[10px] opacity-60 italic line-clamp-2 mt-0.5">{schedule.notes}</div>
+                        )}
+                      </div>
+                    )
+                  } else {
+                    const appointment = event.data
+                    const colorClass =
+                      APPOINTMENT_COLORS[appointment.type as keyof typeof APPOINTMENT_COLORS] ||
+                      'bg-gray-600/15 border-gray-600/40 text-gray-800'
+                    const Icon = appointment.type === 'adoption' ? Heart : Stethoscope
+                    const animalName = appointment.animal_id ? animalNames[appointment.animal_id] : null
+                    const top = topPxForTime(appointment.start_time)
+                    const height = heightPxForDuration(appointment.start_time, appointment.end_time)
+                    return (
+                      <div
+                        key={`appointment-${appointment.id}`}
+                        className={`absolute left-1 right-1 rounded-md border px-2 py-1 overflow-hidden text-[11px] leading-tight ${colorClass} group`}
+                        style={{ top, height }}
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="flex items-center gap-1 font-semibold truncate flex-1">
+                            <Icon className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{appointment.client_name}</span>
+                          </div>
+                          <button
+                            onClick={() =>
+                              onDeleteAppointment(appointment.id, appointment.client_name || 'Client inconnu')
+                            }
+                            disabled={isPending && deletingId === appointment.id}
+                            className="opacity-0 group-hover:opacity-100 shrink-0 text-error hover:text-error/80 disabled:opacity-30 transition-opacity"
+                            title="Supprimer"
+                          >
+                            {isPending && deletingId === appointment.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
+                        {animalName && (
+                          <div className="text-[10px] font-medium opacity-75">🐾 {animalName}</div>
+                        )}
+                        <div className="text-[10px] opacity-70">
+                          {appointment.start_time.slice(0, 5)} – {appointment.end_time.slice(0, 5)}
+                        </div>
+                        {appointment.notes && height >= HOUR_HEIGHT_PX * 1.5 && (
+                          <div className="text-[10px] opacity-60 italic line-clamp-2 mt-0.5">{appointment.notes}</div>
+                        )}
+                      </div>
+                    )
+                  }
+                })}
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
