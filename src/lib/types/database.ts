@@ -4,7 +4,7 @@ export type ClientKind = 'person' | 'organization'
 export type DocumentType = 'devis' | 'facture' | 'avoir'
 export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'converted' | 'validated'
 export type DocumentPaymentMethod = 'cheque' | 'virement' | 'especes' | 'cb' | 'prelevement' | 'autre'
-export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings' | 'manage_outing_assignments' | 'manage_adoptions' | 'manage_planning' | 'manage_leaves' | 'view_own_leaves' | 'manage_payslips' | 'manage_veterinarians' | 'view_animal_news'
+export type Permission = 'manage_establishment' | 'manage_documents' | 'manage_clients' | 'manage_animals' | 'view_animals' | 'manage_health' | 'manage_movements' | 'manage_boxes' | 'manage_posts' | 'manage_donations' | 'view_pound' | 'view_statistics' | 'manage_outings' | 'manage_outing_assignments' | 'manage_adoptions' | 'manage_planning' | 'manage_leaves' | 'view_own_leaves' | 'manage_payslips' | 'manage_veterinarians' | 'view_animal_news' | 'manage_astreinte'
 
 export interface LineItem {
   description: string
@@ -178,6 +178,8 @@ export interface PermissionGroup {
   manage_volunteer_applications: boolean
   manage_foster_applications: boolean
   manage_abuse_reports: boolean
+  // Module astreinte (tickets, communes, accès)
+  manage_astreinte: boolean
   created_at: string
   updated_at: string
 }
@@ -246,6 +248,7 @@ export interface Permissions {
   canManageVolunteerApplications: boolean
   canManageFosterApplications: boolean
   canManageAbuseReports: boolean
+  canManageAstreinte: boolean
   isAdmin: boolean
   isOwner: boolean
 }

@@ -19,7 +19,7 @@ export default async function AstreinteTicketsPage({
   searchParams: Promise<SearchParams>
 }) {
   const ctx = await getEstablishmentContext()
-  if (!ctx?.permissions.canManageEstablishment) {
+  if (!ctx?.permissions.canManageAstreinte) {
     redirect('/dashboard')
   }
 

@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function AccessPage() {
   const ctx = await getEstablishmentContext()
-  if (!ctx?.permissions.canManageEstablishment) {
+  if (!ctx?.permissions.canManageAstreinte) {
     redirect('/dashboard')
   }
 

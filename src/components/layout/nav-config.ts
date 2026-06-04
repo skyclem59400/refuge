@@ -120,10 +120,10 @@ const shelterSections: NavSection[] = [
   {
     label: 'Astreinte',
     items: [
-      { href: '/astreinte/tickets', label: 'Tickets', Icon: Inbox, permission: 'canManageEstablishment' },
-      { href: '/astreinte/communes', label: 'Communes', Icon: MapPin, permission: 'canManageEstablishment' },
+      { href: '/astreinte/tickets', label: 'Tickets', Icon: Inbox, permission: 'canManageAstreinte' },
+      { href: '/astreinte/communes', label: 'Communes', Icon: MapPin, permission: 'canManageAstreinte' },
       { href: '/admin/conventions', label: 'Conventions fourrière', Icon: FileSignature, permission: 'canManageEstablishment' },
-      { href: '/astreinte/acces', label: 'Accès portail', Icon: KeyRound, permission: 'canManageEstablishment' },
+      { href: '/astreinte/acces', label: 'Accès portail', Icon: KeyRound, permission: 'canManageAstreinte' },
     ],
   },
   {

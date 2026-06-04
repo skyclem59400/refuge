@@ -18,7 +18,7 @@ export default async function CommunesPage({
   searchParams: Promise<SearchParams>
 }) {
   const ctx = await getEstablishmentContext()
-  if (!ctx?.permissions.canManageEstablishment) {
+  if (!ctx?.permissions.canManageAstreinte) {
     redirect('/dashboard')
   }
 

@@ -13,7 +13,7 @@ export default async function CommuneDetailPage({
   params: Promise<{ code_insee: string }>
 }) {
   const ctx = await getEstablishmentContext()
-  if (!ctx?.permissions.canManageEstablishment) {
+  if (!ctx?.permissions.canManageAstreinte) {
     redirect('/dashboard')
   }
 

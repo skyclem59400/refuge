@@ -38,6 +38,7 @@ function buildPermissions(groups: PermissionGroup[], membership: EstablishmentMe
     canManageVolunteerApplications: has('manage_volunteer_applications'),
     canManageFosterApplications: has('manage_foster_applications'),
     canManageAbuseReports: has('manage_abuse_reports'),
+    canManageAstreinte: has('manage_astreinte') || has('manage_establishment'),
   }
 }
 

@@ -167,7 +167,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
   const { id } = await params
 
   const ctx = await getEstablishmentContext()
-  if (!ctx?.permissions.canManageEstablishment) {
+  if (!ctx?.permissions.canManageAstreinte) {
     redirect('/dashboard')
   }
 
