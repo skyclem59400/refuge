@@ -32,6 +32,20 @@ export async function buildEngagementCertificatePdf(certificateId: string): Prom
     throw new Error('Certificat introuvable')
   }
 
+  // Résout le nom du salarié qui a créé le certificat (pour le bloc Refuge SDA).
+  let createdByName: string | null = null
+  if (certificate.created_by) {
+    try {
+      const { data: usersInfo } = await admin.rpc('get_users_info', { user_ids: [certificate.created_by] })
+      if (usersInfo && Array.isArray(usersInfo) && usersInfo.length > 0) {
+        const u = usersInfo[0]
+        createdByName = u.full_name || u.email || null
+      }
+    } catch (e) {
+      console.warn('[engagement-certificate-pdf] could not resolve creator name:', (e as Error).message)
+    }
+  }
+
   let companyInfo: CompanyInfo | undefined
   let logoUrl: string | null = null
 
@@ -73,7 +87,7 @@ export async function buildEngagementCertificatePdf(certificateId: string): Prom
     }
   }
 
-  const html = buildEngagementCertificateHtml(certificate, certificate.animal, certificate.adopter, companyInfo, logoBase64)
+  const html = buildEngagementCertificateHtml(certificate, certificate.animal, certificate.adopter, companyInfo, logoBase64, createdByName)
 
   const puppeteer = await import('puppeteer')
   const browser = await puppeteer.default.launch({

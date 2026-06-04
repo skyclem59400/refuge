@@ -1,5 +1,6 @@
 import type { CompanyInfo } from '@/lib/types/database'
 import { getSpeciesLabel } from '@/lib/species'
+import { buildCachetSvg } from './cachet'
 
 interface EngagementCertificatePdfData {
   certificate_number: string
@@ -104,7 +105,8 @@ export function buildEngagementCertificateHtml(
   animal: EngagementPdfAnimal,
   adopter: EngagementPdfClient,
   company: CompanyInfo | undefined,
-  logoBase64: string | undefined
+  logoBase64: string | undefined,
+  createdByName?: string | null
 ): string {
   const adopterAddressLines = [
     htmlEscape(adopter.address) || '',
@@ -118,6 +120,7 @@ export function buildEngagementCertificateHtml(
   const companySiret = company?.siret || '32110272500025'
 
   const adopterFullName = fullName(adopter)
+  const refugeCachetSvg = buildCachetSvg(company || { name: companyName })
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -290,6 +293,10 @@ export function buildEngagementCertificateHtml(
       font-size: 9.5pt;
       font-weight: 700;
       color: ${NAVY};
+      /* Force le bloc signed-at + signatures + footer sur une page seule,
+         pour que la sigbox adoptant tombe toujours au même endroit
+         (cible Documenso : pageY=20 sur la dernière page). */
+      page-break-before: always;
     }
     .signatures {
       display: grid;
@@ -300,7 +307,36 @@ export function buildEngagementCertificateHtml(
     }
     .sigbox { border: 1px solid ${STONE_300}; border-radius: 6px; overflow: hidden; }
     .sigbox-head { background: ${NAVY}; color: white; text-align: center; padding: 2mm; font-size: 8.5pt; letter-spacing: 1pt; font-weight: 700; text-transform: uppercase; }
-    .sigbox-body { min-height: 32mm; padding: 3mm 4mm; font-size: 8.5pt; color: ${STONE_500}; }
+    .sigbox-body { min-height: 40mm; padding: 3mm 4mm; font-size: 8.5pt; color: ${STONE_500}; }
+    .sigbox-body.is-refuge {
+      display: flex;
+      align-items: center;
+      gap: 3mm;
+      padding: 2mm 3mm;
+      color: ${NAVY};
+    }
+    .sigbox-body.is-refuge .cachet {
+      width: 26mm;
+      height: 26mm;
+      flex-shrink: 0;
+    }
+    .sigbox-body.is-refuge .cachet svg { display: block; width: 100%; height: 100%; }
+    .sigbox-body.is-refuge .signer-name {
+      flex: 1;
+      font-size: 9pt;
+      font-weight: 700;
+      color: ${NAVY};
+      line-height: 1.3;
+    }
+    .sigbox-body.is-refuge .signer-label {
+      font-size: 7.5pt;
+      font-weight: 400;
+      color: ${STONE_500};
+      text-transform: uppercase;
+      letter-spacing: 0.5pt;
+      display: block;
+      margin-bottom: 1mm;
+    }
 
     .footer {
       margin-top: 8mm;
@@ -440,8 +476,14 @@ export function buildEngagementCertificateHtml(
       <div class="sigbox-body">Mention manuscrite « Lu et approuvé »<br/>puis signature</div>
     </div>
     <div class="sigbox">
-      <div class="sigbox-head">Signature du Refuge</div>
-      <div class="sigbox-body">Pour ${htmlEscape(companyName)}</div>
+      <div class="sigbox-head">Signature du Refuge SDA</div>
+      <div class="sigbox-body is-refuge">
+        <div class="cachet">${refugeCachetSvg}</div>
+        <div class="signer-name">
+          <span class="signer-label">Pour ${htmlEscape(companyName)}</span>
+          ${createdByName ? htmlEscape(createdByName) : 'Le représentant'}
+        </div>
+      </div>
     </div>
   </div>
 

@@ -214,11 +214,17 @@ export async function createAndSendEngagementCertificate(input: CreateEngagement
     //    - NAME : auto-rempli
     //    - DATE : auto-rempli
     //    - SIGNATURE : à dessiner par le signataire
+    //
+    // Le template force `page-break-before: always` sur .signed-at, donc la
+    // dernière page ne contient que : signed-at (~8mm) + sigbox (40mm
+    // min-height) + footer. La sigbox adoptant occupe en gros 32→72mm depuis
+    // le haut, soit 11%→24% de la page A4. Les pageY ci-dessous ciblent ce
+    // créneau et sont alignés avec le style hérité du contrat d'adoption.
     const lastPage = pdfResult.pageCount
     const fieldsToAdd: Array<{ type: 'NAME' | 'DATE' | 'SIGNATURE'; pageY: number; pageHeight: number }> = [
-      { type: 'NAME', pageY: 79, pageHeight: 4 },
-      { type: 'DATE', pageY: 84, pageHeight: 4 },
-      { type: 'SIGNATURE', pageY: 89, pageHeight: 8 },
+      { type: 'NAME', pageY: 12, pageHeight: 3 },
+      { type: 'DATE', pageY: 16, pageHeight: 3 },
+      { type: 'SIGNATURE', pageY: 20, pageHeight: 6 },
     ]
     for (const field of fieldsToAdd) {
       try {
