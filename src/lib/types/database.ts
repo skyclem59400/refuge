@@ -410,6 +410,8 @@ export interface Animal {
   description_external_pending: string | null
   description_external_pending_updated_at: string | null
   description_external_pending_updated_by: string | null
+  /** Utilisateur qui a saisi l'animal (NULL pour les animaux importés anciens). */
+  created_by: string | null
   /** Adoptant pré-réservé (certificat d'engagement en cours). NULL si pas de pré-réservation. */
   pre_reservation_client_id: string | null
   retirement_basket: boolean
