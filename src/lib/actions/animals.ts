@@ -498,6 +498,57 @@ export async function rejectAnimalDescription(animalId: string, reason?: string)
   }
 }
 
+/**
+ * Dépublie le texte actuellement visible sur sda-nord.com (vide description_external).
+ * Utile quand un texte a été publié à tort (ex. note de fourrière dupliquée à
+ * la création) et qu'il faut le retirer du site sans avoir besoin d'un brouillon
+ * de remplacement. Réservé aux admins.
+ */
+export async function unpublishAnimalDescription(animalId: string) {
+  try {
+    const { establishmentId, userId } = await requirePermission('manage_establishment')
+    const supabase = await createClient()
+    const admin = createAdminClient()
+
+    const { data: current } = await admin
+      .from('animals')
+      .select('id, name, description_external')
+      .eq('id', animalId)
+      .eq('establishment_id', establishmentId)
+      .single()
+
+    if (!current) return { error: 'Animal introuvable' }
+    if (!current.description_external) {
+      return { error: 'Cet animal n’a pas de texte publié à retirer.' }
+    }
+
+    const { error } = await supabase
+      .from('animals')
+      .update({ description_external: null })
+      .eq('id', animalId)
+      .eq('establishment_id', establishmentId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/animals')
+    revalidatePath(`/animals/${animalId}`)
+    logActivity({
+      action: 'update',
+      entityType: 'animal',
+      entityId: animalId,
+      entityName: current.name,
+      details: {
+        unpublished_description: true,
+        unpublished_by_user_id: userId,
+        old_length: current.description_external.length,
+      },
+    })
+    return { success: true }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
 export async function toggleIsSos(animalId: string, isSos: boolean) {
   try {
     const { establishmentId } = await requirePermission('manage_adoptions')

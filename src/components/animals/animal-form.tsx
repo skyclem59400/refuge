@@ -3,8 +3,8 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert } from 'lucide-react'
-import { createAnimal, updateAnimal, approveAnimalDescription, rejectAnimalDescription } from '@/lib/actions/animals'
+import { Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert, EyeOff } from 'lucide-react'
+import { createAnimal, updateAnimal, approveAnimalDescription, rejectAnimalDescription, unpublishAnimalDescription } from '@/lib/actions/animals'
 import { CommuneAutocomplete } from '@/components/ui/commune-autocomplete'
 import { AddressAutocomplete } from '@/components/ui/address-autocomplete'
 import { JudicialOwnerPicker } from '@/components/animals/judicial-owner-picker'
@@ -73,6 +73,7 @@ export function AnimalForm({ animal, boxes = [], judicialOwner = null, canApprov
   )
   const [isGenerating, setIsGenerating] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
+  const [isUnpublishing, setIsUnpublishing] = useState(false)
   const [okCats, setOkCats] = useState<boolean | null>(animal?.ok_cats ?? null)
   const [okMales, setOkMales] = useState<boolean | null>(animal?.ok_males ?? null)
   const [okFemales, setOkFemales] = useState<boolean | null>(animal?.ok_females ?? null)
@@ -560,6 +561,34 @@ export function AnimalForm({ animal, boxes = [], judicialOwner = null, canApprov
               rows={6}
               className={`${inputClass} resize-y font-serif leading-relaxed bg-surface/50 cursor-not-allowed opacity-80`}
             />
+            {canApproveDescription && descriptionExternalPublished && animal?.id && (
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  disabled={isUnpublishing}
+                  onClick={async () => {
+                    if (!animal?.id) return
+                    if (!confirm("Retirer ce texte du site sda-nord.com ? L'animal ne sera plus visible publiquement tant qu'aucun nouveau texte n'aura été approuvé.")) return
+                    setIsUnpublishing(true)
+                    try {
+                      const res = await unpublishAnimalDescription(animal.id)
+                      if (res.success) {
+                        toast.success('Texte retiré du site.')
+                        router.refresh()
+                      } else {
+                        toast.error(res.error || 'Erreur lors du retrait')
+                      }
+                    } finally {
+                      setIsUnpublishing(false)
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-warning/15 text-warning hover:bg-warning/25 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isUnpublishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <EyeOff className="w-3.5 h-3.5" />}
+                  Retirer du site
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Brouillon (éditable) + bouton IA */}
