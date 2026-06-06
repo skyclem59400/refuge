@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Heart, Bookmark, Home, Siren, FileEdit } from 'lucide-react'
+import { Heart, Bookmark, Home, Siren, FileEdit, Briefcase } from 'lucide-react'
 import { AnimalStatusBadge, SpeciesBadge } from './animal-status-badge'
 import { getSexIcon, calculateAge, getStatusLabel } from '@/lib/sda-utils'
 import { toggleAdoptable, toggleReserved, toggleRetirementBasket, toggleIsSos } from '@/lib/actions/animals'
@@ -453,6 +453,12 @@ export function AnimalList({ animals, canManageAdoptions = false }: Readonly<Ani
                       {animal.judicial_procedure && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-error/90 text-white backdrop-blur-sm">
                           ⚖️ EN PROCÉDURE
+                        </span>
+                      )}
+                      {animal.pros_only && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/90 text-white backdrop-blur-sm" title="Adoptable uniquement par des professionnels">
+                          <Briefcase className="w-3 h-3" />
+                          PROS UNIQUEMENT
                         </span>
                       )}
                     </div>

@@ -79,6 +79,7 @@ export function AnimalForm({ animal, boxes = [], judicialOwner = null, canApprov
   const [okFemales, setOkFemales] = useState<boolean | null>(animal?.ok_females ?? null)
   const [arrivedSterilized, setArrivedSterilized] = useState<boolean>(animal?.arrived_sterilized ?? false)
   const [sterilizedNow, setSterilizedNow] = useState<boolean>(animal?.sterilized ?? false)
+  const [prosOnly, setProsOnly] = useState<boolean>(animal?.pros_only ?? false)
 
   // Identification fields
   const [chipNumber, setChipNumber] = useState(animal?.chip_number || '')
@@ -184,6 +185,7 @@ export function AnimalForm({ animal, boxes = [], judicialOwner = null, canApprov
         ok_males: supportsCompatibility(species) ? okMales : null,
         ok_females: supportsCompatibility(species) ? okFemales : null,
         arrived_sterilized: arrivedSterilized,
+        pros_only: prosOnly,
         // Si l'animal est arrivé stérilisé, l'état actuel l'est aussi
         sterilized: arrivedSterilized || sterilizedNow,
         judicial_procedure: judicialProcedure,
@@ -477,6 +479,14 @@ export function AnimalForm({ animal, boxes = [], judicialOwner = null, canApprov
                 disabled={arrivedSterilized}
               />
               <span>Actuellement stérilisé(e){arrivedSterilized ? ' (auto)' : ''}</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer" title="Si activé, l'animal apparaîtra avec le badge 'Pros uniquement' sur le site sda-nord.com (éleveur, éducateur, dresseur, comportementaliste).">
+              <input
+                type="checkbox"
+                checked={prosOnly}
+                onChange={(e) => setProsOnly(e.target.checked)}
+              />
+              <span>Adoptable uniquement par des professionnels</span>
             </label>
           </div>
         </div>

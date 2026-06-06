@@ -338,6 +338,7 @@ export async function updateAnimal(id: string, data: {
   judicial_appeal_deadline?: string | null
   judicial_lawyer_name?: string | null
   judicial_lawyer_contact?: string | null
+  pros_only?: boolean
 }) {
   try {
     const { establishmentId, userId } = await requirePermission('manage_animals')
