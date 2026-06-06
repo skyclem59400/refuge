@@ -36,12 +36,16 @@ function buildUpcoming(records: AnimalHealthRecord[]): UpcomingReminder[] {
     const due = new Date(r.next_due_date)
     const diffDays = Math.floor((due.getTime() - now.getTime()) / 86400000)
     // On ignore les rappels qui sont déjà couverts par un vaccin plus
-    // récent (date > next_due_date d'un autre record du même type).
+    // récent (date >= next_due_date d'un autre record du même type).
+    // L'égalité couvre le cas usuel : un rappel saisi exactement à la
+    // date d'échéance théorique (ex. Orka — primo 02/03/2026 due le
+    // 30/03/2026, rappel saisi pile le 30/03/2026 → l'alerte primo doit
+    // s'éteindre, pas rester "en retard depuis 0 jour").
     const supersededBy = records.find(
       (other) =>
         other.id !== r.id &&
         other.type === 'vaccination' &&
-        new Date(other.date) > due,
+        new Date(other.date) >= due,
     )
     if (supersededBy) continue
     out.push({
