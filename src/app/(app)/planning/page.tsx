@@ -61,12 +61,14 @@ async function resolveUserNames(
   return names
 }
 
-function buildAnimalMaps(allAnimals: { id: string; nom: string }[] | null) {
+function buildAnimalMaps(allAnimals: { id: string; name: string }[] | null) {
   const animals = allAnimals || []
-  const animalsForForm = animals.map((a) => ({ id: a.id, nom: a.nom }))
+  // EventCreator (et schedule views) consomment `{ id, nom }` historiquement.
+  // On normalise depuis `name` (colonne réelle en base) vers `nom` (clé du form).
+  const animalsForForm = animals.map((a) => ({ id: a.id, nom: a.name }))
   const animalNames: Record<string, string> = {}
   for (const animal of animals) {
-    animalNames[animal.id] = animal.nom
+    animalNames[animal.id] = animal.name
   }
   return { animalsForForm, animalNames }
 }
@@ -98,9 +100,9 @@ export default async function PlanningPage(props: Readonly<{ searchParams: Promi
   // Fetch animals for appointment linking and form
   const { data: allAnimals } = await admin
     .from('animals')
-    .select('id, nom')
+    .select('id, name')
     .eq('establishment_id', ctx.establishment.id)
-    .order('nom')
+    .order('name')
 
   const { animalsForForm, animalNames } = buildAnimalMaps(allAnimals)
 
