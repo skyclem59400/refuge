@@ -328,6 +328,13 @@ export type AnimalSpecies =
   | 'tortoise'
   | 'other'
 export type AnimalSex = 'male' | 'female' | 'unknown'
+
+/** État d'entente entre l'animal et un type d'autre animal.
+ * - 'yes' : s'entend bien
+ * - 'no'  : ne s'entend pas
+ * - 'selective' : s'entend avec certains mais pas tous (cas typique des chiens)
+ * - null : pas testé / inconnu */
+export type CompatibilityState = 'yes' | 'no' | 'selective' | null
 export type AnimalStatus = 'pound' | 'shelter' | 'foster_family' | 'boarding' | 'adopted' | 'returned' | 'transferred' | 'deceased' | 'euthanized'
 export type AnimalOrigin = 'found' | 'abandoned' | 'transferred_in' | 'surrender' | 'requisition' | 'divagation'
 export type MovementType = 'pound_entry' | 'shelter_transfer' | 'foster_placement' | 'adoption' | 'return_to_owner' | 'transfer_out' | 'death' | 'euthanasia' | 'reservation' | 'reservation_cancelled'
@@ -418,9 +425,11 @@ export interface Animal {
   /** Adoptant pré-réservé (certificat d'engagement en cours). NULL si pas de pré-réservation. */
   pre_reservation_client_id: string | null
   retirement_basket: boolean
-  ok_cats: boolean | null
-  ok_males: boolean | null
-  ok_females: boolean | null
+  /** État d'entente : 'yes' (oui), 'no' (non), 'selective' (sélectif — s'entend
+   * avec certains types mais pas tous), null (pas testé). */
+  ok_cats: CompatibilityState
+  ok_males: CompatibilityState
+  ok_females: CompatibilityState
   // Hunimalis sync fields
   hunimalis_id: number | null
   photo_url: string | null

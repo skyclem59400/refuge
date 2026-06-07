@@ -52,9 +52,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       description_external: string | null
       reserved: boolean
       status: string
-      ok_cats: boolean | null
-      ok_males: boolean | null
-      ok_females: boolean | null
+      ok_cats: 'yes' | 'no' | 'selective' | null
+      ok_males: 'yes' | 'no' | 'selective' | null
+      ok_females: 'yes' | 'no' | 'selective' | null
       behavior_score: number | null
       establishment_id: string
       establishments: { id: string; name: string; adoption_appointment_settings: { enabled?: boolean } }

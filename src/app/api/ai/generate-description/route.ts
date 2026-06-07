@@ -35,9 +35,10 @@ function stripMarkdownFormatting(text: string): string {
     .trim()
 }
 
-function formatTriState(val: boolean | null, yes: string, no: string): string {
-  if (val === true) return yes
-  if (val === false) return no
+function formatTriState(val: 'yes' | 'no' | 'selective' | null, yes: string, no: string): string {
+  if (val === 'yes') return yes
+  if (val === 'no') return no
+  if (val === 'selective') return `${yes} (sélectif — s'entend avec certains mais pas tous)`
   return 'non évalué'
 }
 
@@ -368,9 +369,9 @@ interface AnimalRow {
   sterilized: boolean
   behavior_score: number | null
   description: string | null
-  ok_cats: boolean | null
-  ok_males: boolean | null
-  ok_females: boolean | null
+  ok_cats: 'yes' | 'no' | 'selective' | null
+  ok_males: 'yes' | 'no' | 'selective' | null
+  ok_females: 'yes' | 'no' | 'selective' | null
   shelter_entry_date: string | null
   status: string | null
   photo_url: string | null

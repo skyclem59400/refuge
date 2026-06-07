@@ -28,7 +28,7 @@ import {
   supportsCompatibility,
   isFarmRuminantOrPorcine,
 } from '@/lib/species'
-import type { Animal, Box, BoxWithZone, AnimalSpecies, AnimalSex, AnimalOrigin } from '@/lib/types/database'
+import type { Animal, Box, BoxWithZone, AnimalSpecies, AnimalSex, AnimalOrigin, CompatibilityState } from '@/lib/types/database'
 
 interface JudicialOwnerSnapshot {
   client_id: string
@@ -74,9 +74,9 @@ export function AnimalForm({ animal, boxes = [], judicialOwner = null, canApprov
   const [isGenerating, setIsGenerating] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
   const [isUnpublishing, setIsUnpublishing] = useState(false)
-  const [okCats, setOkCats] = useState<boolean | null>(animal?.ok_cats ?? null)
-  const [okMales, setOkMales] = useState<boolean | null>(animal?.ok_males ?? null)
-  const [okFemales, setOkFemales] = useState<boolean | null>(animal?.ok_females ?? null)
+  const [okCats, setOkCats] = useState<CompatibilityState>(animal?.ok_cats ?? null)
+  const [okMales, setOkMales] = useState<CompatibilityState>(animal?.ok_males ?? null)
+  const [okFemales, setOkFemales] = useState<CompatibilityState>(animal?.ok_females ?? null)
   const [arrivedSterilized, setArrivedSterilized] = useState<boolean>(animal?.arrived_sterilized ?? false)
   const [sterilizedNow, setSterilizedNow] = useState<boolean>(animal?.sterilized ?? false)
   const [prosOnly, setProsOnly] = useState<boolean>(animal?.pros_only ?? false)
@@ -505,9 +505,10 @@ export function AnimalForm({ animal, boxes = [], judicialOwner = null, canApprov
                   <span className="text-sm">{item.label}</span>
                   <div className="flex rounded-lg border border-border overflow-hidden">
                     {([
-                      { val: true, text: 'Oui', color: 'bg-green-500 text-white' },
-                      { val: null, text: '?', color: 'bg-surface-hover text-muted' },
-                      { val: false, text: 'Non', color: 'bg-red-500 text-white' },
+                      { val: 'yes' as CompatibilityState, text: 'Oui', color: 'bg-green-500 text-white' },
+                      { val: 'selective' as CompatibilityState, text: 'Sélectif', color: 'bg-amber-500 text-white' },
+                      { val: null as CompatibilityState, text: '?', color: 'bg-surface-hover text-muted' },
+                      { val: 'no' as CompatibilityState, text: 'Non', color: 'bg-red-500 text-white' },
                     ] as const).map((opt) => (
                       <button
                         key={String(opt.val)}
@@ -516,6 +517,7 @@ export function AnimalForm({ animal, boxes = [], judicialOwner = null, canApprov
                         className={`px-2.5 py-1 text-xs font-medium transition-colors ${
                           item.value === opt.val ? opt.color : 'bg-surface text-muted hover:bg-surface-hover'
                         }`}
+                        title={opt.val === 'selective' ? "S'entend avec certains mais pas tous" : undefined}
                       >
                         {opt.text}
                       </button>
