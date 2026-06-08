@@ -598,6 +598,49 @@ export async function getAssignments(filters?: {
 }
 
 // ---------------------------------------------------------------------------
+// getOutingsCalendar — vue calendrier (assignations + sorties réalisées)
+//
+// Source unifiée pour la vue calendrier de /sorties : fusionne
+// outing_assignments (planifié) et animal_outings (réalisé) sur une plage.
+// Si une assignment a un outing_id, on ne retourne que l'outing (= réalisé)
+// pour éviter le doublon.
+// ---------------------------------------------------------------------------
+
+export async function getOutingsCalendar(filters: {
+  dateFrom: string
+  dateTo: string
+}) {
+  try {
+    const { establishmentId } = await requireEstablishment()
+    const supabase = createAdminClient()
+
+    const [assignmentsRes, outingsRes] = await Promise.all([
+      supabase
+        .from('outing_assignments')
+        .select('id, animal_id, assigned_to, partner_id, date, outing_id, notes, animals!inner(id, name, species, photo_url, establishment_id)')
+        .eq('establishment_id', establishmentId)
+        .gte('date', filters.dateFrom)
+        .lte('date', filters.dateTo)
+        .order('date'),
+      supabase
+        .from('animal_outings')
+        .select('id, animal_id, walked_by, started_at, ended_at, duration_minutes, is_tig, tig_walker_name, rating, animals!inner(id, name, species, photo_url, establishment_id)')
+        .eq('animals.establishment_id', establishmentId)
+        .gte('started_at', `${filters.dateFrom}T00:00:00`)
+        .lte('started_at', `${filters.dateTo}T23:59:59`)
+        .order('started_at'),
+    ])
+
+    if (assignmentsRes.error) return { error: assignmentsRes.error.message }
+    if (outingsRes.error) return { error: outingsRes.error.message }
+
+    return { data: { assignments: assignmentsRes.data || [], outings: outingsRes.data || [] } }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // createAssignment — manager assigns a dog to a person
 // ---------------------------------------------------------------------------
 

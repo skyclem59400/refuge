@@ -1,19 +1,22 @@
+import type { ComponentProps } from 'react'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Footprints, Calendar, AlertTriangle, PawPrint, BarChart3, Info } from 'lucide-react'
-import { getOutings, getAnimalOutingPriority, getOutingStats, getOutingLeaderboard, getAssignments, getAssignmentStats } from '@/lib/actions/outings'
+import { Footprints, Calendar, AlertTriangle, PawPrint, BarChart3, Info, CalendarDays } from 'lucide-react'
+import { getOutings, getAnimalOutingPriority, getOutingStats, getOutingLeaderboard, getAssignments, getAssignmentStats, getOutingsCalendar, getOutingPartners } from '@/lib/actions/outings'
 import { getEstablishmentMembers } from '@/lib/actions/establishments'
 import { getEstablishmentContext } from '@/lib/establishment/context'
 import { createAdminClient } from '@/lib/supabase/server'
 import { OutingPriorityList } from '@/components/outings/outing-priority-list'
 import { OutingHistory } from '@/components/outings/outing-history'
 import { OutingStats } from '@/components/outings/outing-stats'
+import { OutingsCalendarView } from '@/components/outings/outings-calendar-view'
 import { MyDailyAssignments } from '@/components/outings/my-daily-assignments'
 import AssignmentPanel from '@/components/outings/assignment-panel'
 import { AssignmentStats } from '@/components/outings/assignment-stats'
 
 const views = [
   { key: 'promenades', label: 'Promenades', Icon: Footprints },
+  { key: 'calendrier', label: 'Calendrier', Icon: CalendarDays },
   { key: 'statistiques', label: 'Statistiques', Icon: BarChart3 },
 ] as const
 
@@ -337,12 +340,41 @@ export default async function SortiesPage({
   const { canManageOutings, canManageOutingAssignments: canManageAssignments, isAdmin } = ctx.permissions
   const canViewStats = isAdmin || canManageAssignments
   const currentUserId = ctx.membership.user_id
-  const view: ViewKey = params.view === 'statistiques' && canViewStats ? 'statistiques' : 'promenades'
+  const view: ViewKey =
+    params.view === 'statistiques' && canViewStats ? 'statistiques' :
+    params.view === 'calendrier' ? 'calendrier' :
+    'promenades'
   const currentPage = Math.max(1, parseInt(params.page || '1', 10) || 1)
 
   const raw = await fetchPageData(view, canManageAssignments, currentPage)
   const data = processPageData(raw, view, currentUserId)
   const totalPages = Math.max(1, Math.ceil(data.totalOutingsCount / OUTINGS_PER_PAGE))
+
+  // Calendrier : fetch en plus de la semaine courante (assignations + sorties).
+  let calendarData: Awaited<ReturnType<typeof getOutingsCalendar>>['data'] | null = null
+  let calendarPartners: { id: string; name: string }[] = []
+  let initialWeekStart = ''
+  if (view === 'calendrier') {
+    const monday = new Date()
+    monday.setDate(monday.getDay() === 0 ? monday.getDate() - 6 : monday.getDate() - monday.getDay() + 1)
+    monday.setHours(0, 0, 0, 0)
+    const start = monday.toISOString().split('T')[0]
+    // Plage large pour permettre la navigation +/- 4 semaines sans refetch.
+    const fromDate = new Date(monday)
+    fromDate.setDate(fromDate.getDate() - 28)
+    const toDate = new Date(monday)
+    toDate.setDate(toDate.getDate() + 28 + 6)
+    const [calRes, partnersRes] = await Promise.all([
+      getOutingsCalendar({
+        dateFrom: fromDate.toISOString().split('T')[0],
+        dateTo: toDate.toISOString().split('T')[0],
+      }),
+      getOutingPartners(),
+    ])
+    calendarData = calRes.data ?? { assignments: [], outings: [] }
+    calendarPartners = (partnersRes.data || []).map((p: { id: string; name: string }) => ({ id: p.id, name: p.name }))
+    initialWeekStart = start
+  }
 
   const uniqueUserIds = collectUserIds(data.outings, raw.leaderboardResult.data, data.allAssignments, data.members)
   const userNames = await resolveUserNames(uniqueUserIds)
@@ -377,7 +409,7 @@ export default async function SortiesPage({
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 mb-6 border-b border-border">
+      <div className="flex items-center gap-1 mb-6 border-b border-border overflow-x-auto">
         {views.filter((v) => v.key !== 'statistiques' || canViewStats).map((v) => (
           <Link
             key={v.key}
@@ -413,6 +445,24 @@ export default async function SortiesPage({
           sortedPriorityAnimals={data.sortedPriorityAnimals}
           currentPage={currentPage}
           totalPages={totalPages}
+        />
+      )}
+
+      {view === 'calendrier' && calendarData && (
+        <OutingsCalendarView
+          // Supabase type-genère `animals: T[]` pour les jointures même 1:1.
+          // L'API retourne en réalité un seul animal — on normalise ici.
+          initialAssignments={calendarData.assignments.map((a) => ({
+            ...a,
+            animals: Array.isArray(a.animals) ? a.animals[0] : a.animals,
+          })) as ComponentProps<typeof OutingsCalendarView>['initialAssignments']}
+          initialOutings={calendarData.outings.map((o) => ({
+            ...o,
+            animals: Array.isArray(o.animals) ? o.animals[0] : o.animals,
+          })) as ComponentProps<typeof OutingsCalendarView>['initialOutings']}
+          userNames={userNames}
+          partners={calendarPartners}
+          initialWeekStart={initialWeekStart}
         />
       )}
 
