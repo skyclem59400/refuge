@@ -11,7 +11,8 @@ import {
   FileText,
   Send,
   CheckCircle2,
-  XCircle,
+  PenLine,
+  AlertCircle,
 } from 'lucide-react'
 import {
   type ConventionContract,
@@ -21,6 +22,7 @@ import {
   formatCents,
 } from '@/lib/actions/conventions-types'
 import { markConventionAsSent, markConventionAsSigned, clearNewlyAddedFlag } from '@/lib/actions/conventions'
+import { sendConventionForSignature, sendConventionsForSignatureBulk, type BulkSendResult } from '@/lib/actions/convention-signature'
 
 type ScopeFilter = 'all' | 'epci' | 'CAC' | 'CA2C' | 'Sud-Artois' | 'indep'
 
@@ -39,6 +41,10 @@ export function ConventionsListClient({ initialList }: { initialList: Convention
   const [status, setStatus] = useState<ConventionStatus | 'all'>('all')
   const [newlyOnly, setNewlyOnly] = useState(false)
   const [q, setQ] = useState('')
+
+  // Sélection multiple pour envoi groupé électronique
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkReport, setBulkReport] = useState<BulkSendResult[] | null>(null)
 
   const filtered = useMemo(() => {
     let result = initialList
@@ -96,6 +102,73 @@ export function ConventionsListClient({ initialList }: { initialList: Convention
       router.refresh()
     })
   }
+
+  // ─── Sélection multiple ─────────────────────────────────────────────
+  // Une convention est "éligible à l'envoi signature" si :
+  //   - elle a un email signataire
+  //   - elle a un PDF source
+  //   - elle n'est ni signed ni cancelled
+  function isEligibleForSignature(c: ConventionContract): boolean {
+    return Boolean(c.signatory_email) && Boolean(c.pdf_url) && c.status !== 'signed' && c.status !== 'cancelled'
+  }
+
+  const eligibleFiltered = useMemo(() => filtered.filter(isEligibleForSignature), [filtered])
+
+  function toggleOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllVisible() {
+    const eligibleIds = eligibleFiltered.map((c) => c.id)
+    const allSelected = eligibleIds.every((id) => selectedIds.has(id))
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (allSelected) {
+        eligibleIds.forEach((id) => next.delete(id))
+      } else {
+        eligibleIds.forEach((id) => next.add(id))
+      }
+      return next
+    })
+  }
+
+  function handleSendOne(id: string) {
+    if (!confirm('Envoyer cette convention pour signature électronique à la collectivité ?')) return
+    setActingId(id)
+    startTransition(async () => {
+      const res = await sendConventionForSignature(id)
+      setActingId(null)
+      if (res.error) alert(`Erreur : ${res.error}`)
+      else router.refresh()
+    })
+  }
+
+  function handleSendBulk() {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    const msg = ids.length === 1
+      ? 'Envoyer 1 convention pour signature électronique ?'
+      : `Envoyer ${ids.length} conventions pour signature électronique ? L'opération peut prendre environ ${Math.ceil(ids.length * 0.7)} secondes.`
+    if (!confirm(msg)) return
+    startTransition(async () => {
+      const res = await sendConventionsForSignatureBulk(ids)
+      if (res.error) {
+        alert(`Erreur globale : ${res.error}`)
+        return
+      }
+      if (res.data) {
+        setBulkReport(res.data.results)
+        setSelectedIds(new Set())
+        router.refresh()
+      }
+    })
+  }
+  // ─────────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
@@ -167,6 +240,61 @@ export function ConventionsListClient({ initialList }: { initialList: Convention
         </div>
       </div>
 
+      {/* Barre d'action sticky quand des conventions sont sélectionnées */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border-2 border-primary/40 bg-primary/5 backdrop-blur">
+          <div className="text-sm">
+            <strong className="text-primary">{selectedIds.size}</strong> convention{selectedIds.size > 1 ? 's' : ''} sélectionnée{selectedIds.size > 1 ? 's' : ''} pour envoi signature électronique
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-surface-hover transition-colors"
+            >
+              Annuler la sélection
+            </button>
+            <button
+              type="button"
+              onClick={handleSendBulk}
+              disabled={isPending}
+              className="inline-flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <PenLine className="w-4 h-4" />
+              {isPending ? 'Envoi en cours…' : `Envoyer pour signature (${selectedIds.size})`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Rapport d'envoi en masse (apparaît après bulk) */}
+      {bulkReport && (
+        <div className="rounded-xl border-2 border-border bg-surface p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-semibold">
+              Rapport d&apos;envoi : {bulkReport.filter((r) => r.ok).length} OK / {bulkReport.filter((r) => !r.ok).length} échec{bulkReport.filter((r) => !r.ok).length > 1 ? 's' : ''}
+            </div>
+            <button
+              type="button"
+              onClick={() => setBulkReport(null)}
+              className="text-xs text-muted hover:text-text"
+            >
+              Fermer
+            </button>
+          </div>
+          <ul className="text-xs space-y-1 max-h-64 overflow-y-auto">
+            {bulkReport.map((r) => (
+              <li key={r.conventionId} className={`flex items-start gap-2 px-2 py-1 rounded ${r.ok ? 'text-success' : 'text-warning'}`}>
+                {r.ok ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
+                <span className="font-mono text-muted">{r.contractNumber}</span>
+                <span>{r.scopeName}</span>
+                {!r.ok && <span className="text-muted italic">— {r.error}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Newly added highlight */}
       {!newlyOnly && filtered.some((c) => c.newly_added) && (
         <div className="rounded-xl border-2 border-warning/30 bg-warning/5 p-4">
@@ -186,6 +314,17 @@ export function ConventionsListClient({ initialList }: { initialList: Convention
           <table className="w-full text-sm">
             <thead className="bg-surface-dark text-muted text-xs uppercase tracking-wide">
               <tr>
+                <th className="text-left px-3 py-3 font-medium w-10">
+                  {eligibleFiltered.length > 0 && (
+                    <input
+                      type="checkbox"
+                      aria-label="Sélectionner toutes les conventions éligibles visibles"
+                      checked={eligibleFiltered.every((c) => selectedIds.has(c.id))}
+                      onChange={toggleAllVisible}
+                      className="rounded cursor-pointer"
+                    />
+                  )}
+                </th>
                 <th className="text-left px-4 py-3 font-medium">N°</th>
                 <th className="text-left px-4 py-3 font-medium">Périmètre</th>
                 <th className="text-left px-4 py-3 font-medium">Signataire</th>
@@ -199,7 +338,7 @@ export function ConventionsListClient({ initialList }: { initialList: Convention
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-muted text-sm">
+                  <td colSpan={9} className="px-4 py-12 text-center text-muted text-sm">
                     Aucune convention ne correspond à ces filtres.
                   </td>
                 </tr>
@@ -207,13 +346,39 @@ export function ConventionsListClient({ initialList }: { initialList: Convention
               {filtered.map((c) => {
                 const scopeBadge = c.epci_code_siren ? EPCI_LABELS[c.epci_code_siren] || 'EPCI' : 'Indep.'
                 const isActing = actingId === c.id
+                const eligible = isEligibleForSignature(c)
+                const checked = selectedIds.has(c.id)
                 return (
                   <tr
                     key={c.id}
                     className={`border-t border-border hover:bg-surface-hover transition-colors ${
-                      c.newly_added ? 'bg-warning/5' : ''
+                      checked ? 'bg-primary/5' : c.newly_added ? 'bg-warning/5' : ''
                     }`}
                   >
+                    <td className="px-3 py-3 w-10">
+                      {eligible ? (
+                        <input
+                          type="checkbox"
+                          aria-label={`Sélectionner ${c.scope_name}`}
+                          checked={checked}
+                          onChange={() => toggleOne(c.id)}
+                          className="rounded cursor-pointer"
+                        />
+                      ) : (
+                        <span
+                          className="text-muted/40 text-xs"
+                          title={
+                            !c.signatory_email ? 'Email signataire manquant'
+                            : !c.pdf_url ? 'PDF source manquant'
+                            : c.status === 'cancelled' ? 'Convention annulée'
+                            : c.status === 'signed' ? 'Déjà signée'
+                            : 'Non éligible'
+                          }
+                        >
+                          —
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-mono text-xs text-muted">{c.contract_number}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -268,13 +433,24 @@ export function ConventionsListClient({ initialList }: { initialList: Convention
                             <FileText className="w-3.5 h-3.5" />
                           </a>
                         )}
-                        {c.status === 'ready' && (
+                        {eligible && (
+                          <button
+                            type="button"
+                            onClick={() => handleSendOne(c.id)}
+                            disabled={isActing}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-primary/10 hover:bg-primary/20 text-primary transition-colors disabled:opacity-50"
+                            title="Envoyer pour signature électronique"
+                          >
+                            <PenLine className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {c.status === 'ready' && !c.documenso_document_id && (
                           <button
                             type="button"
                             onClick={() => handleMarkSent(c.id)}
                             disabled={isActing}
                             className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 transition-colors disabled:opacity-50"
-                            title="Marquer comme envoyé"
+                            title="Marquer comme envoyé (papier)"
                           >
                             <Send className="w-3.5 h-3.5" />
                           </button>

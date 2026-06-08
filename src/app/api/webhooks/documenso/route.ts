@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
   //   "adoption_<uuid>"              → adoption_contracts
   //   "abandonment_<uuid>"           → abandonment_contracts
   //   "engagement_<uuid>"            → engagement_certificates (loi 30/11/2021)
+  //   "convention_<uuid>"            → convention_contracts (fourrière communes)
   //   "<uuid>" (no prefix)           → foster_contracts (legacy)
   const externalId = payload.data?.externalId
   const isAdoptionCancellation =
@@ -116,6 +117,75 @@ export async function POST(request: NextRequest) {
     !isAdoptionCancellation
   const isAbandonment = typeof externalId === 'string' && externalId.startsWith('abandonment_')
   const isEngagement = typeof externalId === 'string' && externalId.startsWith('engagement_')
+  const isConvention = typeof externalId === 'string' && externalId.startsWith('convention_')
+
+  // ============================================
+  // Cas spécial : convention_contracts (fourrière communes)
+  // — pas d'animal, pas de movement, pas de bucket dédié (réutilise "convention-contracts")
+  // — met à jour signature_status + status métier
+  // ============================================
+  if (isConvention) {
+    const idLookup = (externalId ?? '').replace(/^convention_/, '')
+    const { data: convention } = await admin
+      .from('convention_contracts')
+      .select('id, contract_number, scope_name, signature_status, documenso_document_id')
+      .or(`documenso_document_id.eq.${documensoDocId},id.eq.${idLookup}`)
+      .maybeSingle()
+
+    if (!convention) {
+      return NextResponse.json({ ok: true, ignored: 'convention not found' })
+    }
+
+    const updateData: Record<string, unknown> = { signature_status: newStatus }
+
+    if (payload.data?.recipients?.find((r) => r.signedAt)?.signedAt) {
+      updateData.signed_at_via_documenso = payload.data.recipients.find((r) => r.signedAt)!.signedAt
+    } else if (payload.data?.Recipient?.find((r) => r.signedAt)?.signedAt) {
+      updateData.signed_at_via_documenso = payload.data.Recipient.find((r) => r.signedAt)!.signedAt
+    }
+
+    const finalEvent = payload.event === 'document.completed' || payload.event === 'document.signed'
+
+    // Sur signature finale : passer le status métier en "signed" + télécharger PDF signé
+    if (newStatus === 'signed' && finalEvent && convention.signature_status !== 'signed') {
+      updateData.status = 'signed'
+      if (updateData.signed_at_via_documenso) {
+        updateData.signed_date = String(updateData.signed_at_via_documenso).slice(0, 10)
+      }
+
+      try {
+        const buf = await downloadSignedPdf(documensoDocId)
+        // Préfixe "signed_" pour ne pas écraser le PDF source (même bucket)
+        const fileName = `signed_${convention.id}_${Date.now()}.pdf`
+        const { data: upload, error: uploadErr } = await admin.storage
+          .from('convention-contracts')
+          .upload(fileName, Buffer.from(buf), {
+            contentType: 'application/pdf',
+            upsert: false,
+          })
+        if (!uploadErr && upload) {
+          const { data: pub } = admin.storage.from('convention-contracts').getPublicUrl(upload.path)
+          updateData.signed_pdf_url = pub.publicUrl
+        }
+      } catch (e) {
+        console.warn('Webhook (convention): could not download signed PDF:', (e as Error).message)
+      }
+    } else if (newStatus === 'rejected') {
+      updateData.status = 'cancelled'
+    }
+
+    const { error } = await admin
+      .from('convention_contracts')
+      .update(updateData)
+      .eq('id', convention.id)
+
+    if (error) {
+      console.error('Webhook convention update error:', error.message)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ ok: true, contractId: convention.id, type: 'convention', newStatus })
+  }
 
   type SupportedTable = 'adoption_contracts' | 'foster_contracts' | 'abandonment_contracts' | 'engagement_certificates'
   type SupportedBucket = 'adoption-contracts' | 'foster-contracts' | 'abandonment-contracts' | 'engagement-certificates'
