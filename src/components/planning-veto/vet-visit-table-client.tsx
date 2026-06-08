@@ -59,9 +59,21 @@ export function VetVisitTableClient({ visit, availableAnimals }: Readonly<Props>
   const [pendingLineId, setPendingLineId] = useState<string | null>(null)
   const [showAddPanel, setShowAddPanel] = useState(false)
   const [search, setSearch] = useState('')
+  /** Filtre par espèce (demande Caroline : séparer chats et chiens dans le tableau). */
+  const [speciesFilter, setSpeciesFilter] = useState<'all' | 'dog' | 'cat'>('all')
 
   // État local des lignes (pour optimistic updates)
   const [lines, setLines] = useState<VetVisitLineWithAnimal[]>(visit.lines)
+
+  // Lignes filtrées selon l'espèce sélectionnée.
+  const visibleLines = speciesFilter === 'all'
+    ? lines
+    : lines.filter((l) => l.animal.species === speciesFilter)
+  const countByFilter = {
+    all: lines.length,
+    dog: lines.filter((l) => l.animal.species === 'dog').length,
+    cat: lines.filter((l) => l.animal.species === 'cat').length,
+  }
 
   const filteredAnimals = search.length >= 2
     ? availableAnimals
@@ -263,6 +275,32 @@ export function VetVisitTableClient({ visit, availableAnimals }: Readonly<Props>
         </div>
       )}
 
+      {/* Filtre par espèce */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs uppercase tracking-wider text-muted font-semibold">Espèce :</span>
+        <div className="flex rounded-lg border border-border overflow-hidden">
+          {([
+            { key: 'all' as const, label: 'Tous', emoji: '' },
+            { key: 'dog' as const, label: 'Chiens', emoji: '🐕' },
+            { key: 'cat' as const, label: 'Chats', emoji: '🐈' },
+          ]).map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => setSpeciesFilter(opt.key)}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                speciesFilter === opt.key
+                  ? 'bg-primary text-white'
+                  : 'bg-surface text-muted hover:bg-surface-hover'
+              }`}
+            >
+              {opt.emoji && <span className="mr-1">{opt.emoji}</span>}
+              {opt.label} <span className="opacity-70">({countByFilter[opt.key]})</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Tableau */}
       <div className="bg-surface rounded-xl border border-border overflow-x-auto">
         <table className="w-full text-xs">
@@ -285,13 +323,15 @@ export function VetVisitTableClient({ visit, availableAnimals }: Readonly<Props>
             </tr>
           </thead>
           <tbody>
-            {lines.length === 0 ? (
+            {visibleLines.length === 0 ? (
               <tr>
                 <td colSpan={ACT_COLUMNS.length + 9} className="text-center py-8 text-muted">
-                  Aucune ligne. Ajoute des animaux au planning.
+                  {lines.length === 0
+                    ? 'Aucune ligne. Ajoute des animaux au planning.'
+                    : `Aucun ${speciesFilter === 'dog' ? 'chien' : 'chat'} dans ce planning.`}
                 </td>
               </tr>
-            ) : lines.map((line) => {
+            ) : visibleLines.map((line) => {
               const isValidated = !!line.validated_at
               const isPending = pendingLineId === line.id
               return (

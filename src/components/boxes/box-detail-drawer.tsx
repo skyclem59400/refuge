@@ -316,7 +316,11 @@ function AnimalRow({
           onClick={() => setShowOutingModal(true)}
           type="button"
           title="Assigner une sortie / défouloir à un bénévole"
-          className="shrink-0 p-1.5 rounded-md text-muted hover:bg-primary/10 hover:text-primary opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+          aria-label="Assigner une sortie"
+          /* Toujours visible : Franck travaille sur tactile (iPad), où le
+             hover ne se déclenche jamais — l'ancienne classe opacity-0
+             group-hover:opacity-100 rendait le bouton invisible en mobile. */
+          className="shrink-0 p-1.5 rounded-md text-muted bg-primary/5 hover:bg-primary/15 hover:text-primary transition-colors"
         >
           <Footprints size={13} />
         </button>
@@ -327,7 +331,8 @@ function AnimalRow({
           onClick={onOpenMove}
           type="button"
           title="Déplacer vers un autre box"
-          className="shrink-0 p-1.5 rounded-md text-muted hover:bg-primary/10 hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+          aria-label="Déplacer vers un autre box"
+          className="shrink-0 p-1.5 rounded-md text-muted hover:bg-primary/10 hover:text-primary transition-colors"
         >
           <Move size={13} />
         </button>
