@@ -87,3 +87,35 @@ export async function requirePermission(permission: Permission): Promise<AuthCon
   ctx.groups = (groups as PermissionGroup[]) || []
   return ctx
 }
+
+/**
+ * Exige que l'utilisateur soit membre du groupe système "Administrateur".
+ * Plus strict que `requirePermission('manage_establishment')` qui peut être
+ * délégué aux Managers via les groupes personnalisés.
+ */
+export async function requireAdmin(): Promise<AuthContext> {
+  const ctx = await resolveAuth()
+
+  const supabase = await createClient()
+  const { data: memberGroups } = await supabase
+    .from('member_groups')
+    .select('group_id')
+    .eq('member_id', ctx.membership.id)
+
+  const groupIds = (memberGroups || []).map((mg: { group_id: string }) => mg.group_id)
+  if (groupIds.length === 0) throw new Error('Accès réservé aux administrateurs')
+
+  const { data: groups } = await supabase
+    .from('permission_groups')
+    .select('*')
+    .in('id', groupIds)
+
+  const isAdmin = (groups as PermissionGroup[] || []).some(
+    (g) => g.is_system === true && g.name === 'Administrateur',
+  )
+
+  if (!isAdmin) throw new Error('Accès réservé aux administrateurs')
+
+  ctx.groups = (groups as PermissionGroup[]) || []
+  return ctx
+}

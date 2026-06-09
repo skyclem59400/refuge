@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 export default async function ElusPage() {
   const ctx = await getEstablishmentContext()
   if (!ctx) redirect('/setup')
-  if (!ctx.permissions.canManageEstablishment) {
+  if (!ctx.permissions.isAdmin) {
     return (
       <div className="p-8">
         <h1 className="text-2xl font-display">Permissions insuffisantes</h1>

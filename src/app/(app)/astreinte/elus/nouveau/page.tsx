@@ -9,8 +9,8 @@ export const dynamic = 'force-dynamic'
 export default async function NouvelEluPage() {
   const ctx = await getEstablishmentContext()
   if (!ctx) redirect('/setup')
-  if (!ctx.permissions.canManageEstablishment) {
-    return <div className="p-8"><h1 className="text-2xl font-display">Permissions insuffisantes</h1></div>
+  if (!ctx.permissions.isAdmin) {
+    return <div className="p-8"><h1 className="text-2xl font-display">Permissions insuffisantes — accès admin uniquement.</h1></div>
   }
 
   return (

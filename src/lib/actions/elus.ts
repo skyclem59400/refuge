@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/establishment/permissions'
+import { requireAdmin } from '@/lib/establishment/permissions'
 import { logActivity } from '@/lib/actions/activity-log'
 
 export type ToneVariant = 'tu-prenom' | 'vous-prenom' | 'vous-nom' | 'institutionnel'
@@ -31,7 +31,7 @@ export interface Elu {
 
 export async function listElus() {
   try {
-    const { establishmentId } = await requirePermission('manage_establishment')
+    const { establishmentId } = await requireAdmin()
     const admin = createAdminClient()
     const { data, error } = await admin
       .from('elus')
@@ -47,7 +47,7 @@ export async function listElus() {
 
 export async function getEluById(id: string) {
   try {
-    const { establishmentId } = await requirePermission('manage_establishment')
+    const { establishmentId } = await requireAdmin()
     const admin = createAdminClient()
     const { data, error } = await admin
       .from('elus')
@@ -81,7 +81,7 @@ export interface EluInput {
 
 export async function upsertElu(input: EluInput) {
   try {
-    const { establishmentId } = await requirePermission('manage_establishment')
+    const { establishmentId } = await requireAdmin()
     const supabase = await createClient()
     const payload = { ...input, establishment_id: establishmentId }
     const { data, error } = input.id
@@ -104,7 +104,7 @@ export async function upsertElu(input: EluInput) {
 
 export async function deleteElu(id: string) {
   try {
-    const { establishmentId } = await requirePermission('manage_establishment')
+    const { establishmentId } = await requireAdmin()
     const supabase = await createClient()
     const { data: existing } = await createAdminClient()
       .from('elus').select('first_name, last_name').eq('id', id).eq('establishment_id', establishmentId).single()
@@ -148,7 +148,7 @@ export function buildGreeting(elu: Pick<Elu, 'tone_variant' | 'first_name' | 'la
  */
 export async function markEluContacted(id: string) {
   try {
-    const { establishmentId } = await requirePermission('manage_establishment')
+    const { establishmentId } = await requireAdmin()
     const supabase = await createClient()
     const { error } = await supabase
       .from('elus')
