@@ -36,6 +36,7 @@ import {
   ClipboardCheck,
   Home as HomeIcon,
   UserPlus,
+  Landmark,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -123,6 +124,7 @@ const shelterSections: NavSection[] = [
       { href: '/astreinte/tickets', label: 'Tickets', Icon: Inbox, permission: 'canManageAstreinte' },
       { href: '/astreinte/communes', label: 'Communes', Icon: MapPin, permission: 'canManageAstreinte' },
       { href: '/admin/conventions', label: 'Conventions fourrière', Icon: FileSignature, permission: 'canManageEstablishment' },
+      { href: '/astreinte/elus', label: 'Élus', Icon: Landmark, permission: 'canManageEstablishment' },
       { href: '/astreinte/acces', label: 'Accès portail', Icon: KeyRound, permission: 'canManageAstreinte' },
     ],
   },
